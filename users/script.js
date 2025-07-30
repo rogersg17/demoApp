@@ -208,9 +208,9 @@ function renderUsers() {
   
   if (filteredUsers.length === 0) {
     tbody.innerHTML = `
-      <tr>
-        <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-          <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
+      <tr role="row">
+        <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);" role="cell">
+          <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem; display: block;" aria-hidden="true"></i>
           No users found matching your criteria
         </td>
       </tr>
@@ -219,34 +219,55 @@ function renderUsers() {
   }
   
   tbody.innerHTML = filteredUsers.map(user => `
-    <tr data-user-id="${user.id}">
-      <td>
-        <input type="checkbox" class="checkbox" data-user-id="${user.id}">
+    <tr data-user-id="${user.id}" role="row">
+      <td role="cell">
+        <input 
+          type="checkbox" 
+          class="checkbox" 
+          data-user-id="${user.id}"
+          aria-label="Select ${user.firstName} ${user.lastName}"
+          title="Select this user">
       </td>
-      <td>
+      <td role="cell">
         <div class="user-info">
-          <div class="user-avatar">${user.avatar}</div>
+          <div class="user-avatar" role="img" aria-label="Avatar for ${user.firstName} ${user.lastName}">${user.avatar}</div>
           <div class="user-details">
             <h4>${user.firstName} ${user.lastName}</h4>
             <p>${user.department}</p>
           </div>
         </div>
       </td>
-      <td>${user.email}</td>
-      <td>
-        <span class="role-badge">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
+      <td role="cell">
+        <span class="user-email">${user.email}</span>
       </td>
-      <td>
-        <span class="status-badge ${user.status}">${user.status.charAt(0).toUpperCase() + user.status.slice(1)}</span>
+      <td role="cell">
+        <span class="role-badge" role="img" aria-label="Role: ${user.role}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
       </td>
-      <td>${user.lastActive}</td>
-      <td>
-        <div class="actions">
-          <button class="action-btn edit" onclick="editUser(${user.id})" title="Edit User">
-            <i class="fas fa-edit"></i>
+      <td role="cell">
+        <span class="status-badge ${user.status}" role="img" aria-label="Status: ${user.status}">${user.status.charAt(0).toUpperCase() + user.status.slice(1)}</span>
+      </td>
+      <td role="cell">
+        <span class="last-active" aria-label="Last active: ${user.lastActive}">${user.lastActive}</span>
+      </td>
+      <td role="cell">
+        <div class="actions" role="group" aria-label="User actions for ${user.firstName} ${user.lastName}">
+          <button 
+            class="action-btn edit" 
+            onclick="editUser(${user.id})" 
+            title="Edit ${user.firstName} ${user.lastName}"
+            aria-label="Edit user ${user.firstName} ${user.lastName}"
+            role="button"
+            type="button">
+            <i class="fas fa-edit" aria-hidden="true"></i>
           </button>
-          <button class="action-btn delete" onclick="deleteUser(${user.id})" title="Delete User">
-            <i class="fas fa-trash"></i>
+          <button 
+            class="action-btn delete" 
+            onclick="deleteUser(${user.id})" 
+            title="Delete ${user.firstName} ${user.lastName}"
+            aria-label="Delete user ${user.firstName} ${user.lastName}"
+            role="button"
+            type="button">
+            <i class="fas fa-trash" aria-hidden="true"></i>
           </button>
         </div>
       </td>

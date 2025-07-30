@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Demo App</title>
+  <meta name="description" content="Demo App dashboard with user management, analytics, and application overview.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,53 +13,74 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 </head>
 <body>
-  <div class="header">
-    <h1>Demo App Dashboard</h1>
-    <div class="header-right">
-      <div class="avatar">
-        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" alt="User Avatar" class="avatar-img">
-        <div class="badge">3</div>
+  <header class="header" role="banner">
+    <h1 id="app-title">Demo App Dashboard</h1>
+    <div class="header-right" role="region" aria-label="User information and controls">
+      <div class="avatar" role="img" aria-labelledby="user-info">
+        <img 
+          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" 
+          alt="User profile picture" 
+          class="avatar-img">
+        <div class="badge" aria-label="3 notifications">3</div>
       </div>
-      <span id="welcomeMessage">Welcome, User!</span>
-      <button id="logoutBtn" class="logout-btn">
-        <i class="fas fa-sign-out-alt"></i>
+      <span id="welcomeMessage" id="user-info" role="status" aria-live="polite">Welcome, User!</span>
+      <button 
+        id="logoutBtn" 
+        class="logout-btn"
+        aria-label="Sign out of your account"
+        type="button">
+        <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
         Sign Out
       </button>
     </div>
-  </div>
+  </header>
 
-  <div class="sidebar">
-    <div class="sidebar-icon" title="Dashboard" data-page="dashboard">
-      <i class="fas fa-home"></i>
-    </div>
-    <div class="sidebar-icon" title="User Management" data-page="users">
-      <i class="fas fa-user-shield"></i>
-    </div>
-    <div class="sidebar-icon" title="Analytics & Reports" data-page="analytics">
-      <i class="fas fa-chart-bar"></i>
-    </div>
-  </div>
+  <nav class="sidebar" role="navigation" aria-label="Main navigation">
+    <button 
+      class="sidebar-icon" 
+      data-page="dashboard"
+      aria-label="Dashboard - Current page"
+      aria-current="page"
+      type="button">
+      <i class="fas fa-home" aria-hidden="true"></i>
+    </button>
+    <button 
+      class="sidebar-icon" 
+      data-page="users"
+      aria-label="User Management"
+      type="button">
+      <i class="fas fa-user-shield" aria-hidden="true"></i>
+    </button>
+    <button 
+      class="sidebar-icon" 
+      data-page="analytics"
+      aria-label="Analytics & Reports"
+      type="button">
+      <i class="fas fa-chart-bar" aria-hidden="true"></i>
+    </button>
+  </nav>
 
-  <div class="main-content">
-    <div class="welcome-section">
-      <h1>Welcome to Your Dashboard</h1>
+  <main class="main-content" role="main" aria-labelledby="dashboard-heading">
+    <section class="welcome-section" aria-labelledby="welcome-heading">
+      <h2 id="welcome-heading" id="dashboard-heading">Welcome to Your Dashboard</h2>
       <p>Monitor your application metrics, manage users, and access all your tools from this central hub.</p>
-    </div>
+    </section>
     
-    <div class="dashboard-cards">
-      <div class="card">
-        <i class="fas fa-user-shield"></i>
-        <h3>User Management</h3>
-        <p>Manage user accounts, permissions, and access controls across your application with comprehensive tools for user administration.</p>
-      </div>
+    <section class="dashboard-cards" role="region" aria-labelledby="features-heading">
+      <h2 id="features-heading" class="sr-only">Available Features</h2>
+      <article class="card" tabindex="0" role="button" aria-labelledby="user-mgmt-title" aria-describedby="user-mgmt-desc">
+        <i class="fas fa-user-shield" aria-hidden="true"></i>
+        <h3 id="user-mgmt-title">User Management</h3>
+        <p id="user-mgmt-desc">Manage user accounts, permissions, and access controls across your application with comprehensive tools for user administration.</p>
+      </article>
       
-      <div class="card">
-        <i class="fas fa-chart-bar"></i>
-        <h3>Analytics & Reports</h3>
-        <p>View detailed analytics, generate comprehensive reports, and track key performance metrics to drive data-driven decisions.</p>
-      </div>
-    </div>
-  </div>
+      <article class="card" tabindex="0" role="button" aria-labelledby="analytics-title" aria-describedby="analytics-desc">
+        <i class="fas fa-chart-bar" aria-hidden="true"></i>
+        <h3 id="analytics-title">Analytics & Reports</h3>
+        <p id="analytics-desc">View detailed analytics, generate comprehensive reports, and track key performance metrics to drive data-driven decisions.</p>
+      </article>
+    </section>
+  </main>
 
   <script>
     // Check if user is logged in

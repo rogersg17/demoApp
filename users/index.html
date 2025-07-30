@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>User Management - Demo App</title>
+  <meta name="description" content="Manage user accounts, permissions, and access controls in the Demo App.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,88 +13,121 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👥</text></svg>">
 </head>
 <body>
-  <div class="header">
+  <header class="header" role="banner">
     <div class="header-left">
-      <button id="backBtn" class="back-btn">
-        <i class="fas fa-arrow-left"></i>
+      <button 
+        id="backBtn" 
+        class="back-btn"
+        aria-label="Go back to dashboard"
+        type="button">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span>Dashboard</span>
       </button>
-      <h1>User Management</h1>
+      <h1 id="page-title">User Management</h1>
     </div>
-    <div class="header-right">
-      <div class="search-container">
-        <input type="text" id="searchUsers" placeholder="Search users..." class="search-input">
-        <i class="fas fa-search search-icon"></i>
+    <div class="header-right" role="region" aria-label="Search and user controls">
+      <div class="search-container" role="search">
+        <label for="searchUsers" class="sr-only">Search users</label>
+        <input 
+          type="text" 
+          id="searchUsers" 
+          name="search"
+          placeholder="Search users..." 
+          class="search-input"
+          aria-describedby="search-help"
+          autocomplete="off">
+        <div id="search-help" class="sr-only">Enter a name, email, or role to filter users</div>
+        <i class="fas fa-search search-icon" aria-hidden="true"></i>
       </div>
-      <button id="addUserBtn" class="add-user-btn">
-        <i class="fas fa-plus"></i>
+      <button 
+        id="addUserBtn" 
+        class="add-user-btn"
+        aria-label="Add new user"
+        type="button">
+        <i class="fas fa-plus" aria-hidden="true"></i>
         Add User
       </button>
-      <div class="avatar">
-        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" alt="User Avatar" class="avatar-img">
-        <div class="badge">3</div>
+      <div class="avatar" role="img" aria-labelledby="current-user-info">
+        <img 
+          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" 
+          alt="Current user profile picture" 
+          class="avatar-img">
+        <div class="badge" aria-label="3 notifications">3</div>
       </div>
-      <span id="welcomeMessage">Welcome, User!</span>
-      <button id="logoutBtn" class="logout-btn">
-        <i class="fas fa-sign-out-alt"></i>
+      <span id="welcomeMessage" id="current-user-info" role="status" aria-live="polite">Welcome, User!</span>
+      <button 
+        id="logoutBtn" 
+        class="logout-btn"
+        aria-label="Sign out of your account"
+        type="button">
+        <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
         Sign Out
       </button>
     </div>
-  </div>
+  </header>
 
-  <div class="main-content">
-    <div class="page-header">
-      <div class="stats-cards">
-        <div class="stat-card">
-          <div class="stat-icon">
+  <main class="main-content" role="main" aria-labelledby="page-title">
+    <section class="page-header" aria-labelledby="stats-heading">
+      <h2 id="stats-heading" class="sr-only">User Statistics Overview</h2>
+      <div class="stats-cards" role="region" aria-label="User statistics">
+        <div class="stat-card" role="img" aria-labelledby="total-users-label" aria-describedby="total-users-value">
+          <div class="stat-icon" aria-hidden="true">
             <i class="fas fa-users"></i>
           </div>
           <div class="stat-content">
-            <div class="stat-number" id="totalUsers">24</div>
-            <div class="stat-label">Total Users</div>
+            <div class="stat-number" id="totalUsers" id="total-users-value" aria-label="24 total users">24</div>
+            <div class="stat-label" id="total-users-label">Total Users</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon active">
+        <div class="stat-card" role="img" aria-labelledby="active-users-label" aria-describedby="active-users-value">
+          <div class="stat-icon active" aria-hidden="true">
             <i class="fas fa-user-check"></i>
           </div>
           <div class="stat-content">
-            <div class="stat-number" id="activeUsers">18</div>
-            <div class="stat-label">Active Users</div>
+            <div class="stat-number" id="activeUsers" id="active-users-value" aria-label="18 active users">18</div>
+            <div class="stat-label" id="active-users-label">Active Users</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon pending">
+        <div class="stat-card" role="img" aria-labelledby="pending-users-label" aria-describedby="pending-users-value">
+          <div class="stat-icon pending" aria-hidden="true">
             <i class="fas fa-user-clock"></i>
           </div>
           <div class="stat-content">
-            <div class="stat-number" id="pendingUsers">3</div>
-            <div class="stat-label">Pending</div>
+            <div class="stat-number" id="pendingUsers" id="pending-users-value" aria-label="3 pending users">3</div>
+            <div class="stat-label" id="pending-users-label">Pending</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon inactive">
+        <div class="stat-card" role="img" aria-labelledby="inactive-users-label" aria-describedby="inactive-users-value">
+          <div class="stat-icon inactive" aria-hidden="true">
             <i class="fas fa-user-times"></i>
           </div>
           <div class="stat-content">
-            <div class="stat-number" id="inactiveUsers">3</div>
-            <div class="stat-label">Inactive</div>
+            <div class="stat-number" id="inactiveUsers" id="inactive-users-value" aria-label="3 inactive users">3</div>
+            <div class="stat-label" id="inactive-users-label">Inactive</div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="users-section">
+    <section class="users-section" aria-labelledby="users-section-title">
       <div class="section-header">
-        <h2>All Users</h2>
-        <div class="filters">
-          <select id="statusFilter" class="filter-select">
+        <h2 id="users-section-title">All Users</h2>
+        <div class="filters" role="group" aria-label="Filter users">
+          <label for="statusFilter" class="sr-only">Filter by status</label>
+          <select 
+            id="statusFilter" 
+            class="filter-select"
+            aria-label="Filter users by status">
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="inactive">Inactive</option>
           </select>
-          <select id="roleFilter" class="filter-select">
+          <label for="roleFilter" class="sr-only">Filter by role</label>
+          <select 
+            id="roleFilter" 
+            class="filter-select"
+            aria-label="Filter users by role">
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>
             <option value="user">User</option>
@@ -102,106 +136,213 @@
         </div>
       </div>
 
-      <div class="users-table-container">
-        <table class="users-table" id="usersTable">
+      <div class="users-table-container" role="region" aria-labelledby="users-table-caption" aria-live="polite">
+        <table class="users-table" id="usersTable" role="table">
+          <caption id="users-table-caption" class="sr-only">
+            User management table showing user details, status, and available actions
+          </caption>
           <thead>
-            <tr>
-              <th>
-                <input type="checkbox" id="selectAll" class="checkbox">
+            <tr role="row">
+              <th scope="col" role="columnheader">
+                <input 
+                  type="checkbox" 
+                  id="selectAll" 
+                  class="checkbox"
+                  aria-label="Select all users"
+                  title="Select or deselect all users">
               </th>
-              <th>User</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Last Active</th>
-              <th>Actions</th>
+              <th scope="col" role="columnheader">User</th>
+              <th scope="col" role="columnheader">Email</th>
+              <th scope="col" role="columnheader">Role</th>
+              <th scope="col" role="columnheader">Status</th>
+              <th scope="col" role="columnheader">Last Active</th>
+              <th scope="col" role="columnheader">Actions</th>
             </tr>
           </thead>
-          <tbody id="usersTableBody">
+          <tbody id="usersTableBody" role="rowgroup">
             <!-- Users will be populated by JavaScript -->
           </tbody>
         </table>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <!-- Add User Modal -->
-  <div id="addUserModal" class="modal">
+  <div 
+    id="addUserModal" 
+    class="modal" 
+    role="dialog" 
+    aria-labelledby="add-user-title" 
+    aria-describedby="add-user-description"
+    aria-modal="true"
+    aria-hidden="true">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add New User</h3>
-        <button class="close-modal" id="closeModal">
-          <i class="fas fa-times"></i>
+        <h3 id="add-user-title">Add New User</h3>
+        <button 
+          class="close-modal" 
+          id="closeModal"
+          aria-label="Close add user dialog"
+          title="Close dialog"
+          type="button">
+          <i class="fas fa-times" aria-hidden="true"></i>
         </button>
       </div>
-      <form id="addUserForm" class="modal-form">
+      <div id="add-user-description" class="sr-only">
+        Fill out the form below to add a new user to the system. All fields marked with an asterisk are required.
+      </div>
+      <form id="addUserForm" class="modal-form" novalidate aria-describedby="form-errors">
+        <div id="form-errors" class="form-errors" aria-live="polite"></div>
         <div class="form-row">
           <div class="input-group">
-            <label for="firstName">First Name</label>
-            <input type="text" id="firstName" required>
+            <label for="firstName">First Name *</label>
+            <input 
+              type="text" 
+              id="firstName" 
+              name="firstName"
+              required
+              autocomplete="given-name"
+              aria-describedby="firstName-error"
+              aria-invalid="false">
+            <div id="firstName-error" class="field-error" aria-live="polite"></div>
           </div>
           <div class="input-group">
-            <label for="lastName">Last Name</label>
-            <input type="text" id="lastName" required>
+            <label for="lastName">Last Name *</label>
+            <input 
+              type="text" 
+              id="lastName" 
+              name="lastName"
+              required
+              autocomplete="family-name"
+              aria-describedby="lastName-error"
+              aria-invalid="false">
+            <div id="lastName-error" class="field-error" aria-live="polite"></div>
           </div>
         </div>
         <div class="form-row">
           <div class="input-group">
-            <label for="email">Email Address</label>
-            <input type="email" id="email" required>
+            <label for="email">Email Address *</label>
+            <input 
+              type="email" 
+              id="email" 
+              name="email"
+              required
+              autocomplete="email"
+              aria-describedby="email-error email-help"
+              aria-invalid="false">
+            <div id="email-help" class="field-help">This will be used as the user's login email</div>
+            <div id="email-error" class="field-error" aria-live="polite"></div>
           </div>
           <div class="input-group">
-            <label for="role">Role</label>
-            <select id="role" required>
+            <label for="role">Role *</label>
+            <select 
+              id="role" 
+              name="role"
+              required
+              aria-describedby="role-error role-help"
+              aria-invalid="false">
               <option value="">Select Role</option>
               <option value="user">User</option>
               <option value="moderator">Moderator</option>
               <option value="admin">Admin</option>
             </select>
+            <div id="role-help" class="field-help">Select the appropriate access level for this user</div>
+            <div id="role-error" class="field-error" aria-live="polite"></div>
           </div>
         </div>
         <div class="form-row">
           <div class="input-group">
             <label for="department">Department</label>
-            <input type="text" id="department">
+            <input 
+              type="text" 
+              id="department" 
+              name="department"
+              autocomplete="organization"
+              aria-describedby="department-help">
+            <div id="department-help" class="field-help">Optional: User's department or team</div>
           </div>
           <div class="input-group">
             <label for="status">Status</label>
-            <select id="status">
+            <select 
+              id="status" 
+              name="status"
+              aria-describedby="status-help">
               <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="inactive">Inactive</option>
             </select>
+            <div id="status-help" class="field-help">Initial account status</div>
           </div>
         </div>
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
-          <button type="submit" class="btn-primary">Add User</button>
+        <div class="modal-actions" role="group" aria-label="Form actions">
+          <button 
+            type="button" 
+            class="btn-secondary" 
+            id="cancelBtn"
+            aria-label="Cancel and close dialog">
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="btn-primary"
+            aria-describedby="submit-help">
+            Add User
+          </button>
+          <div id="submit-help" class="sr-only">Create the new user account with the provided information</div>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Delete User Confirmation Modal -->
-  <div id="deleteUserModal" class="modal">
+  <div 
+    id="deleteUserModal" 
+    class="modal"
+    role="dialog"
+    aria-labelledby="delete-user-title"
+    aria-describedby="delete-user-description"
+    aria-modal="true"
+    aria-hidden="true">
     <div class="modal-content delete-modal">
       <div class="modal-header delete-header">
-        <div class="delete-icon">
+        <div class="delete-icon" aria-hidden="true">
           <i class="fas fa-exclamation-triangle"></i>
         </div>
-        <h3>Confirm Deletion</h3>
-        <button class="close-modal" id="closeDeleteModal">
-          <i class="fas fa-times"></i>
+        <h3 id="delete-user-title">Confirm Deletion</h3>
+        <button 
+          class="close-modal" 
+          id="closeDeleteModal"
+          aria-label="Close delete confirmation modal"
+          title="Close modal"
+          role="button"
+          type="button">
+          <i class="fas fa-times" aria-hidden="true"></i>
         </button>
       </div>
       <div class="modal-body">
-        <p>Are you sure you want to delete <strong id="deleteUserName"></strong>?</p>
-        <p class="warning-text">This action cannot be undone and will permanently remove the user from the system.</p>
+        <p id="delete-user-description">
+          Are you sure you want to delete <strong id="deleteUserName" aria-live="polite"></strong>?
+        </p>
+        <p class="warning-text" role="alert">
+          This action cannot be undone and will permanently remove the user from the system.
+        </p>
       </div>
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
-        <button type="button" class="btn-danger" id="confirmDeleteBtn">
-          <i class="fas fa-trash"></i>
+      <div class="modal-actions" role="group" aria-label="Deletion confirmation actions">
+        <button 
+          type="button" 
+          class="btn-secondary" 
+          id="cancelDeleteBtn"
+          aria-label="Cancel delete operation"
+          role="button">
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          class="btn-danger" 
+          id="confirmDeleteBtn"
+          aria-label="Confirm delete user permanently"
+          role="button">
+          <i class="fas fa-trash" aria-hidden="true"></i>
           Delete User
         </button>
       </div>
