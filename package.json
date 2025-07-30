@@ -4,15 +4,21 @@
   "description": "Demo web application with login functionality and Playwright tests",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test",
-    "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui",
-    "test:report": "playwright show-report"
+    "start": "http-server . -p 3000 -c-1",
+    "dev": "http-server . -p 3000 -c-1 -o",
+    "test": "playwright test --config=playwright.config.localhost.js",
+    "test:headed": "playwright test --config=playwright.config.localhost.js --headed",
+    "test:ui": "playwright test --config=playwright.config.localhost.js --ui",
+    "test:report": "playwright show-report",
+    "test:localhost": "BASE_URL=http://localhost:3000 playwright test --config=playwright.config.localhost.js",
+    "test:github": "BASE_URL=https://rogersg17.github.io/demoApp/ playwright test --config=playwright.config.localhost.js"
   },
   "keywords": ["demo", "login", "webapp", "playwright", "testing"],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.54.1"
+    "@playwright/test": "^1.54.1",
+    "http-server": "^14.1.1",
+    "start-server-and-test": "^2.0.3"
   }
 }
