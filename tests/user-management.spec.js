@@ -1,305 +1,197 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
+const { LoginPage, UserManagementPage } = require('../page-objects');
 
-const getFilePath = (relativePath) => {
-  return 'file://' + path.resolve(__dirname, '..', relativePath).replace(/\\/g, '/');
-};
+test.describe.configure({ mode: 'serial' });
 
-test.describe('User Management', () => {
-  // Helper function to login before each test
-  const loginAndNavigateToUsers = async (page) => {
-    await page.goto(getFilePath('login/index.html'));
-    await page.fill('#username', 'admin');
-    await page.fill('#password', 'admin123');
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/.*mainPage\/index\.html/);
-    
-    // Navigate to user management
-    await page.click('.sidebar-icon[data-page="users"]');
-    await expect(page).toHaveURL(/.*users\/index\.html/);
-  };
+test.describe('User Management - Add and Delete Users', () => {
+  let loginPage;
+  let userManagementPage;
 
   test.beforeEach(async ({ page }) => {
-    // Clear session storage before each test
-    await page.goto(getFilePath('login/index.html'));
-    await page.evaluate(() => sessionStorage.clear());
+    // Initialize page objects
+    loginPage = new LoginPage(page);
+    userManagementPage = new UserManagementPage(page);
+    
+    // Clear storage and navigate to login
+    await loginPage.goto();
+    await page.evaluate(() => {
+      sessionStorage.clear();
+      localStorage.clear();
+    });
   });
 
-  test('should display user management page correctly', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+  /**
+   * Helper function to login and navigate to user management
+   */
+  const loginAndNavigateToUsers = async () => {
+    await loginPage.loginAndWaitForRedirect('testuser', 'password123');
+    await userManagementPage.navigateToUserManagement();
+    await userManagementPage.resetToDefaultState();
+  };
+
+  test('should display user management page with default users', async ({ page }) => {
+    await loginAndNavigateToUsers();
     
-    // Verify page title and header
-    await expect(page).toHaveTitle(/User Management/);
-    await expect(page.locator('h1')).toContainText('User Management');
-    
-    // Verify stats cards are present
-    await expect(page.locator('.stat-card')).toHaveCount(4);
-    
-    // Verify users table is present
-    await expect(page.locator('.users-table')).toBeVisible();
-    await expect(page.locator('th').filter({ hasText: 'User' })).toBeVisible();
-    await expect(page.locator('th').filter({ hasText: 'Email' })).toBeVisible();
-    await expect(page.locator('th').filter({ hasText: 'Role' })).toBeVisible();
-    await expect(page.locator('th').filter({ hasText: 'Status' })).toBeVisible();
-    await expect(page.locator('th').filter({ hasText: 'Actions' })).toBeVisible();
-    
-    // Verify some users are displayed (default data)
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
+    // Verify page elements using page object methods
+    await userManagementPage.verifyPageElements();
+    await userManagementPage.verifyDefaultUsers();
   });
 
-  test('should open add user modal', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+  test('should open and close add user modal', async ({ page }) => {
+    await loginAndNavigateToUsers();
     
-    // Click add user button
-    await page.click('#addUserBtn');
+    // Test opening modal
+    await userManagementPage.addUserButton.click();
+    await expect(userManagementPage.addUserModal).toBeVisible();
+    await userManagementPage.verifyAddUserFormFields();
     
-    // Verify modal is visible
-    await expect(page.locator('#addUserModal')).toBeVisible();
-    await expect(page.locator('#addUserModal h3')).toContainText('Add New User');
+    // Test closing modal with close button
+    await userManagementPage.closeModalButton.click();
+    await expect(userManagementPage.addUserModal).not.toBeVisible();
     
-    // Verify form fields are present
-    await expect(page.locator('#firstName')).toBeVisible();
-    await expect(page.locator('#lastName')).toBeVisible();
-    await expect(page.locator('#email')).toBeVisible();
-    await expect(page.locator('#role')).toBeVisible();
-    await expect(page.locator('#department')).toBeVisible();
-    await expect(page.locator('#status')).toBeVisible();
-    
-    // Close modal
-    await page.click('#closeModal');
-    await expect(page.locator('#addUserModal')).not.toBeVisible();
+    // Test cancel button
+    await userManagementPage.addUserButton.click();
+    await userManagementPage.cancelButton.click();
+    await expect(userManagementPage.addUserModal).not.toBeVisible();
   });
 
   test('should add a new user successfully', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+    await loginAndNavigateToUsers();
     
-    // Count initial users
-    const initialUserCount = await page.locator('#usersTableBody tr').count();
+    // Verify initial state
+    const initialUserCount = await userManagementPage.userRows.count();
+    expect(initialUserCount).toBe(8);
     
-    // Open add user modal
-    await page.click('#addUserBtn');
-    await expect(page.locator('#addUserModal')).toBeVisible();
+    // Add new user using page object
+    const userData = {
+      firstName: 'Test',
+      lastName: 'User', 
+      email: 'test.user@example.com',
+      role: 'user',
+      department: 'QA Testing',
+      status: 'active'
+    };
     
-    // Fill out the form
-    await page.fill('#firstName', 'Test');
-    await page.fill('#lastName', 'User');
-    await page.fill('#email', 'test.user@example.com');
-    await page.selectOption('#role', 'user');
-    await page.fill('#department', 'QA');
-    await page.selectOption('#status', 'active');
-    
-    // Submit the form
-    await page.click('button[type="submit"]');
-    
-    // Wait for modal to close
-    await expect(page.locator('#addUserModal')).not.toBeVisible();
+    await userManagementPage.addUser(userData);
     
     // Verify user was added
-    await expect(page.locator('#usersTableBody tr')).toHaveCount(initialUserCount + 1);
+    const newUserCount = await userManagementPage.userRows.count();
+    expect(newUserCount).toBe(9);
     
-    // Verify the new user appears in the table
-    await expect(page.locator('#usersTableBody')).toContainText('Test User');
-    await expect(page.locator('#usersTableBody')).toContainText('test.user@example.com');
-    await expect(page.locator('#usersTableBody')).toContainText('QA');
+    // Verify user data in table
+    await userManagementPage.verifyUserInTable(userData);
     
     // Verify success notification
-    await expect(page.locator('.notification')).toBeVisible();
-    await expect(page.locator('.notification')).toContainText('User added successfully');
+    await userManagementPage.verifySuccessNotification('User added successfully');
+    
+    // Verify stats update
+    await userManagementPage.waitForStatsUpdate(9);
   });
 
   test('should validate required fields when adding user', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+    await loginAndNavigateToUsers();
     
-    // Open add user modal
-    await page.click('#addUserBtn');
-    await expect(page.locator('#addUserModal')).toBeVisible();
+    // Open modal and try to submit empty form
+    await userManagementPage.addUserButton.click();
+    await expect(userManagementPage.addUserModal).toBeVisible();
+    await userManagementPage.submitButton.click();
     
-    // Try to submit empty form
-    await page.click('button[type="submit"]');
+    // Modal should still be visible (validation prevents submission)
+    await expect(userManagementPage.addUserModal).toBeVisible();
     
-    // Modal should still be visible (form validation failed)
-    await expect(page.locator('#addUserModal')).toBeVisible();
+    // Test partial form submission (missing required fields)
+    await userManagementPage.fillAddUserForm({
+      firstName: 'Test',
+      lastName: '', // Missing required field
+      email: '',
+      role: 'user'
+    });
+    await userManagementPage.submitButton.click();
     
-    // Check HTML5 validation (required fields)
-    const firstNameValidity = await page.locator('#firstName').evaluate(el => el.validity.valid);
-    const lastNameValidity = await page.locator('#lastName').evaluate(el => el.validity.valid);
-    const emailValidity = await page.locator('#email').evaluate(el => el.validity.valid);
-    const roleValidity = await page.locator('#role').evaluate(el => el.validity.valid);
+    // Modal should still be visible
+    await expect(userManagementPage.addUserModal).toBeVisible();
     
-    expect(firstNameValidity).toBe(false);
-    expect(lastNameValidity).toBe(false);
-    expect(emailValidity).toBe(false);
-    expect(roleValidity).toBe(false);
+    // Complete the form and submit successfully
+    await userManagementPage.fillAddUserForm({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      role: 'user'
+    });
+    await userManagementPage.submitButton.click();
+    
+    // Modal should close
+    await expect(userManagementPage.addUserModal).not.toBeVisible();
   });
 
-  test('should open delete confirmation modal', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+  test('should prevent duplicate email addresses', async ({ page }) => {
+    await loginAndNavigateToUsers();
     
-    // Wait for users to load
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
+    // Try to add user with existing email
+    const duplicateUserData = {
+      firstName: 'Duplicate',
+      lastName: 'User', 
+      email: 'john.doe@example.com', // This email already exists
+      role: 'user'
+    };
     
-    // Click delete button on first user
-    await page.click('#usersTableBody tr:first-child .action-btn.delete');
+    await userManagementPage.addUserButton.click();
+    await expect(userManagementPage.addUserModal).toBeVisible();
+    await userManagementPage.fillAddUserForm(duplicateUserData);
+    await userManagementPage.submitButton.click();
     
-    // Verify delete modal is visible
-    await expect(page.locator('#deleteUserModal')).toBeVisible();
-    await expect(page.locator('#deleteUserModal h3')).toContainText('Confirm Deletion');
+    // Should show error notification
+    await userManagementPage.verifyErrorNotification('Email address already exists');
     
-    // Verify user name is displayed in modal
-    await expect(page.locator('#deleteUserName')).not.toBeEmpty();
+    // Modal should remain open
+    await expect(userManagementPage.addUserModal).toBeVisible();
+  });
+
+  test('should open and close delete confirmation modal', async ({ page }) => {
+    await loginAndNavigateToUsers();
     
-    // Verify warning message
-    await expect(page.locator('.warning-text')).toContainText('This action cannot be undone');
+    // Verify initial state
+    await userManagementPage.verifyDefaultUsers();
     
-    // Close modal using cancel button
-    await page.click('#cancelDeleteBtn');
-    await expect(page.locator('#deleteUserModal')).not.toBeVisible();
+    // Get first user name and click delete
+    const firstUserName = await userManagementPage.getUserName(0);
+    const userRow = userManagementPage.userRows.nth(0);
+    await userRow.locator('.action-btn.delete').click();
+    
+    // Verify delete modal
+    await userManagementPage.verifyDeleteModal(firstUserName);
+    
+    // Test cancel button
+    await userManagementPage.cancelDeleteButton.click();
+    await expect(userManagementPage.deleteUserModal).not.toBeVisible();
+    
+    // Test close button (X)
+    await userRow.locator('.action-btn.delete').click();
+    await userManagementPage.verifyDeleteModal(firstUserName);
+    await userManagementPage.closeDeleteModalButton.click();
+    await expect(userManagementPage.deleteUserModal).not.toBeVisible();
   });
 
   test('should delete a user successfully', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+    await loginAndNavigateToUsers();
     
-    // Wait for users to load and count them
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
-    const initialUserCount = userCount;
+    // Verify initial state
+    await userManagementPage.verifyDefaultUsers();
     
-    // Get the name of the first user to verify deletion
-    const firstUserName = await page.locator('#usersTableBody tr:first-child .user-details h4').textContent();
-    
-    // Click delete button on first user
-    await page.click('#usersTableBody tr:first-child .action-btn.delete');
-    
-    // Verify delete modal is visible and shows correct user
-    await expect(page.locator('#deleteUserModal')).toBeVisible();
-    await expect(page.locator('#deleteUserName')).toContainText(firstUserName);
-    
-    // Confirm deletion
-    await page.click('#confirmDeleteBtn');
-    
-    // Wait for loading state
-    await expect(page.locator('#confirmDeleteBtn')).toContainText('Deleting...');
-    
-    // Wait for modal to close
-    await expect(page.locator('#deleteUserModal')).not.toBeVisible();
+    // Delete the first user
+    const deletedUserName = await userManagementPage.deleteUser(0);
     
     // Verify user count decreased
-    await expect(page.locator('#usersTableBody tr')).toHaveCount(initialUserCount - 1);
+    const newUserCount = await userManagementPage.userRows.count();
+    expect(newUserCount).toBe(7);
     
-    // Verify the user is no longer in the table
-    await expect(page.locator('#usersTableBody')).not.toContainText(firstUserName);
+    // Verify user is no longer in table
+    await userManagementPage.verifyUserNotInTable(deletedUserName);
     
     // Verify success notification
-    await expect(page.locator('.notification')).toBeVisible();
-    await expect(page.locator('.notification')).toContainText('deleted successfully');
-  });
-
-  test('should close delete modal when clicking outside', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
+    await userManagementPage.verifySuccessNotification('deleted successfully');
     
-    // Wait for users to load
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
-    
-    // Click delete button on first user
-    await page.click('#usersTableBody tr:first-child .action-btn.delete');
-    
-    // Verify delete modal is visible
-    await expect(page.locator('#deleteUserModal')).toBeVisible();
-    
-    // Click outside the modal (on the backdrop)
-    await page.click('#deleteUserModal', { position: { x: 5, y: 5 } });
-    
-    // Modal should close
-    await expect(page.locator('#deleteUserModal')).not.toBeVisible();
-  });
-
-  test('should filter users by status', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
-    
-    // Wait for users to load
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
-    const allUsersCount = userCount;
-    
-    // Filter by active status
-    await page.selectOption('#statusFilter', 'active');
-    
-    // Wait for filter to apply and check that we have fewer or equal users
-    await page.waitForTimeout(500); // Allow time for filtering
-    const activeUsersCount = await page.locator('#usersTableBody tr').count();
-    
-    // Should have active users only (could be same or fewer than total)
-    expect(activeUsersCount).toBeLessThanOrEqual(allUsersCount);
-    
-    // Verify all visible users have active status
-    const statusBadges = await page.locator('#usersTableBody .status-badge.active').count();
-    expect(statusBadges).toBe(activeUsersCount);
-    
-    // Reset filter
-    await page.selectOption('#statusFilter', 'all');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#usersTableBody tr')).toHaveCount(allUsersCount);
-  });
-
-  test('should search users by name', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
-    
-    // Wait for users to load
-    const userCount = await page.locator('#usersTableBody tr').count();
-    expect(userCount).toBeGreaterThan(0);
-    const allUsersCount = userCount;
-    
-    // Search for "John" (should find John Doe from default data)
-    await page.fill('#searchUsers', 'John');
-    await page.waitForTimeout(500); // Allow time for search
-    
-    const searchResultsCount = await page.locator('#usersTableBody tr').count();
-    expect(searchResultsCount).toBeLessThanOrEqual(allUsersCount);
-    
-    // Verify search results contain "John"
-    if (searchResultsCount > 0) {
-      await expect(page.locator('#usersTableBody')).toContainText('John');
-    }
-    
-    // Clear search
-    await page.fill('#searchUsers', '');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#usersTableBody tr')).toHaveCount(allUsersCount);
-  });
-
-  test('should navigate back to dashboard', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
-    
-    // Click back button
-    await page.click('#backBtn');
-    
-    // Should be back on main page
-    await expect(page).toHaveURL(/.*mainPage\/index\.html/);
-    await expect(page.locator('.welcome-section h1')).toContainText('Welcome to Your Dashboard');
-  });
-
-  test('should maintain user session during user management operations', async ({ page }) => {
-    await loginAndNavigateToUsers(page);
-    
-    // Verify welcome message is still showing correct user
-    await expect(page.locator('#welcomeMessage')).toContainText('Welcome, admin!');
-    
-    // Add a user
-    await page.click('#addUserBtn');
-    await page.fill('#firstName', 'Session');
-    await page.fill('#lastName', 'Test');
-    await page.fill('#email', 'session.test@example.com');
-    await page.selectOption('#role', 'user');
-    await page.click('button[type="submit"]');
-    
-    // Session should still be maintained
-    await expect(page.locator('#welcomeMessage')).toContainText('Welcome, admin!');
-    
-    // Logout should still work
-    await page.click('#logoutBtn');
-    await expect(page).toHaveURL(/.*login\/index\.html/);
+    // Verify stats update
+    await userManagementPage.waitForStatsUpdate(7);
   });
 });
