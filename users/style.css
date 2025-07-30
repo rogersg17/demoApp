@@ -10,6 +10,7 @@
   --error-background: rgba(255, 59, 48, 0.1);
   --success-color: #32D74B;
   --border-color: #D1D1D6;
+  --input-border-color: #B3B3B8;
   --border-radius: 12px;
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -28,6 +29,7 @@
   --bg-card-hover: rgba(255, 255, 255, 0.8);
   
   --border-color: rgba(255, 255, 255, 0.1);
+  --input-border-color: rgba(255, 255, 255, 0.3);
   --shadow-light: 0 4px 20px rgba(0, 122, 255, 0.15);
   --shadow-medium: 0 8px 32px rgba(0, 0, 0, 0.3);
   --shadow-heavy: 0 20px 60px rgba(0, 0, 0, 0.4);
@@ -703,19 +705,20 @@ body::before {
 .input-group input,
 .input-group select {
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--input-border-color);
   color: var(--text-primary);
   padding: 0.75rem 1rem;
   border-radius: var(--border-radius);
   font-family: inherit;
   transition: var(--transition);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .input-group input:focus,
 .input-group select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .modal-actions {
