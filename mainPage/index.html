@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Main Page</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-A+N4i1lbf9IUdDn5vztYZ3E4jvZl9Mbmh2CtHwbnW7RzOaBvCqTIvTYV4pclO9AzEzO/fK2ShSgg1X5iFQoqxw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <div><strong>Demo App</strong></div>
+      <div>Welcome Dashboard</div>
+      <i class="fas fa-search"></i>
+      <i class="fas fa-user-plus"></i>
+      <i class="fas fa-user"></i>
+      <div>|</div>
+    </div>
+    <div class="header-right">
+      <span id="welcomeMessage">Welcome, User!</span>
+      <i class="fas fa-flag"></i>
+      <i class="fas fa-th-large"></i>
+      <i class="fas fa-comment-dots"></i>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-icon">
+      <i class="fas fa-home"></i><br/>Dashboard
+    </div>
+    <div class="sidebar-icon">
+      <i class="fas fa-users"></i><br/>Users
+    </div>
+    <div class="sidebar-icon">
+      <i class="fas fa-cog"></i><br/>Settings
+    </div>
+    <div class="sidebar-icon">
+      <i class="fas fa-chart-bar"></i><br/>Reports
+    </div>
+    <div class="sidebar-icon">
+      <i class="fas fa-help-circle"></i><br/>Help
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="welcome-section">
+      <h1>Welcome to the Main Dashboard</h1>
+      <p>You have successfully logged in to the demo application.</p>
+      
+      <div class="dashboard-cards">
+        <div class="card">
+          <i class="fas fa-users"></i>
+          <h3>Users</h3>
+          <p>Manage user accounts and permissions</p>
+        </div>
+        
+        <div class="card">
+          <i class="fas fa-chart-line"></i>
+          <h3>Analytics</h3>
+          <p>View reports and statistics</p>
+        </div>
+        
+        <div class="card">
+          <i class="fas fa-tasks"></i>
+          <h3>Tasks</h3>
+          <p>Manage your daily tasks</p>
+        </div>
+        
+        <div class="card">
+          <i class="fas fa-cog"></i>
+          <h3>Settings</h3>
+          <p>Configure application settings</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check if user is logged in
+    window.addEventListener('load', function() {
+      const loggedInUser = sessionStorage.getItem('loggedInUser');
+      
+      if (!loggedInUser) {
+        // Redirect to login if not logged in
+        window.location.href = '../login/index.html';
+        return;
+      }
+      
+      // Display welcome message
+      document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+      
+      // Handle logout
+      document.getElementById('logoutBtn').addEventListener('click', function() {
+        sessionStorage.removeItem('loggedInUser');
+        window.location.href = '../login/index.html';
+      });
+    });
+  </script>
+
+</body>
+</html>

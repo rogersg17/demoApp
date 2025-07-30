@@ -9,7 +9,7 @@
 <body>
   <div class="login-container">
     <h2>Login</h2>
-    <form>
+    <form id="loginForm">
       <div class="input-group">
         <label for="username">Username</label>
         <input type="text" id="username" required />
@@ -20,6 +20,31 @@
       </div>
       <button type="submit">Login</button>
     </form>
+    <div id="error-message" class="error-message" style="display: none;">
+      Invalid username or password. Please try again.
+    </div>
   </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMessage = document.getElementById('error-message');
+      
+      // Simple authentication - in a real app, this would be server-side
+      if (username && password) {
+        // For demo purposes, accept any non-empty username and password
+        // Store username in sessionStorage for the main page
+        sessionStorage.setItem('loggedInUser', username);
+        
+        // Redirect to main page
+        window.location.href = '../mainPage/index.html';
+      } else {
+        errorMessage.style.display = 'block';
+      }
+    });
+  </script>
 </body>
 </html>
