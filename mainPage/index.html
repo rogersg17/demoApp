@@ -3,76 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Main Page</title>
+  <title>Dashboard - Demo App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-A+N4i1lbf9IUdDn5vztYZ3E4jvZl9Mbmh2CtHwbnW7RzOaBvCqTIvTYV4pclO9AzEzO/fK2ShSgg1X5iFQoqxw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 </head>
 <body>
-
   <div class="header">
-    <div class="header-left">
-      <div><strong>Demo App</strong></div>
-      <i class="fas fa-search"></i>
-      <i class="fas fa-user-plus"></i>
-      <i class="fas fa-user"></i>
-      <div>|</div>
-    </div>
+    <h1>Demo App Dashboard</h1>
     <div class="header-right">
+      <div class="avatar">
+        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" alt="User Avatar" class="avatar-img">
+        <div class="badge">3</div>
+      </div>
       <span id="welcomeMessage">Welcome, User!</span>
-      <i class="fas fa-flag"></i>
-      <i class="fas fa-th-large"></i>
-      <i class="fas fa-comment-dots"></i>
-      <button id="logoutBtn" class="logout-btn">Logout</button>
+      <button id="logoutBtn" class="logout-btn">
+        <i class="fas fa-sign-out-alt"></i>
+        Sign Out
+      </button>
     </div>
   </div>
 
   <div class="sidebar">
-    <div class="sidebar-icon">
-      <i class="fas fa-home"></i><br/>Dashboard
+    <div class="sidebar-icon" title="Dashboard" data-page="dashboard">
+      <i class="fas fa-home"></i>
     </div>
-    <div class="sidebar-icon">
-      <i class="fas fa-users"></i><br/>Users
+    <div class="sidebar-icon" title="User Management" data-page="users">
+      <i class="fas fa-user-shield"></i>
     </div>
-    <div class="sidebar-icon">
-      <i class="fas fa-cog"></i><br/>Settings
-    </div>
-    <div class="sidebar-icon">
-      <i class="fas fa-chart-bar"></i><br/>Reports
-    </div>
-    <div class="sidebar-icon">
-      <i class="fas fa-help-circle"></i><br/>Help
+    <div class="sidebar-icon" title="Analytics & Reports" data-page="analytics">
+      <i class="fas fa-chart-bar"></i>
     </div>
   </div>
 
   <div class="main-content">
     <div class="welcome-section">
-      <h1>Welcome to the Main Dashboard</h1>
-      <p>You have successfully logged in to the demo application.</p>
+      <h1>Welcome to Your Dashboard</h1>
+      <p>Monitor your application metrics, manage users, and access all your tools from this central hub.</p>
+    </div>
+    
+    <div class="dashboard-cards">
+      <div class="card">
+        <i class="fas fa-user-shield"></i>
+        <h3>User Management</h3>
+        <p>Manage user accounts, permissions, and access controls across your application with comprehensive tools for user administration.</p>
+      </div>
       
-      <div class="dashboard-cards">
-        <div class="card">
-          <i class="fas fa-users"></i>
-          <h3>Users</h3>
-          <p>Manage user accounts and permissions</p>
-        </div>
-        
-        <div class="card">
-          <i class="fas fa-chart-line"></i>
-          <h3>Analytics</h3>
-          <p>View reports and statistics</p>
-        </div>
-        
-        <div class="card">
-          <i class="fas fa-tasks"></i>
-          <h3>Tasks</h3>
-          <p>Manage your daily tasks</p>
-        </div>
-        
-        <div class="card">
-          <i class="fas fa-cog"></i>
-          <h3>Settings</h3>
-          <p>Configure application settings</p>
-        </div>
+      <div class="card">
+        <i class="fas fa-chart-bar"></i>
+        <h3>Analytics & Reports</h3>
+        <p>View detailed analytics, generate comprehensive reports, and track key performance metrics to drive data-driven decisions.</p>
       </div>
     </div>
   </div>
@@ -91,13 +74,135 @@
       // Display welcome message
       document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
       
+      // Set dashboard icon as active since we're on the main page
+      document.querySelector('.sidebar-icon[data-page="dashboard"]').classList.add('active');
+      
       // Handle logout
       document.getElementById('logoutBtn').addEventListener('click', function() {
-        sessionStorage.removeItem('loggedInUser');
-        window.location.href = '../login/index.html';
+        // Add loading state
+        const btn = this;
+        btn.classList.add('loading');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing out...';
+        
+        // Simulate logout delay for better UX
+        setTimeout(() => {
+          sessionStorage.removeItem('loggedInUser');
+          window.location.href = '../login/index.html';
+        }, 1000);
+      });
+      
+      // Add click handlers for sidebar icons
+      document.querySelectorAll('.sidebar-icon').forEach((icon, index) => {
+        icon.addEventListener('click', function() {
+          // Remove active class from all icons
+          document.querySelectorAll('.sidebar-icon').forEach(i => i.classList.remove('active'));
+          // Add active class to clicked icon
+          this.classList.add('active');
+          
+          // Add subtle click animation
+          this.style.transform = 'scale(0.95)';
+          setTimeout(() => {
+            this.style.transform = '';
+          }, 150);
+          
+          // Handle navigation
+          const page = this.getAttribute('data-page');
+          if (page === 'users') {
+            // Navigate to users page with smooth transition
+            this.style.background = 'var(--primary-gradient)';
+            this.style.color = 'white';
+            
+            setTimeout(() => {
+              window.location.href = '../users/index.html';
+            }, 300);
+          } else if (page === 'analytics') {
+            // For analytics page, show coming soon notification
+            showNotification('Analytics & Reports page coming soon!', 'info');
+          }
+        });
+      });
+      
+      // Set first icon as active by default
+      document.querySelector('.sidebar-icon').classList.add('active');
+      
+      // Add hover effects to cards
+      document.querySelectorAll('.card').forEach((card, index) => {
+        card.addEventListener('mouseenter', function() {
+          this.style.transform = 'translateY(-10px) scale(1.02)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+          this.style.transform = '';
+        });
+        
+        // Add click functionality to cards
+        card.addEventListener('click', function() {
+          const cardTitle = this.querySelector('h3').textContent;
+          if (cardTitle === 'User Management') {
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              window.location.href = '../users/index.html';
+            }, 200);
+          } else if (cardTitle === 'Analytics & Reports') {
+            showNotification('Analytics & Reports page coming soon!', 'info');
+          }
+        });
+        
+        // Add cursor pointer
+        card.style.cursor = 'pointer';
       });
     });
+    
+    // Notification function
+    function showNotification(message, type = 'info') {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `
+        <div class="notification-content">
+          <i class="fas fa-${getNotificationIcon(type)}"></i>
+          <span>${message}</span>
+        </div>
+      `;
+      
+      Object.assign(notification.style, {
+        position: 'fixed',
+        top: '100px',
+        right: '20px',
+        background: type === 'success' ? 'var(--success-gradient)' : 
+                    type === 'error' ? 'var(--danger-gradient)' : 
+                    'var(--primary-gradient)',
+        color: 'white',
+        padding: '1rem 1.5rem',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-medium)',
+        zIndex: '1001',
+        transform: 'translateX(100%)',
+        transition: 'var(--transition-smooth)',
+        backdropFilter: 'blur(20px)'
+      });
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+      }, 100);
+      
+      setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 3000);
+    }
+    
+    function getNotificationIcon(type) {
+      switch (type) {
+        case 'success': return 'check-circle';
+        case 'error': return 'exclamation-circle';
+        case 'warning': return 'exclamation-triangle';
+        default: return 'info-circle';
+      }
+    }
   </script>
-
 </body>
 </html>
