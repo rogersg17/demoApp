@@ -12,11 +12,11 @@
     <form id="loginForm">
       <div class="input-group">
         <label for="username">Username</label>
-        <input type="text" id="username" required />
+        <input type="text" id="username" />
       </div>
       <div class="input-group">
         <label for="password">Password</label>
-        <input type="password" id="password" required />
+        <input type="password" id="password" />
       </div>
       <button type="submit">Login</button>
     </form>
@@ -29,9 +29,12 @@
     document.getElementById('loginForm').addEventListener('submit', function(e) {
       e.preventDefault();
       
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
       const errorMessage = document.getElementById('error-message');
+      
+      // Hide error message initially
+      errorMessage.style.display = 'none';
       
       // Simple authentication - in a real app, this would be server-side
       if (username && password) {
@@ -42,6 +45,7 @@
         // Redirect to main page
         window.location.href = '../mainPage/index.html';
       } else {
+        // Show error message for empty credentials
         errorMessage.style.display = 'block';
       }
     });
