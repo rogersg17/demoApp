@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management - Demo App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-A+N4i1lbf9IUdDn5vztYZ3E4jvZl9Mbmh2CtHwbnW7RzOaBvCqTIvTYV4pclO9AzEzO/fK2ShSgg1X5iFQoqxw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👥</text></svg>">
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <button id="backBtn" class="back-btn">
+        <i class="fas fa-arrow-left"></i>
+        <span>Dashboard</span>
+      </button>
+      <h1>User Management</h1>
+    </div>
+    <div class="header-right">
+      <div class="search-container">
+        <input type="text" id="searchUsers" placeholder="Search users..." class="search-input">
+        <i class="fas fa-search search-icon"></i>
+      </div>
+      <button id="addUserBtn" class="add-user-btn">
+        <i class="fas fa-plus"></i>
+        Add User
+      </button>
+      <div class="avatar">
+        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" alt="User Avatar" class="avatar-img">
+        <div class="badge">3</div>
+      </div>
+      <span id="welcomeMessage">Welcome, User!</span>
+      <button id="logoutBtn" class="logout-btn">
+        <i class="fas fa-sign-out-alt"></i>
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="page-header">
+      <div class="stats-cards">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number" id="totalUsers">24</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon active">
+            <i class="fas fa-user-check"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number" id="activeUsers">18</div>
+            <div class="stat-label">Active Users</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon pending">
+            <i class="fas fa-user-clock"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number" id="pendingUsers">3</div>
+            <div class="stat-label">Pending</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon inactive">
+            <i class="fas fa-user-times"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number" id="inactiveUsers">3</div>
+            <div class="stat-label">Inactive</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="users-section">
+      <div class="section-header">
+        <h2>All Users</h2>
+        <div class="filters">
+          <select id="statusFilter" class="filter-select">
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select id="roleFilter" class="filter-select">
+            <option value="all">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+            <option value="moderator">Moderator</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="users-table-container">
+        <table class="users-table" id="usersTable">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" id="selectAll" class="checkbox">
+              </th>
+              <th>User</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <!-- Users will be populated by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div id="addUserModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add New User</h3>
+        <button class="close-modal" id="closeModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <form id="addUserForm" class="modal-form">
+        <div class="form-row">
+          <div class="input-group">
+            <label for="firstName">First Name</label>
+            <input type="text" id="firstName" required>
+          </div>
+          <div class="input-group">
+            <label for="lastName">Last Name</label>
+            <input type="text" id="lastName" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" required>
+          </div>
+          <div class="input-group">
+            <label for="role">Role</label>
+            <select id="role" required>
+              <option value="">Select Role</option>
+              <option value="user">User</option>
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label for="department">Department</label>
+            <input type="text" id="department">
+          </div>
+          <div class="input-group">
+            <label for="status">Status</label>
+            <select id="status">
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn-primary">Add User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete User Confirmation Modal -->
+  <div id="deleteUserModal" class="modal">
+    <div class="modal-content delete-modal">
+      <div class="modal-header delete-header">
+        <div class="delete-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Confirm Deletion</h3>
+        <button class="close-modal" id="closeDeleteModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong id="deleteUserName"></strong>?</p>
+        <p class="warning-text">This action cannot be undone and will permanently remove the user from the system.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmDeleteBtn">
+          <i class="fas fa-trash"></i>
+          Delete User
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
