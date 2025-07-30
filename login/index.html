@@ -3,25 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login Page</title>
+  <title>Login - Demo App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
 </head>
 <body>
   <div class="login-container">
-    <h2>Login</h2>
+    <h2>Welcome Back</h2>
     <form id="loginForm">
-      <div class="input-group">
+      <div class="input-group floating">
+        <input type="text" id="username" placeholder=" " />
         <label for="username">Username</label>
-        <input type="text" id="username" />
       </div>
-      <div class="input-group">
+      <div class="input-group floating">
+        <input type="password" id="password" placeholder=" " />
         <label for="password">Password</label>
-        <input type="password" id="password" />
       </div>
-      <button type="submit">Login</button>
+      <button type="submit" id="loginBtn">
+        <span>Sign In</span>
+      </button>
     </form>
     <div id="error-message" class="error-message" style="display: none;">
       Invalid username or password. Please try again.
+    </div>
+    <div id="success-message" class="success-message" style="display: none;">
+      Login successful! Redirecting...
     </div>
   </div>
 
@@ -32,22 +41,106 @@
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value.trim();
       const errorMessage = document.getElementById('error-message');
+      const successMessage = document.getElementById('success-message');
+      const loginBtn = document.getElementById('loginBtn');
+      const btnSpan = loginBtn.querySelector('span');
       
-      // Hide error message initially
+      // Hide messages initially
       errorMessage.style.display = 'none';
+      successMessage.style.display = 'none';
       
-      // Simple authentication - in a real app, this would be server-side
-      if (username && password) {
-        // For demo purposes, accept any non-empty username and password
-        // Store username in sessionStorage for the main page
-        sessionStorage.setItem('loggedInUser', username);
-        
-        // Redirect to main page
-        window.location.href = '../mainPage/index.html';
-      } else {
-        // Show error message for empty credentials
-        errorMessage.style.display = 'block';
+      // Add loading state
+      loginBtn.classList.add('loading');
+      btnSpan.textContent = 'Signing in...';
+      
+      // Simulate network delay for better UX
+      setTimeout(() => {
+        // Simple authentication - in a real app, this would be server-side
+        if (username && password) {
+          // For demo purposes, accept any non-empty username and password
+          loginBtn.classList.remove('loading');
+          loginBtn.classList.add('success');
+          btnSpan.innerHTML = '<i class="checkmark">✓</i> Success!';
+          
+          // Show success message
+          successMessage.style.display = 'block';
+          
+          // Store username in sessionStorage for the main page
+          sessionStorage.setItem('loggedInUser', username);
+          
+          // Redirect to main page after success animation
+          setTimeout(() => {
+            window.location.href = '../mainPage/index.html';
+          }, 1500);
+        } else {
+          // Show error for empty credentials
+          loginBtn.classList.remove('loading');
+          loginBtn.classList.add('error');
+          btnSpan.textContent = 'Please try again';
+          
+          errorMessage.style.display = 'block';
+          
+          // Shake animation for form
+          document.querySelector('.login-container').classList.add('shake');
+          
+          // Reset button after delay
+          setTimeout(() => {
+            loginBtn.classList.remove('error');
+            loginBtn.classList.remove('success');
+            btnSpan.textContent = 'Sign In';
+            document.querySelector('.login-container').classList.remove('shake');
+          }, 2000);
+        }
+      }, 1000);
+    });
+    
+    // Add input focus effects
+    document.querySelectorAll('.input-group input').forEach(input => {
+      input.addEventListener('focus', function() {
+        this.parentElement.classList.add('focused');
+      });
+      
+      input.addEventListener('blur', function() {
+        if (!this.value) {
+          this.parentElement.classList.remove('focused');
+        }
+      });
+      
+      input.addEventListener('input', function() {
+        if (this.value) {
+          this.parentElement.classList.add('has-value');
+        } else {
+          this.parentElement.classList.remove('has-value');
+        }
+      });
+    });
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
       }
+    });
+    
+    // Add form validation styling
+    function validateInput(input) {
+      const inputGroup = input.parentElement;
+      if (input.value.trim()) {
+        inputGroup.classList.add('valid');
+        inputGroup.classList.remove('invalid');
+      } else {
+        inputGroup.classList.remove('valid');
+        inputGroup.classList.add('invalid');
+      }
+    }
+    
+    document.querySelectorAll('.input-group input').forEach(input => {
+      input.addEventListener('blur', () => validateInput(input));
+      input.addEventListener('input', () => {
+        if (input.classList.contains('invalid')) {
+          validateInput(input);
+        }
+      });
     });
   </script>
 </body>
