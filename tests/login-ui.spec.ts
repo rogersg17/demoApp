@@ -37,8 +37,8 @@ test.describe('Login UI Tests', () => {
 
   test.describe('Form Behavior', () => {
     test('TC016: Verify loading state during login', async () => {
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       await loginPage.loginButton.click();
       
       // Check for loading state immediately after click
@@ -48,8 +48,8 @@ test.describe('Login UI Tests', () => {
     });
 
     test('TC017: Verify success state animation', async () => {
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       await loginPage.loginButton.click();
       
       // Wait for success state
@@ -59,6 +59,9 @@ test.describe('Login UI Tests', () => {
     });
 
     test('TC018: Verify error state animation', async () => {
+      // Use invalid credentials to trigger server-side error with shake animation
+      await loginPage.usernameInput.fill('invaliduser');
+      await loginPage.passwordInput.fill('wrongpassword');
       await loginPage.loginButton.click();
       
       // Check for error state and shake animation

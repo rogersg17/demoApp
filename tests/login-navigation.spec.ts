@@ -11,13 +11,13 @@ test.describe('Login Navigation Tests', () => {
 
   test.describe('Redirection', () => {
     test('TC027: Verify successful login redirect', async () => {
-      await loginPage.loginAndWaitForRedirect('testuser', 'testpass');
+      await loginPage.loginAndWaitForRedirect('admin', 'admin123');
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
 
     test('TC028: Verify redirect timing', async () => {
       const startTime = Date.now();
-      await loginPage.login('testuser', 'testpass');
+      await loginPage.login('admin', 'admin123');
       
       // Wait for redirect
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/, { timeout: 5000 });
@@ -30,32 +30,32 @@ test.describe('Login Navigation Tests', () => {
     });
 
     test('TC029: Verify session storage', async () => {
-      const username = 'testuser';
-      await loginPage.login(username, 'testpass');
+      const username = 'admin';
+      await loginPage.login(username, 'admin123');
       
       // Wait for redirect to complete
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
       
-      // Check sessionStorage
+      // Check sessionStorage - now stores full name instead of username
       const storedUser = await loginPage.page.evaluate(() => {
         return sessionStorage.getItem('loggedInUser');
       });
-      expect(storedUser).toBe(username);
+      expect(storedUser).toBe('Admin User'); // Full name, not username
     });
 
     test('TC030: Verify dashboard access', async () => {
-      const username = 'testuser';
-      await loginPage.loginAndWaitForRedirect(username, 'testpass');
+      const username = 'admin';
+      await loginPage.loginAndWaitForRedirect(username, 'admin123');
       
       // Verify we're on the dashboard
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
       await expect(loginPage.page).toHaveTitle('Dashboard - Demo App');
       
-      // Check that welcome message contains the username
+      // Check that welcome message contains the full name
       const welcomeMessage = loginPage.page.locator('#welcomeMessage');
       await expect(welcomeMessage).toBeVisible();
       const welcomeText = await welcomeMessage.textContent();
-      expect(welcomeText).toContain(username);
+      expect(welcomeText).toContain('Admin User'); // Expect full name
     });
   });
 });

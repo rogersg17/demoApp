@@ -79,7 +79,7 @@ class LoginPage {
    * Verify error message is displayed
    * @param {string} [expectedMessage] - Expected error message text
    */
-  async verifyErrorMessage(expectedMessage = 'Invalid username or password') {
+  async verifyErrorMessage(expectedMessage = 'Invalid credentials') {
     await expect(this.errorMessage).toBeVisible();
     if (expectedMessage) {
       await expect(this.errorMessage).toContainText(expectedMessage);

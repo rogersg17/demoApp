@@ -1,108 +1,17 @@
-// Sample user data
-let users = [
-  {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    role: 'admin',
-    status: 'active',
-    department: 'IT',
-    lastActive: '2 hours ago',
-    avatar: 'JD'
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    lastName: 'Smith',
-    email: 'jane.smith@example.com',
-    role: 'user',
-    status: 'active',
-    department: 'Marketing',
-    lastActive: '1 day ago',
-    avatar: 'JS'
-  },
-  {
-    id: 3,
-    firstName: 'Mike',
-    lastName: 'Johnson',
-    email: 'mike.johnson@example.com',
-    role: 'moderator',
-    status: 'pending',
-    department: 'Sales',
-    lastActive: '3 days ago',
-    avatar: 'MJ'
-  },
-  {
-    id: 4,
-    firstName: 'Sarah',
-    lastName: 'Wilson',
-    email: 'sarah.wilson@example.com',
-    role: 'user',
-    status: 'active',
-    department: 'HR',
-    lastActive: '5 minutes ago',
-    avatar: 'SW'
-  },
-  {
-    id: 5,
-    firstName: 'David',
-    lastName: 'Brown',
-    email: 'david.brown@example.com',
-    role: 'user',
-    status: 'inactive',
-    department: 'Finance',
-    lastActive: '1 week ago',
-    avatar: 'DB'
-  },
-  {
-    id: 6,
-    firstName: 'Emma',
-    lastName: 'Davis',
-    email: 'emma.davis@example.com',
-    role: 'admin',
-    status: 'active',
-    department: 'IT',
-    lastActive: '30 minutes ago',
-    avatar: 'ED'
-  },
-  {
-    id: 7,
-    firstName: 'Alex',
-    lastName: 'Miller',
-    email: 'alex.miller@example.com',
-    role: 'user',
-    status: 'pending',
-    department: 'Design',
-    lastActive: '2 days ago',
-    avatar: 'AM'
-  },
-  {
-    id: 8,
-    firstName: 'Lisa',
-    lastName: 'Garcia',
-    email: 'lisa.garcia@example.com',
-    role: 'moderator',
-    status: 'active',
-    department: 'Support',
-    lastActive: '1 hour ago',
-    avatar: 'LG'
-  }
-];
-
-let filteredUsers = [...users];
+// Users data will be loaded from API
+let users = [];
+let filteredUsers = [];
 
 // Initialize the page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Check authentication
   checkAuth();
   
   // Initialize event listeners
   initializeEventListeners();
   
-  // Render initial data
-  renderUsers();
-  updateStats();
+  // Load users from API
+  await loadUsers();
   
   // Add loading animation
   document.body.classList.add('loaded');
@@ -117,6 +26,130 @@ function checkAuth() {
   }
   
   document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+}
+
+// API Functions
+async function loadUsers() {
+  try {
+    showLoading(true);
+    const response = await fetch('/api/users');
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Unauthorized - redirect to login
+        sessionStorage.clear();
+        window.location.href = '../login/index.html';
+        return;
+      }
+      throw new Error('Failed to load users');
+    }
+    
+    const userData = await response.json();
+    
+    // Transform API data to match UI expectations
+    users = userData.map(user => ({
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      department: user.department,
+      lastActive: formatLastActive(user.last_login),
+      avatar: (user.first_name.charAt(0) + user.last_name.charAt(0)).toUpperCase()
+    }));
+    
+    filteredUsers = [...users];
+    
+    // Render initial data
+    renderUsers();
+    updateStats();
+    
+    showLoading(false);
+  } catch (error) {
+    console.error('Error loading users:', error);
+    showLoading(false);
+    showNotification('Failed to load users. Please refresh the page.', 'error');
+  }
+}
+
+function formatLastActive(lastLogin) {
+  if (!lastLogin) return 'Never';
+  
+  const now = new Date();
+  const loginDate = new Date(lastLogin);
+  const diffMs = now - loginDate;
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return loginDate.toLocaleDateString();
+}
+
+function showLoading(show) {
+  const loadingElement = document.getElementById('loadingSpinner');
+  if (loadingElement) {
+    loadingElement.style.display = show ? 'flex' : 'none';
+  }
+}
+
+function showNotification(message, type = 'info') {
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.innerHTML = `
+    <div class="notification-content">
+      <i class="fas fa-${getNotificationIcon(type)}"></i>
+      <span>${message}</span>
+    </div>
+  `;
+  
+  // Style the notification
+  Object.assign(notification.style, {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    background: type === 'success' ? '#10b981' : 
+                type === 'error' ? '#ef4444' : 
+                '#6366f1',
+    color: 'white',
+    padding: '1rem 1.5rem',
+    borderRadius: '0.5rem',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    zIndex: '1001',
+    transform: 'translateX(100%)',
+    transition: 'transform 0.3s ease',
+    maxWidth: '300px'
+  });
+  
+  document.body.appendChild(notification);
+  
+  // Animate in
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+  }, 100);
+  
+  // Remove after delay
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        document.body.removeChild(notification);
+      }
+    }, 300);
+  }, 3000);
+}
+
+function getNotificationIcon(type) {
+  switch (type) {
+    case 'success': return 'check-circle';
+    case 'error': return 'exclamation-circle';
+    case 'warning': return 'exclamation-triangle';
+    default: return 'info-circle';
+  }
 }
 
 function initializeEventListeners() {

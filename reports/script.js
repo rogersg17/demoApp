@@ -1,130 +1,19 @@
-// Sample user data (imported from the users module)
-let users = [
-  {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    role: 'admin',
-    status: 'active',
-    department: 'IT',
-    lastActive: '2 hours ago',
-    avatar: 'JD',
-    sessions: 145,
-    avgDuration: '28m'
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    lastName: 'Smith',
-    email: 'jane.smith@example.com',
-    role: 'user',
-    status: 'active',
-    department: 'Marketing',
-    lastActive: '1 day ago',
-    avatar: 'JS',
-    sessions: 89,
-    avgDuration: '22m'
-  },
-  {
-    id: 3,
-    firstName: 'Mike',
-    lastName: 'Johnson',
-    email: 'mike.johnson@example.com',
-    role: 'moderator',
-    status: 'pending',
-    department: 'Sales',
-    lastActive: '3 days ago',
-    avatar: 'MJ',
-    sessions: 67,
-    avgDuration: '18m'
-  },
-  {
-    id: 4,
-    firstName: 'Sarah',
-    lastName: 'Wilson',
-    email: 'sarah.wilson@example.com',
-    role: 'user',
-    status: 'active',
-    department: 'HR',
-    lastActive: '5 minutes ago',
-    avatar: 'SW',
-    sessions: 203,
-    avgDuration: '31m'
-  },
-  {
-    id: 5,
-    firstName: 'David',
-    lastName: 'Brown',
-    email: 'david.brown@example.com',
-    role: 'user',
-    status: 'inactive',
-    department: 'Finance',
-    lastActive: '1 week ago',
-    avatar: 'DB',
-    sessions: 34,
-    avgDuration: '15m'
-  },
-  {
-    id: 6,
-    firstName: 'Emma',
-    lastName: 'Davis',
-    email: 'emma.davis@example.com',
-    role: 'admin',
-    status: 'active',
-    department: 'IT',
-    lastActive: '30 minutes ago',
-    avatar: 'ED',
-    sessions: 178,
-    avgDuration: '35m'
-  },
-  {
-    id: 7,
-    firstName: 'Alex',
-    lastName: 'Miller',
-    email: 'alex.miller@example.com',
-    role: 'user',
-    status: 'pending',
-    department: 'Design',
-    lastActive: '2 days ago',
-    avatar: 'AM',
-    sessions: 56,
-    avgDuration: '20m'
-  },
-  {
-    id: 8,
-    firstName: 'Lisa',
-    lastName: 'Garcia',
-    email: 'lisa.garcia@example.com',
-    role: 'moderator',
-    status: 'active',
-    department: 'Support',
-    lastActive: '1 hour ago',
-    avatar: 'LG',
-    sessions: 112,
-    avgDuration: '26m'
-  }
-];
+// Sample user data (will be replaced with API data)
+let users = [];
 
 // Chart instances
 let userStatusChart, userRolesChart, departmentChart, userGrowthChart, activityChart;
 
 // Initialize the page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Check authentication
   checkAuth();
   
   // Initialize event listeners
   initializeEventListeners();
   
-  // Update statistics
-  updateStatistics();
-  
-  // Initialize charts
-  initializeCharts();
-  
-  // Populate reports table
-  populateReportsTable();
+  // Load data from API
+  await loadAnalyticsData();
   
   // Add loading animation
   document.body.classList.add('loaded');
@@ -139,6 +28,144 @@ function checkAuth() {
   }
   
   document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+}
+
+// API Functions
+async function loadAnalyticsData() {
+  try {
+    showLoading();
+    
+    // Load all analytics data in parallel
+    const [usersResponse, statsResponse, departmentResponse, roleResponse, statusResponse, growthResponse, activityResponse] = await Promise.all([
+      fetch('/api/users'),
+      fetch('/api/analytics/stats'),
+      fetch('/api/analytics/users-by-department'),
+      fetch('/api/analytics/users-by-role'),
+      fetch('/api/analytics/users-by-status'),
+      fetch('/api/analytics/user-growth'),
+      fetch('/api/analytics/user-activity')
+    ]);
+    
+    // Check for authentication errors
+    if (usersResponse.status === 401 || statsResponse.status === 401) {
+      sessionStorage.clear();
+      window.location.href = '../login/index.html';
+      return;
+    }
+    
+    // Parse responses
+    const usersData = await usersResponse.json();
+    const statsData = await statsResponse.json();
+    const departmentData = await departmentResponse.json();
+    const roleData = await roleResponse.json();
+    const statusData = await statusResponse.json();
+    const growthData = await growthResponse.json();
+    const activityData = await activityResponse.json();
+    
+    // Transform users data
+    users = usersData.map(user => ({
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      department: user.department,
+      lastActive: formatLastActive(user.last_login),
+      avatar: (user.first_name.charAt(0) + user.last_name.charAt(0)).toUpperCase(),
+      sessions: Math.floor(Math.random() * 200) + 50, // Simulated data
+      avgDuration: Math.floor(Math.random() * 30) + 15 + 'm' // Simulated data
+    }));
+    
+    // Update statistics
+    updateStatisticsFromAPI(statsData);
+    
+    // Initialize charts with API data
+    initializeChartsWithData(departmentData, roleData, statusData, growthData, activityData);
+    
+    // Populate reports table
+    populateReportsTable();
+    
+    hideLoading();
+  } catch (error) {
+    console.error('Error loading analytics data:', error);
+    hideLoading();
+    showNotification('Failed to load analytics data. Please refresh the page.', 'error');
+  }
+}
+
+function formatLastActive(lastLogin) {
+  if (!lastLogin) return 'Never';
+  
+  const now = new Date();
+  const loginDate = new Date(lastLogin);
+  const diffMs = now - loginDate;
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return loginDate.toLocaleDateString();
+}
+
+function updateStatisticsFromAPI(statsData) {
+  document.getElementById('totalUsers').textContent = statsData.total_users || 0;
+  document.getElementById('activeUsers').textContent = statsData.active_users || 0;
+  document.getElementById('pendingUsers').textContent = statsData.pending_users || 0;
+}
+
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.innerHTML = `
+    <div class="notification-content">
+      <i class="fas fa-${getNotificationIcon(type)}"></i>
+      <span>${message}</span>
+    </div>
+  `;
+  
+  Object.assign(notification.style, {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    background: type === 'success' ? '#10b981' : 
+                type === 'error' ? '#ef4444' : 
+                '#6366f1',
+    color: 'white',
+    padding: '1rem 1.5rem',
+    borderRadius: '0.5rem',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    zIndex: '1001',
+    transform: 'translateX(100%)',
+    transition: 'transform 0.3s ease',
+    maxWidth: '300px'
+  });
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+  }, 100);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        document.body.removeChild(notification);
+      }
+    }, 300);
+  }, 3000);
+}
+
+function getNotificationIcon(type) {
+  switch (type) {
+    case 'success': return 'check-circle';
+    case 'error': return 'exclamation-circle';
+    case 'warning': return 'exclamation-triangle';
+    default: return 'info-circle';
+  }
 }
 
 function initializeEventListeners() {
@@ -194,7 +221,17 @@ function initializeEventListeners() {
   });
 }
 
+function initializeChartsWithData(departmentData, roleData, statusData, growthData, activityData) {
+  initUserStatusChart(statusData);
+  initUserRolesChart(roleData);
+  initDepartmentChart(departmentData);
+  initUserGrowthChart(growthData);
+  initActivityChart(activityData);
+}
+
 function updateStatistics() {
+  // This function is now replaced by updateStatisticsFromAPI
+  // Keep for backward compatibility
   const activeUsers = users.filter(user => user.status === 'active').length;
   const pendingUsers = users.filter(user => user.status === 'pending').length;
   const totalUsers = users.length;
@@ -204,29 +241,30 @@ function updateStatistics() {
   document.getElementById('pendingUsers').textContent = pendingUsers;
 }
 
-function initializeCharts() {
-  initUserStatusChart();
-  initUserRolesChart();
-  initDepartmentChart();
-  initUserGrowthChart();
-  initActivityChart();
-}
-
-function initUserStatusChart() {
+function initUserStatusChart(statusData = null) {
   const ctx = document.getElementById('userStatusChart').getContext('2d');
   
-  const statusCounts = {
-    active: users.filter(u => u.status === 'active').length,
-    pending: users.filter(u => u.status === 'pending').length,
-    inactive: users.filter(u => u.status === 'inactive').length
-  };
+  let labels, data;
+  if (statusData && statusData.length > 0) {
+    labels = statusData.map(item => item.status.charAt(0).toUpperCase() + item.status.slice(1));
+    data = statusData.map(item => item.count);
+  } else {
+    // Fallback to calculated data
+    const statusCounts = {
+      active: users.filter(u => u.status === 'active').length,
+      pending: users.filter(u => u.status === 'pending').length,
+      inactive: users.filter(u => u.status === 'inactive').length
+    };
+    labels = ['Active', 'Pending', 'Inactive'];
+    data = [statusCounts.active, statusCounts.pending, statusCounts.inactive];
+  }
   
   userStatusChart = new Chart(ctx, {
     type: 'pie',
     data: {
-      labels: ['Active', 'Pending', 'Inactive'],
+      labels: labels,
       datasets: [{
-        data: [statusCounts.active, statusCounts.pending, statusCounts.inactive],
+        data: data,
         backgroundColor: [
           '#10b981',
           '#f59e0b',
@@ -261,21 +299,30 @@ function initUserStatusChart() {
   });
 }
 
-function initUserRolesChart() {
+function initUserRolesChart(roleData = null) {
   const ctx = document.getElementById('userRolesChart').getContext('2d');
   
-  const roleCounts = {
-    admin: users.filter(u => u.role === 'admin').length,
-    moderator: users.filter(u => u.role === 'moderator').length,
-    user: users.filter(u => u.role === 'user').length
-  };
+  let labels, data;
+  if (roleData && roleData.length > 0) {
+    labels = roleData.map(item => item.role.charAt(0).toUpperCase() + item.role.slice(1));
+    data = roleData.map(item => item.count);
+  } else {
+    // Fallback to calculated data
+    const roleCounts = {
+      admin: users.filter(u => u.role === 'admin').length,
+      moderator: users.filter(u => u.role === 'moderator').length,
+      user: users.filter(u => u.role === 'user').length
+    };
+    labels = ['Admin', 'Moderator', 'User'];
+    data = [roleCounts.admin, roleCounts.moderator, roleCounts.user];
+  }
   
   userRolesChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['Admin', 'Moderator', 'User'],
+      labels: labels,
       datasets: [{
-        data: [roleCounts.admin, roleCounts.moderator, roleCounts.user],
+        data: data,
         backgroundColor: [
           '#8b5cf6',
           '#3b82f6',
@@ -310,16 +357,24 @@ function initUserRolesChart() {
   });
 }
 
-function initDepartmentChart() {
+function initDepartmentChart(departmentData = null) {
   const ctx = document.getElementById('departmentChart').getContext('2d');
   
-  const departmentCounts = {};
-  users.forEach(user => {
-    departmentCounts[user.department] = (departmentCounts[user.department] || 0) + 1;
-  });
-  
-  const departments = Object.keys(departmentCounts);
-  const counts = Object.values(departmentCounts);
+  let departments, counts;
+  if (departmentData && departmentData.length > 0) {
+    departments = departmentData.map(item => item.department);
+    counts = departmentData.map(item => item.count);
+  } else {
+    // Fallback to calculated data
+    const departmentCounts = {};
+    users.forEach(user => {
+      if (user.department) {
+        departmentCounts[user.department] = (departmentCounts[user.department] || 0) + 1;
+      }
+    });
+    departments = Object.keys(departmentCounts);
+    counts = Object.values(departmentCounts);
+  }
   
   departmentChart = new Chart(ctx, {
     type: 'bar',

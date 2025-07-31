@@ -10,9 +10,9 @@ test.describe('Login Message Display Tests', () => {
   });
 
   test.describe('Error Messages', () => {
-    test('TC021: Verify error message display', async () => {
+    test('TC021: Verify error message display for empty fields', async () => {
       await loginPage.loginButton.click();
-      await loginPage.verifyErrorMessage('Invalid username or password. Please try again.');
+      await loginPage.verifyErrorMessage('Please enter both username and password.');
     });
 
     test('TC022: Verify error message styling', async () => {
@@ -31,13 +31,13 @@ test.describe('Login Message Display Tests', () => {
 
   test.describe('Success Messages', () => {
     test('TC024: Verify success message display', async () => {
-      await loginPage.login('testuser', 'testpass');
+      await loginPage.login('admin', 'admin123');
       await loginPage.verifySuccessMessage('Login successful! Redirecting...');
     });
 
     test('TC025: Verify success message timing', async () => {
       const startTime = Date.now();
-      await loginPage.login('testuser', 'testpass');
+      await loginPage.login('admin', 'admin123');
       
       // Wait for redirect
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/, { timeout: 5000 });
@@ -50,7 +50,7 @@ test.describe('Login Message Display Tests', () => {
     });
 
     test('TC026: Verify success message accessibility', async () => {
-      await loginPage.login('testuser', 'testpass');
+      await loginPage.login('admin', 'admin123');
       await expect(loginPage.successMessage).toBeVisible();
       await expect(loginPage.successMessage).toHaveAttribute('role', 'status');
       await expect(loginPage.successMessage).toHaveAttribute('aria-live', 'polite');

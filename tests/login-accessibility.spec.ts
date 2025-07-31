@@ -68,8 +68,8 @@ test.describe('Login Accessibility Tests', () => {
     });
 
     test('TC042: Verify Enter key submission', async () => {
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       
       // Press Enter in password field
       await loginPage.passwordInput.press('Enter');
@@ -79,8 +79,8 @@ test.describe('Login Accessibility Tests', () => {
     });
 
     test('TC043: Verify Ctrl+Enter submission', async () => {
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       
       // Press Ctrl+Enter
       await loginPage.page.keyboard.press('Control+Enter');
@@ -94,11 +94,11 @@ test.describe('Login Accessibility Tests', () => {
       await loginPage.page.keyboard.press('Tab'); // Should focus first element
       
       // Fill username using keyboard
-      await loginPage.page.keyboard.type('testuser');
+      await loginPage.page.keyboard.type('admin');
       
       // Tab to password
       await loginPage.page.keyboard.press('Tab');
-      await loginPage.page.keyboard.type('testpass');
+      await loginPage.page.keyboard.type('admin123');
       
       // Tab to button and activate
       await loginPage.page.keyboard.press('Tab');

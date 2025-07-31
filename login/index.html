@@ -74,7 +74,7 @@
   </main>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       
       const username = document.getElementById('username').value.trim();
@@ -88,15 +88,37 @@
       errorMessage.style.display = 'none';
       successMessage.style.display = 'none';
       
+      // Validate inputs
+      if (!username || !password) {
+        loginBtn.classList.add('error');
+        btnSpan.textContent = 'Please fill in all fields';
+        errorMessage.textContent = 'Please enter both username and password.';
+        errorMessage.style.display = 'block';
+        
+        setTimeout(() => {
+          loginBtn.classList.remove('error');
+          btnSpan.textContent = 'Sign In';
+        }, 2000);
+        return;
+      }
+      
       // Add loading state
       loginBtn.classList.add('loading');
       btnSpan.textContent = 'Signing in...';
       
-      // Simulate network delay for better UX
-      setTimeout(() => {
-        // Simple authentication - in a real app, this would be server-side
-        if (username && password) {
-          // For demo purposes, accept any non-empty username and password
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          // Success
           loginBtn.classList.remove('loading');
           loginBtn.classList.add('success');
           btnSpan.innerHTML = '<i class="checkmark">✓</i> Success!';
@@ -104,33 +126,41 @@
           // Show success message
           successMessage.style.display = 'block';
           
-          // Store username in sessionStorage for the main page
-          sessionStorage.setItem('loggedInUser', username);
+          // Store user info in sessionStorage for the main page
+          sessionStorage.setItem('loggedInUser', data.user.firstName + ' ' + data.user.lastName);
+          sessionStorage.setItem('userId', data.user.id);
+          sessionStorage.setItem('userRole', data.user.role);
           
           // Redirect to main page after success animation
           setTimeout(() => {
             window.location.href = '../mainPage/index.html';
           }, 1500);
         } else {
-          // Show error for empty credentials
-          loginBtn.classList.remove('loading');
-          loginBtn.classList.add('error');
-          btnSpan.textContent = 'Please try again';
-          
-          errorMessage.style.display = 'block';
-          
-          // Shake animation for form
-          document.querySelector('.login-container').classList.add('shake');
-          
-          // Reset button after delay
-          setTimeout(() => {
-            loginBtn.classList.remove('error');
-            loginBtn.classList.remove('success');
-            btnSpan.textContent = 'Sign In';
-            document.querySelector('.login-container').classList.remove('shake');
-          }, 2000);
+          // Error from server
+          throw new Error(data.error || 'Login failed');
         }
-      }, 1000);
+      } catch (error) {
+        console.error('Login error:', error);
+        
+        // Show error
+        loginBtn.classList.remove('loading');
+        loginBtn.classList.add('error');
+        btnSpan.textContent = 'Please try again';
+        
+        errorMessage.textContent = error.message || 'Login failed. Please check your credentials.';
+        errorMessage.style.display = 'block';
+        
+        // Shake animation for form
+        document.querySelector('.login-container').classList.add('shake');
+        
+        // Reset button after delay
+        setTimeout(() => {
+          loginBtn.classList.remove('error');
+          loginBtn.classList.remove('success');
+          btnSpan.textContent = 'Sign In';
+          document.querySelector('.login-container').classList.remove('shake');
+        }, 2000);
+      }
     });
     
     // Add input focus effects

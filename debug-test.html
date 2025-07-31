@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Debug Page</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+        button { padding: 10px; margin: 5px; }
+        input[type="checkbox"] { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test Management Debug</h1>
+    
+    <div class="debug">
+        <h3>Test Checkboxes</h3>
+        <input type="checkbox" class="test-checkbox" id="test1"> 
+        <label for="test1">jira-demo.spec.ts</label><br>
+        
+        <input type="checkbox" class="test-checkbox" id="test2"> 
+        <label for="test2">login-functional.spec.ts</label><br>
+        
+        <input type="checkbox" class="test-checkbox" id="test3"> 
+        <label for="test3">login-ui.spec.ts</label><br>
+    </div>
+    
+    <div class="debug">
+        <button id="runSelectedTestsBtn" disabled>Run Selected</button>
+        <button onclick="debugSelection()">Debug Selection</button>
+    </div>
+    
+    <div class="debug" id="debugOutput"></div>
+    
+    <script>
+        // Simulate the getSelectedTestFiles function
+        function getSelectedTestFiles() {
+            const selectedCheckboxes = document.querySelectorAll('.test-checkbox:checked');
+            const selectedFiles = [];
+            
+            selectedCheckboxes.forEach(checkbox => {
+                const label = document.querySelector(`label[for="${checkbox.id}"]`);
+                if (label) {
+                    selectedFiles.push(label.textContent.trim());
+                }
+            });
+            
+            console.log('Selected files:', selectedFiles);
+            return selectedFiles;
+        }
+        
+        // Simulate the runSelectedTests function
+        async function runSelectedTests() {
+            console.log('🔥 runSelectedTests function called!');
+            
+            const selectedCheckboxes = document.querySelectorAll('.test-checkbox:checked');
+            console.log('Selected checkboxes:', selectedCheckboxes.length);
+            
+            if (selectedCheckboxes.length === 0) {
+                alert('Please select tests to run');
+                return;
+            }
+            
+            const selectedTestFiles = getSelectedTestFiles();
+            console.log('Selected test files to run:', selectedTestFiles);
+            
+            document.getElementById('debugOutput').innerHTML = `
+                <h4>Debug Output:</h4>
+                <p>Selected checkboxes: ${selectedCheckboxes.length}</p>
+                <p>Selected files: ${selectedTestFiles.join(', ')}</p>
+                <p>Request would be sent to: /api/tests/run</p>
+                <p>With data: ${JSON.stringify({testFiles: selectedTestFiles, suite: 'selected'})}</p>
+            `;
+        }
+        
+        // Update button state
+        function updateSelectedCount() {
+            const selectedCount = document.querySelectorAll('.test-checkbox:checked').length;
+            const runSelectedBtn = document.getElementById('runSelectedTestsBtn');
+            
+            if (selectedCount > 0) {
+                runSelectedBtn.textContent = `Run Selected (${selectedCount})`;
+                runSelectedBtn.disabled = false;
+            } else {
+                runSelectedBtn.textContent = 'Run Selected';
+                runSelectedBtn.disabled = true;
+            }
+        }
+        
+        // Debug function
+        function debugSelection() {
+            const checkboxes = document.querySelectorAll('.test-checkbox');
+            const checked = document.querySelectorAll('.test-checkbox:checked');
+            
+            document.getElementById('debugOutput').innerHTML = `
+                <h4>Selection Debug:</h4>
+                <p>Total checkboxes found: ${checkboxes.length}</p>
+                <p>Checked checkboxes: ${checked.length}</p>
+                <p>Button disabled: ${document.getElementById('runSelectedTestsBtn').disabled}</p>
+            `;
+        }
+        
+        // Setup event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Checkbox change listener
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('test-checkbox')) {
+                    updateSelectedCount();
+                }
+            });
+            
+            // Button click listener
+            document.getElementById('runSelectedTestsBtn').addEventListener('click', runSelectedTests);
+            
+            console.log('Event listeners set up');
+        });
+    </script>
+</body>
+</html>

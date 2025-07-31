@@ -58,6 +58,13 @@
       type="button">
       <i class="fas fa-chart-bar" aria-hidden="true"></i>
     </button>
+    <button 
+      class="sidebar-icon" 
+      data-page="tests"
+      aria-label="Test Management"
+      type="button">
+      <i class="fas fa-vial" aria-hidden="true"></i>
+    </button>
   </nav>
 
   <main class="main-content" role="main" aria-labelledby="dashboard-heading">
@@ -78,6 +85,12 @@
         <i class="fas fa-chart-bar" aria-hidden="true"></i>
         <h3 id="analytics-title">Analytics & Reports</h3>
         <p id="analytics-desc">View detailed analytics, generate comprehensive reports, and track key performance metrics to drive data-driven decisions.</p>
+      </article>
+      
+      <article class="card" tabindex="0" role="button" aria-labelledby="tests-title" aria-describedby="tests-desc">
+        <i class="fas fa-vial" aria-hidden="true"></i>
+        <h3 id="tests-title">Test Management</h3>
+        <p id="tests-desc">Manage Playwright test suites, execute tests, and monitor test results to ensure application quality and reliability.</p>
       </article>
     </section>
   </main>
@@ -145,6 +158,14 @@
             setTimeout(() => {
               window.location.href = '../reports/index.html';
             }, 300);
+          } else if (page === 'tests') {
+            // Navigate to test management page
+            this.style.background = 'var(--primary-gradient)';
+            this.style.color = 'white';
+            
+            setTimeout(() => {
+              window.location.href = '../tests-management/index.html';
+            }, 300);
           }
         });
       });
@@ -174,6 +195,11 @@
             this.style.transform = 'scale(0.98)';
             setTimeout(() => {
               window.location.href = '../reports/index.html';
+            }, 200);
+          } else if (cardTitle === 'Test Management') {
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              window.location.href = '../tests-management/index.html';
             }, 200);
           }
         });

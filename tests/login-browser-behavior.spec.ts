@@ -15,8 +15,8 @@ test.describe('Login Browser Behavior Tests', () => {
       const initialUrl = loginPage.page.url();
       
       // Fill form and submit
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       await loginPage.loginButton.click();
       
       // Page should not refresh, URL should not change (until redirect)
@@ -39,8 +39,8 @@ test.describe('Login Browser Behavior Tests', () => {
     });
 
     test('TC047: Verify multiple submissions prevention', async () => {
-      await loginPage.usernameInput.fill('testuser');
-      await loginPage.passwordInput.fill('testpass');
+      await loginPage.usernameInput.fill('admin');
+      await loginPage.passwordInput.fill('admin123');
       
       // Click submit button
       await loginPage.loginButton.click();

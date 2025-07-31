@@ -10,62 +10,72 @@ test.describe('Login Functional Tests', () => {
   });
 
   test.describe('Successful Login Scenarios', () => {
-    test('TC001: Login with valid username and password', async () => {
-      await loginPage.login('testuser', 'testpass');
+    test('TC001: Login with admin credentials', async () => {
+      await loginPage.login('admin', 'admin123');
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC002: Login with alphanumeric username', async () => {
-      await loginPage.login('user123', 'password');
+    test('TC002: Login with regular user credentials', async () => {
+      await loginPage.login('jdoe', 'password123');
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC003: Login with special characters in credentials', async () => {
-      await loginPage.login('user@domain.com', 'Pass@123!');
+    test('TC003: Login with moderator user credentials', async () => {
+      await loginPage.login('jsmith', 'password123');
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC004: Login with single character credentials', async () => {
-      await loginPage.login('a', 'b');
+    test('TC004: Login with HR user credentials', async () => {
+      await loginPage.login('swilson', 'password123');
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC005: Login with maximum length credentials', async () => {
-      const longUsername = 'a'.repeat(300);
-      const longPassword = 'b'.repeat(300);
-      await loginPage.login(longUsername, longPassword);
+    test('TC005: Login with case-sensitive username', async () => {
+      await loginPage.login('admin', 'admin123'); // admin is lowercase in database
       await expect(loginPage.page).toHaveURL(/.*mainPage\/index\.html/);
     });
   });
 
   test.describe('Failed Login Scenarios', () => {
-    test('TC006: Login with empty username', async () => {
-      await loginPage.login('', 'validpassword');
-      await loginPage.verifyErrorMessage();
+    test('TC006: Login with invalid username', async () => {
+      await loginPage.login('invaliduser', 'password123');
+      await loginPage.verifyErrorMessage('Invalid credentials');
       await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC007: Login with empty password', async () => {
-      await loginPage.login('validuser', '');
-      await loginPage.verifyErrorMessage();
+    test('TC007: Login with valid username but wrong password', async () => {
+      await loginPage.login('admin', 'wrongpassword');
+      await loginPage.verifyErrorMessage('Invalid credentials');
       await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC008: Login with both fields empty', async () => {
+    test('TC008: Login with empty username', async () => {
+      await loginPage.login('', 'admin123');
+      await loginPage.verifyErrorMessage('Please enter both username and password.');
+      await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
+    });
+
+    test('TC009: Login with empty password', async () => {
+      await loginPage.login('admin', '');
+      await loginPage.verifyErrorMessage('Please enter both username and password.');
+      await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
+    });
+
+    test('TC010: Login with both fields empty', async () => {
       await loginPage.login('', '');
-      await loginPage.verifyErrorMessage();
+      await loginPage.verifyErrorMessage('Please enter both username and password.');
       await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC009: Login with whitespace-only username', async () => {
-      await loginPage.login('   ', 'validpassword');
-      await loginPage.verifyErrorMessage();
+    test('TC011: Login with case-sensitive password failure', async () => {
+      await loginPage.login('admin', 'ADMIN123'); // Wrong case
+      await loginPage.verifyErrorMessage('Invalid credentials');
       await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
     });
 
-    test('TC010: Login with whitespace-only password', async () => {
-      await loginPage.login('validuser', '   ');
-      await loginPage.verifyErrorMessage();
+    test('TC012: Login with whitespace-only credentials', async () => {
+      await loginPage.login('   ', '   ');
+      await loginPage.verifyErrorMessage('Please enter both username and password.');
       await expect(loginPage.page).not.toHaveURL(/.*mainPage\/index\.html/);
     });
   });

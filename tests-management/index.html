@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Management - Demo App</title>
+  <meta name="description" content="Manage and view Playwright test suites, run tests, and analyze test results.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+</head>
+<body>
+  <header class="header" role="banner">
+    <div class="header-left">
+      <a href="../mainPage/index.html" class="back-btn">
+        <i class="fas fa-arrow-left"></i>
+        Back to Dashboard
+      </a>
+      <h1 class="page-title">Test Management</h1>
+    </div>
+    <div class="user-info" id="welcomeMessage">Welcome, User!</div>
+  </header>
+
+  <main class="main-content">
+    <!-- Test Summary Stats -->
+    <section class="test-summary" aria-label="Test Statistics">
+      <div class="summary-card">
+        <div class="summary-icon total">
+          <i class="fas fa-vial"></i>
+        </div>
+        <div class="summary-info">
+          <h3 id="totalTests">49</h3>
+          <p>Total Tests</p>
+        </div>
+      </div>
+      
+      <div class="summary-card">
+        <div class="summary-icon passing">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="summary-info">
+          <h3 id="passingTests">49</h3>
+          <p>Passing Tests</p>
+        </div>
+      </div>
+      
+      <div class="summary-card">
+        <div class="summary-icon failing">
+          <i class="fas fa-times-circle"></i>
+        </div>
+        <div class="summary-info">
+          <h3 id="failingTests">0</h3>
+          <p>Failing Tests</p>
+        </div>
+      </div>
+      
+      <div class="summary-card">
+        <div class="summary-icon last-run">
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="summary-info">
+          <h3 id="lastRun">Never</h3>
+          <p>Last Run</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Test Management Section -->
+    <section class="test-section" aria-label="Test Management">
+      <div class="section-header">
+        <h2>Playwright Tests</h2>
+        <div class="test-controls">
+          <button id="runAllTestsBtn" class="test-action-btn">
+            <i class="fas fa-play"></i>
+            Run All Tests
+          </button>
+          <button id="runSelectedTestsBtn" class="test-action-btn secondary" disabled>
+            <i class="fas fa-play-circle"></i>
+            Run Selected
+          </button>
+          <button id="refreshBtn" class="refresh-btn" title="Refresh test data">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Test Execution Progress -->
+      <div id="testProgress" class="test-progress" style="display: none;">
+        <div class="progress-info">
+          <span id="progressText">Preparing tests...</span>
+          <span id="progressTime">0s</span>
+        </div>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="test-filters">
+        <div class="filter-group">
+          <label for="statusFilter">Status:</label>
+          <select id="statusFilter" class="filter-select">
+            <option value="all">All Statuses</option>
+            <option value="passed">Passed</option>
+            <option value="failed">Failed</option>
+            <option value="skipped">Skipped</option>
+            <option value="running">Running</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label for="suiteFilter">Suite:</label>
+          <select id="suiteFilter" class="filter-select">
+            <option value="all">All Suites</option>
+            <option value="Accessibility Tests">Accessibility Tests</option>
+            <option value="Browser Tests">Browser Tests</option>
+            <option value="Functional Tests">Functional Tests</option>
+            <option value="Message Tests">Message Tests</option>
+            <option value="Navigation Tests">Navigation Tests</option>
+            <option value="UI Tests">UI Tests</option>
+            <option value="Validation Tests">Validation Tests</option>
+            <option value="Integration Tests">Integration Tests</option>
+          </select>
+        </div>
+        
+        <div class="search-container">
+          <i class="fas fa-search search-icon"></i>
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input" 
+            placeholder="Search tests..."
+            aria-label="Search tests">
+        </div>
+      </div>
+
+      <div class="test-table-container">
+        <table class="test-table" role="table">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" id="selectAllTests" class="test-checkbox" aria-label="Select all tests">
+              </th>
+              <th>Test Name</th>
+              <th>File</th>
+              <th>Suite</th>
+              <th>Status</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody id="testTableBody">
+            <!-- Test rows will be populated by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
