@@ -10,9 +10,15 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:static": "USE_SERVER=false playwright test",
-    "test:user-management": "playwright test tests/user-management.spec.ts",
-    "test:user-management:headed": "playwright test tests/user-management.spec.ts --headed",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:jira": "playwright test --config=playwright.config.jira.ts",
+    "test:jira:headed": "playwright test --headed --config=playwright.config.jira.ts",
+    "test:jira:ui": "playwright test --ui --config=playwright.config.jira.ts",
+    "test:jira:static": "USE_SERVER=false playwright test --config=playwright.config.jira.ts",
+    "test:jira:login-functional": "playwright test tests/login-functional.spec.ts --config=playwright.config.jira.ts",
+    "test:jira:login-functional:headed": "playwright test tests/login-functional.spec.ts --headed --config=playwright.config.jira.ts",
+    "test-jira-setup": "node scripts/test-jira-integration.js",
+    "setup-jira": "node scripts/setup-jira-integration.js"
   },
   "keywords": [
     "demo",
@@ -27,6 +33,7 @@
   "devDependencies": {
     "@playwright/test": "^1.54.1",
     "@types/node": "^24.1.0",
+    "dotenv": "^16.6.1",
     "start-server-and-test": "^2.0.3",
     "typescript": "^5.8.3"
   },
