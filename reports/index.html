@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics & Reports - Demo App</title>
+  <meta name="description" content="User analytics dashboard with charts, graphs, and comprehensive reporting features.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="header" role="banner">
+    <div class="header-left">
+      <button 
+        id="backBtn" 
+        class="back-btn"
+        aria-label="Go back to dashboard"
+        type="button">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+        Back to Dashboard
+      </button>
+      <h1 id="page-title">Analytics & Reports</h1>
+    </div>
+    <div class="header-right" role="region" aria-label="User information and controls">
+      <div class="avatar" role="img" aria-labelledby="user-info">
+        <img 
+          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&crop=face" 
+          alt="User profile picture" 
+          class="avatar-img">
+        <div class="badge" aria-label="3 notifications">3</div>
+      </div>
+      <span id="welcomeMessage" id="user-info" role="status" aria-live="polite">Welcome, User!</span>
+      <button 
+        id="logoutBtn" 
+        class="logout-btn"
+        aria-label="Sign out of your account"
+        type="button">
+        <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <main class="main-content" role="main" aria-labelledby="reports-heading">
+    <div class="reports-container">
+      <section class="page-header" aria-labelledby="reports-heading">
+        <h2 id="reports-heading">User Analytics Dashboard</h2>
+        <p class="page-description">Comprehensive insights into user behavior, demographics, and application usage patterns.</p>
+        
+        <div class="date-filter-controls">
+          <label for="dateRange" class="filter-label">Time Period:</label>
+          <select id="dateRange" class="date-filter" aria-label="Select time period for analytics">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 3 months</option>
+            <option value="365">Last year</option>
+          </select>
+          <button id="refreshData" class="refresh-btn" aria-label="Refresh analytics data">
+            <i class="fas fa-sync-alt" aria-hidden="true"></i>
+            Refresh Data
+          </button>
+        </div>
+      </section>
+
+      <!-- Summary Statistics -->
+      <section class="stats-overview" aria-labelledby="stats-heading">
+        <h3 id="stats-heading" class="sr-only">Overview Statistics</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-users" aria-hidden="true"></i>
+            </div>
+            <div class="stat-content">
+              <h4>Total Users</h4>
+              <span class="stat-value" id="totalUsers">8</span>
+              <span class="stat-change positive">↑ 12.5%</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-user-check" aria-hidden="true"></i>
+            </div>
+            <div class="stat-content">
+              <h4>Active Users</h4>
+              <span class="stat-value" id="activeUsers">6</span>
+              <span class="stat-change positive">↑ 8.3%</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-clock" aria-hidden="true"></i>
+            </div>
+            <div class="stat-content">
+              <h4>Pending Users</h4>
+              <span class="stat-value" id="pendingUsers">2</span>
+              <span class="stat-change negative">↓ 25%</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-chart-line" aria-hidden="true"></i>
+            </div>
+            <div class="stat-content">
+              <h4>Avg. Session</h4>
+              <span class="stat-value">24m</span>
+              <span class="stat-change positive">↑ 15%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="charts-section" aria-labelledby="charts-heading">
+        <h3 id="charts-heading" class="section-title">User Analytics</h3>
+        
+        <div class="charts-grid">
+          <!-- User Status Distribution -->
+          <div class="chart-container">
+            <div class="chart-header">
+              <h4>User Status Distribution</h4>
+              <div class="chart-controls">
+                <button class="chart-action-btn" aria-label="Download chart as image" title="Download Chart">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button class="chart-action-btn" aria-label="View chart in fullscreen" title="Fullscreen">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="userStatusChart" aria-label="Pie chart showing distribution of user statuses"></canvas>
+            </div>
+          </div>
+
+          <!-- User Roles Distribution -->
+          <div class="chart-container">
+            <div class="chart-header">
+              <h4>User Roles Distribution</h4>
+              <div class="chart-controls">
+                <button class="chart-action-btn" aria-label="Download chart as image" title="Download Chart">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button class="chart-action-btn" aria-label="View chart in fullscreen" title="Fullscreen">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="userRolesChart" aria-label="Doughnut chart showing distribution of user roles"></canvas>
+            </div>
+          </div>
+
+          <!-- Department Distribution -->
+          <div class="chart-container">
+            <div class="chart-header">
+              <h4>Users by Department</h4>
+              <div class="chart-controls">
+                <button class="chart-action-btn" aria-label="Download chart as image" title="Download Chart">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button class="chart-action-btn" aria-label="View chart in fullscreen" title="Fullscreen">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="departmentChart" aria-label="Bar chart showing user distribution across departments"></canvas>
+            </div>
+          </div>
+
+          <!-- User Growth Trend -->
+          <div class="chart-container chart-full-width">
+            <div class="chart-header">
+              <h4>User Growth Trend</h4>
+              <div class="chart-controls">
+                <button class="chart-action-btn" aria-label="Download chart as image" title="Download Chart">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button class="chart-action-btn" aria-label="View chart in fullscreen" title="Fullscreen">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="userGrowthChart" aria-label="Line chart showing user registration growth over time"></canvas>
+            </div>
+          </div>
+
+          <!-- User Activity Heatmap -->
+          <div class="chart-container chart-full-width">
+            <div class="chart-header">
+              <h4>User Activity by Day of Week</h4>
+              <div class="chart-controls">
+                <button class="chart-action-btn" aria-label="Download chart as image" title="Download Chart">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button class="chart-action-btn" aria-label="View chart in fullscreen" title="Fullscreen">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="activityChart" aria-label="Bar chart showing user activity levels by day of week"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Detailed Reports Table -->
+      <section class="reports-table-section" aria-labelledby="table-heading">
+        <div class="table-header">
+          <h3 id="table-heading">Detailed User Report</h3>
+          <div class="table-controls">
+            <button id="exportBtn" class="export-btn">
+              <i class="fas fa-file-export" aria-hidden="true"></i>
+              Export CSV
+            </button>
+            <button id="printBtn" class="print-btn">
+              <i class="fas fa-print" aria-hidden="true"></i>
+              Print Report
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="reports-table" role="table" aria-label="Detailed user analytics data">
+            <thead>
+              <tr>
+                <th scope="col">User</th>
+                <th scope="col">Department</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last Active</th>
+                <th scope="col">Sessions</th>
+                <th scope="col">Avg. Duration</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody">
+              <!-- Dynamic content will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-spinner">
+      <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+      <p>Loading analytics data...</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

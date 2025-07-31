@@ -27,5 +27,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Demo App server running at http://localhost:${PORT}`);
   console.log(`📱 Login page: http://localhost:${PORT}/login/index.html`);
   console.log(`👥 User Management: http://localhost:${PORT}/users/index.html`);
+  console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log('✨ Press Ctrl+C to stop the server');
 });

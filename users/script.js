@@ -157,6 +157,11 @@ function initializeEventListeners() {
     showModal();
   });
   
+  // View reports button
+  document.getElementById('viewReportsBtn').addEventListener('click', function() {
+    window.location.href = '../reports/index.html';
+  });
+  
   document.getElementById('closeModal').addEventListener('click', function() {
     hideModal();
   });
