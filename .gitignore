@@ -9,6 +9,10 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Jira integration secrets
+.env.jira
+jira-test-report.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
