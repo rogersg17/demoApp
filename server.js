@@ -3,7 +3,8 @@ const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const { spawn } = require('child_process');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const Database = require('./database/database');
 
 const app = express();
@@ -102,14 +103,14 @@ app.get('/api/tests', requireAuth, async (req, res) => {
   try {
     // Read actual test files from the tests directory
     const testsDir = path.join(__dirname, 'tests');
-    const testFiles = await fs.readdir(testsDir);
+    const testFiles = await fsPromises.readdir(testsDir);
     const specFiles = testFiles.filter(file => file.endsWith('.spec.ts'));
     
     // Parse test files to get test information
     const tests = [];
     for (const file of specFiles) {
       const filePath = path.join(testsDir, file);
-      const content = await fs.readFile(filePath, 'utf8');
+      const content = await fsPromises.readFile(filePath, 'utf8');
       
       // Extract test cases from the file
       const testMatches = content.match(/test\(['"`]([^'"`]+)['"`]/g) || [];

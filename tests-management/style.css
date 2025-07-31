@@ -441,6 +441,13 @@ body::before {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
+.test-date {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  white-space: nowrap;
+}
+
 /* Status Badges */
 .status-badge {
   padding: 0.25rem 0.75rem;
@@ -469,6 +476,11 @@ body::before {
 .status-badge.status-running {
   background: rgba(0, 122, 255, 0.2);
   color: #007AFF;
+}
+
+.status-badge.status-not-run {
+  background: rgba(142, 142, 147, 0.2);
+  color: #8E8E93;
 }
 
 /* No Tests Message */
