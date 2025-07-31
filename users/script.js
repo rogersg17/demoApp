@@ -373,7 +373,7 @@ function hideModal() {
 
 function hideDeleteModal() {
   const modal = document.getElementById('deleteUserModal');
-  modal.style.display = 'none';
+  modal.classList.remove('show');
   
   // Reset confirm button state
   const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
@@ -446,8 +446,8 @@ function deleteUser(userId) {
   // Set user name in modal
   deleteUserName.textContent = `${user.firstName} ${user.lastName}`;
   
-  // Show modal
-  deleteModal.style.display = 'flex';
+  // Show modal with proper centering
+  deleteModal.classList.add('show');
   
   // Handle confirmation
   const handleConfirmDelete = () => {
@@ -463,8 +463,8 @@ function deleteUser(userId) {
       renderUsers();
       updateStats();
       
-      // Hide modal
-      deleteModal.style.display = 'none';
+      // Hide modal with proper class removal
+      deleteModal.classList.remove('show');
       
       // Reset button
       confirmDeleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete User';
