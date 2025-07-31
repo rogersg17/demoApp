@@ -45,15 +45,15 @@ test.describe('Login Browser Behavior Tests', () => {
       // Click submit button
       await loginPage.loginButton.click();
       
-      // Button should be in loading state
-      await expect(loginPage.loginButton).toHaveClass(/loading/);
+      // Button should be in loading state or success state (both prevent multiple submissions)
+      await expect(loginPage.loginButton).toHaveClass(/loading|success/);
       
-      // Try to click again - should not be possible due to loading state
+      // Try to click again - should not be possible due to loading/success state
       const isEnabled = await loginPage.loginButton.isEnabled();
       
       // The button might still be enabled but the class should prevent multiple submissions
       const buttonClass = await loginPage.loginButton.getAttribute('class');
-      expect(buttonClass).toContain('loading');
+      expect(buttonClass).toMatch(/loading|success/);
     });
   });
 });

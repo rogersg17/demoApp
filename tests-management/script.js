@@ -544,23 +544,67 @@ async function refreshTestData() {
 
 // Show notification
 function showNotification(message, type = 'info') {
+    // Ensure notification container exists
+    let notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        `;
+        document.body.appendChild(notificationContainer);
+    }
+    
     // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
+    notification.style.cssText = `
+        position: relative;
+        top: auto;
+        right: auto;
+        pointer-events: auto;
+        transform: translateX(100%);
+        opacity: 0;
+        transition: all 0.3s ease-out;
+    `;
     notification.innerHTML = `
         <span>${message}</span>
-        <button onclick="this.parentElement.remove()">&times;</button>
+        <button onclick="removeNotification(this.parentElement)">&times;</button>
     `;
     
-    // Add to page
-    document.body.appendChild(notification);
+    // Add to container
+    notificationContainer.appendChild(notification);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+        notification.style.transform = 'translateX(0)';
+        notification.style.opacity = '1';
+    });
     
     // Auto remove after 5 seconds
     setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
+        removeNotification(notification);
     }, 5000);
+}
+
+// Remove notification with animation
+function removeNotification(notification) {
+    if (notification && notification.parentElement) {
+        notification.style.transform = 'translateX(100%)';
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 300);
+    }
 }
 
 // Progress indicator functions
