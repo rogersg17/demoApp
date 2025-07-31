@@ -3,6 +3,7 @@ let allTests = [];
 let currentTests = [];
 let testResults = null;
 let currentExecutionTestIds = []; // Store test IDs for current execution
+let latestExecutionResults = { passed: 0, failed: 0, total: 0 }; // Track latest execution summary
 
 // Utility function to format dates
 function formatDate(dateString) {
@@ -272,11 +273,12 @@ function setupEventListeners() {
 
 // Update summary statistics
 function updateSummaryStats() {
-    const passed = allTests.filter(t => t.status === 'passed').length;
-    const failed = allTests.filter(t => t.status === 'failed').length;
+    // Always use latest execution results if available, otherwise show 0 for passed/failed
+    const passed = latestExecutionResults.total > 0 ? latestExecutionResults.passed : 0;
+    const failed = latestExecutionResults.total > 0 ? latestExecutionResults.failed : 0;
     const total = allTests.length;
     
-    console.log('📊 Updating summary stats:', { total, passed, failed });
+    console.log('📊 Updating summary stats:', { total, passed, failed, latestExecution: latestExecutionResults });
     
     document.getElementById('totalTests').textContent = total;
     document.getElementById('passingTests').textContent = passed;
@@ -614,7 +616,17 @@ function updateSelectedTestsAfterCompletion(results) {
     
     console.log(`📝 Updating ${currentExecutionTestIds.length} tests`);
     
-    currentExecutionTestIds.forEach((testId, index) => {
+    // Store the execution IDs before clearing them
+    const executionTestIds = [...currentExecutionTestIds];
+    
+    // Clear the stored test IDs immediately to prevent reuse
+    currentExecutionTestIds = [];
+    
+    // Track the latest execution results for summary
+    let executionPassed = 0;
+    let executionFailed = 0;
+    
+    executionTestIds.forEach((testId, index) => {
         // Find the test in our allTests array and update it
         const testIndex = allTests.findIndex(t => t.id == testId);
         if (testIndex !== -1) {
@@ -626,10 +638,17 @@ function updateSelectedTestsAfterCompletion(results) {
             // If there were failures, distribute them across selected tests
             if (results.failed > 0) {
                 // Mark roughly the right proportion as failed
-                const failureRate = results.failed / results.total;
+                const failureRate = results.failed / executionTestIds.length;
                 if (Math.random() < failureRate) {
                     status = 'failed';
                 }
+            }
+            
+            // Count for latest execution summary
+            if (status === 'passed') {
+                executionPassed++;
+            } else {
+                executionFailed++;
             }
             
             console.log(`✅ Updating test ${testId} (${allTests[testIndex].name}) to status: ${status}`);
@@ -652,10 +671,16 @@ function updateSelectedTestsAfterCompletion(results) {
         }
     });
     
-    // Clear the stored test IDs after completion
-    currentExecutionTestIds = [];
+    // Update latest execution results for summary
+    latestExecutionResults = {
+        passed: executionPassed,
+        failed: executionFailed,
+        total: executionTestIds.length
+    };
     
-    // Force update summary stats with current data
+    console.log('📈 Latest execution results:', latestExecutionResults);
+    
+    // Force update summary stats with latest execution data
     console.log('📈 Updating summary stats');
     updateSummaryStats();
 }
@@ -722,12 +747,14 @@ function updateTestStatusInTable(testId, status, duration, dateRun) {
 function handleTestCompletion(execution) {
     const results = execution.results;
     
+    // Track the number of tests that were executed before any clearing happens
+    const executedTestCount = currentExecutionTestIds.length;
+    
     if (results) {
         const summary = `Tests completed! 
-            Total: ${results.total}, 
-            Passed: ${results.passed}, 
-            Failed: ${results.failed}, 
-            Skipped: ${results.skipped}
+            Total: ${executedTestCount}, 
+            Passed: ${executedTestCount - (results.failed > 0 ? Math.min(results.failed, executedTestCount) : 0)}, 
+            Failed: ${results.failed > 0 ? Math.min(results.failed, executedTestCount) : 0}, 
             Duration: ${results.duration}`;
         
         if (results.failed > 0) {
@@ -743,13 +770,6 @@ function handleTestCompletion(execution) {
         
         // Update all selected tests based on overall results
         updateSelectedTestsAfterCompletion(results);
-        
-        // Update summary statistics
-        if (results.total !== undefined) {
-            document.getElementById('totalTests').textContent = results.total;
-            document.getElementById('passingTests').textContent = results.passed || 0;
-            document.getElementById('failingTests').textContent = results.failed || 0;
-        }
         
         // Re-render the table to ensure all updates are visible
         console.log('🔄 Re-rendering table after test completion');
