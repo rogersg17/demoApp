@@ -8,26 +8,44 @@ class LoginPage {
   constructor(page) {
     this.page = page;
     
-    // Locators - using descriptive names and efficient selectors
+    // Locators - using descriptive names and efficient selectors for React app
     this.usernameInput = page.locator('#username');
     this.passwordInput = page.locator('#password');
-    this.loginButton = page.locator('#loginBtn, button[type="submit"]');
-    this.loginForm = page.locator('#loginForm');
-    this.errorMessage = page.locator('#error-message');
-    this.successMessage = page.locator('#success-message');
-    this.pageHeading = page.locator('h1#login-heading');
+    this.loginButton = page.locator('button[type="submit"]');
+    this.loginForm = page.locator('.login-form');
+    this.errorMessage = page.locator('.error-message');
+    this.successMessage = page.locator('.success-message');
+    this.pageHeading = page.locator('.login-heading');
     
-    // Field error locators
-    this.usernameError = page.locator('#username-error');
-    this.passwordError = page.locator('#password-error');
+    // Field error locators for React app
+    this.usernameError = page.locator('.input-group:has(#username) .field-error');
+    this.passwordError = page.locator('.input-group:has(#password) .field-error');
   }
 
   /**
    * Navigate to the login page and wait for it to load
    * @param {string} [url] - Optional URL override
    */
-  async goto(url = '/login/index.html') {
+  async goto(url = '/login') {
     await this.page.goto(url);
+    
+    // Wait for React app to load
+    await this.page.waitForTimeout(2000);
+    
+    // Clear any existing authentication state for clean test
+    try {
+      await this.page.evaluate(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+      });
+      // Reload to ensure clean state
+      await this.page.reload();
+      await this.page.waitForTimeout(1000);
+    } catch (error) {
+      // If clearing storage fails, just continue
+      console.log('Storage clearing failed, continuing with test');
+    }
+    
     await this.waitForPageLoad();
   }
 

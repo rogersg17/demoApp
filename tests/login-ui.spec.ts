@@ -11,7 +11,7 @@ test.describe('Login UI Tests', () => {
 
   test.describe('Page Elements and Layout', () => {
     test('TC011: Verify login page loads correctly', async () => {
-      await expect(loginPage.page).toHaveTitle('Login - Demo App');
+      await expect(loginPage.page).toHaveTitle('Demo App');
       await loginPage.verifyPageElements();
     });
 

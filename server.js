@@ -6,8 +6,19 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const Database = require('./database/database');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:5173", "http://localhost:3000"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Initialize database
@@ -654,12 +665,40 @@ app.get('*', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected: ${socket.id}`);
+  
+  // Handle test execution status updates
+  socket.on('joinTestExecution', (testId) => {
+    socket.join(`test-${testId}`);
+    console.log(`📊 Client joined test execution room: test-${testId}`);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
+});
+
+// Helper function to emit test updates
+function emitTestUpdate(testId, update) {
+  io.to(`test-${testId}`).emit('testUpdate', {
+    testId,
+    timestamp: new Date().toISOString(),
+    ...update
+  });
+}
+
+// Make emitTestUpdate available globally
+global.emitTestUpdate = emitTestUpdate;
+
+server.listen(PORT, () => {
   console.log(`🚀 Demo App server running at http://localhost:${PORT}`);
   console.log(`📱 Login page: http://localhost:${PORT}/login/index.html`);
   console.log(`👥 User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log(`🧪 Test Management: http://localhost:${PORT}/tests-management/index.html`);
   console.log(`⚙️ Settings: http://localhost:${PORT}/settings/index.html`);
+  console.log(`🔌 WebSocket server ready for real-time updates`);
   console.log('✨ Press Ctrl+C to stop the server');
 });

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #debug {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Login Debug Test</h1>
+        <p>Test the login API directly to debug the "Unexpected end of JSON input" error.</p>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" value="admin" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" value="admin123" required>
+            </div>
+            <button type="submit">🚀 Test Login</button>
+        </form>
+        
+        <button onclick="testConnection()">🔗 Test API Connection</button>
+        <button onclick="clearDebug()">🧹 Clear Debug Log</button>
+        
+        <div id="debug"></div>
+    </div>
+
+    <script>
+        const debugElement = document.getElementById('debug');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            debugElement.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            debugElement.scrollTop = debugElement.scrollHeight;
+        }
+        
+        function clearDebug() {
+            debugElement.innerHTML = '';
+        }
+        
+        async function testConnection() {
+            log('🔍 Testing API connection...', 'info');
+            
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'HEAD',
+                    credentials: 'include'
+                });
+                
+                log(`📡 API Response Status: ${response.status} ${response.statusText}`, 'info');
+                log(`📋 Response Headers: ${JSON.stringify([...response.headers.entries()])}`, 'info');
+                
+                if (response.ok) {
+                    log('✅ API connection successful!', 'success');
+                } else {
+                    log('⚠️ API returned non-OK status (this might be expected if not logged in)', 'info');
+                }
+            } catch (error) {
+                log(`❌ API connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            log(`🔐 Attempting login with username: ${username}`, 'info');
+            
+            try {
+                log('📤 Sending login request...', 'info');
+                
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+                
+                log(`📡 Response Status: ${response.status} ${response.statusText}`, 'info');
+                log(`📋 Response Headers: ${JSON.stringify([...response.headers.entries()])}`, 'info');
+                
+                // Try to get the raw response text first
+                const responseText = await response.text();
+                log(`📄 Raw Response Text: "${responseText}"`, 'info');
+                
+                if (!responseText) {
+                    log('❌ Empty response body - this is likely the cause of "Unexpected end of JSON input"', 'error');
+                    return;
+                }
+                
+                // Try to parse as JSON
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                    log(`📊 Parsed JSON: ${JSON.stringify(data, null, 2)}`, 'info');
+                } catch (jsonError) {
+                    log(`❌ JSON Parse Error: ${jsonError.message}`, 'error');
+                    log(`💡 Response was not valid JSON: "${responseText}"`, 'error');
+                    return;
+                }
+                
+                if (response.ok) {
+                    log('✅ Login successful!', 'success');
+                    log(`👤 User Data: ${JSON.stringify(data.user, null, 2)}`, 'success');
+                } else {
+                    log(`❌ Login failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Network/Fetch Error: ${error.message}`, 'error');
+                
+                if (error.message.includes('Unexpected end of JSON input')) {
+                    log('💡 This suggests the server returned an empty response', 'error');
+                    log('💡 Check if the backend server is running and the proxy is configured correctly', 'error');
+                }
+            }
+        });
+        
+        // Initial connection test
+        window.addEventListener('load', () => {
+            log('🚀 Login Debug Tool Loaded', 'info');
+            log('🎯 Backend should be running on: http://localhost:3000', 'info');
+            log('🎯 Frontend proxy should redirect /api/* to backend', 'info');
+            testConnection();
+        });
+    </script>
+</body>
+</html>
