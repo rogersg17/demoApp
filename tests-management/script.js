@@ -273,16 +273,25 @@ function setupEventListeners() {
 
 // Update summary statistics
 function updateSummaryStats() {
-    // Always use latest execution results if available, otherwise show 0 for passed/failed
-    const passed = latestExecutionResults.total > 0 ? latestExecutionResults.passed : 0;
-    const failed = latestExecutionResults.total > 0 ? latestExecutionResults.failed : 0;
-    const total = allTests.length;
+    // Latest execution results
+    const latestPassed = latestExecutionResults.total > 0 ? latestExecutionResults.passed : 0;
+    const latestFailed = latestExecutionResults.total > 0 ? latestExecutionResults.failed : 0;
+    const latestTotal = latestExecutionResults.total;
     
-    console.log('📊 Updating summary stats:', { total, passed, failed, latestExecution: latestExecutionResults });
+    // Overall test suite status
+    const overallPassed = allTests.filter(t => t.status === 'passed').length;
+    const overallFailed = allTests.filter(t => t.status === 'failed').length;
+    const overallTotal = allTests.length;
     
-    document.getElementById('totalTests').textContent = total;
-    document.getElementById('passingTests').textContent = passed;
-    document.getElementById('failingTests').textContent = failed;
+    console.log('📊 Updating summary stats:', { 
+        latest: { total: latestTotal, passed: latestPassed, failed: latestFailed },
+        overall: { total: overallTotal, passed: overallPassed, failed: overallFailed }
+    });
+    
+    // Update latest execution stats
+    document.getElementById('totalTests').textContent = overallTotal;
+    document.getElementById('passingTests').textContent = `${latestPassed} / ${overallPassed}`;
+    document.getElementById('failingTests').textContent = `${latestFailed} / ${overallFailed}`;
     
     // Update last run time if we have recent executions
     const mostRecentRun = allTests

@@ -667,3 +667,24 @@ body::before {
     transform: translateX(400%);
   }
 }
+
+/* TypeScript enhancement: Status update animation */
+.status-updated {
+  background: rgba(50, 215, 75, 0.1);
+  animation: statusUpdatePulse 2s ease-out;
+}
+
+@keyframes statusUpdatePulse {
+  0% {
+    background: rgba(50, 215, 75, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    background: rgba(50, 215, 75, 0.2);
+    transform: scale(1.005);
+  }
+  100% {
+    background: rgba(50, 215, 75, 0.1);
+    transform: scale(1);
+  }
+}

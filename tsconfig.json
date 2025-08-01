@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
@@ -17,6 +17,7 @@
   },
   "include": [
     "tests/**/*.ts",
+    "tests-management/**/*.ts",
     "playwright.config.ts"
   ],
   "exclude": [
