@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
+import { apiCall } from '../../config/api'
 
 interface User {
   username: string
@@ -24,13 +25,9 @@ const initialState: AuthState = {
 export const login = createAsyncThunk(
   'auth/login',
   async ({ username, password }: { username: string; password: string }) => {
-    const response = await fetch('/api/login', {
+    const response = await apiCall('/api/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ username, password }),
-      credentials: 'include',
     })
 
     if (!response.ok) {
@@ -57,9 +54,8 @@ export const login = createAsyncThunk(
 )
 
 export const logout = createAsyncThunk('auth/logout', async () => {
-  const response = await fetch('/api/logout', {
+  const response = await apiCall('/api/logout', {
     method: 'POST',
-    credentials: 'include',
   })
 
   if (!response.ok) {
@@ -71,9 +67,8 @@ export const logout = createAsyncThunk('auth/logout', async () => {
 })
 
 export const checkAuth = createAsyncThunk('auth/checkAuth', async () => {
-  const response = await fetch('/api/settings', {
+  const response = await apiCall('/api/settings', {
     method: 'HEAD',
-    credentials: 'include',
   })
 
   if (response.ok) {

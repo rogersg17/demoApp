@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import { apiCall } from '../config/api'
 
 interface Settings {
   // Browser Configuration
@@ -57,8 +58,8 @@ const defaultSettings: Settings = {
   verboseLogging: false,
   
   // Environment Configuration
-  baseUrl: 'http://localhost:3000',
-  apiEndpoint: 'http://localhost:3000/api',
+  baseUrl: 'http://localhost:8080',
+  apiEndpoint: 'http://localhost:8080/api',
   testEnvironment: 'local',
   
   // JIRA Integration
@@ -81,6 +82,7 @@ const SettingsPage: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string>('browser')
 
   useEffect(() => {
     loadSettings()
@@ -89,9 +91,7 @@ const SettingsPage: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/settings', {
-        credentials: 'include'
-      })
+      const response = await apiCall('/api/settings')
       
       if (response.ok) {
         const serverSettings = await response.json()
@@ -122,12 +122,8 @@ const SettingsPage: React.FC = () => {
       setSuccess(null)
 
       // Save to server
-      const response = await fetch('/api/settings', {
+      const response = await apiCall('/api/settings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify(settings)
       })
 

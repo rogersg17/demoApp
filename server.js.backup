@@ -5,8 +5,35 @@ const bcrypt = require('bcrypt');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
-const Database = require('./database/database');
-const { createServer } = require('http');
+const Database = require('./database/databasapp.post('/api/logout', requireAuth, (req, res) => {
+  try {
+    const username = req.session.username;
+    const loginTime = req.session.loginTime;
+    const sessionDuration = Date.now() - new Date(loginTime).getTime();
+    
+    // Log logout event
+    console.log(`User logout: ${username}, session duration: ${Math.round(sessionDuration / 1000)}s`);
+    
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+        return res.status(500).json({ error: 'Logout failed' });
+      }
+      
+      res.clearCookie('connect.sid', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
+      
+      res.json({ success: true, message: 'Logout successful' });
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});nst { createServer } = require('http');
 const { Server } = require('socket.io');
 
 // Security packages
@@ -24,26 +51,39 @@ require('dotenv').config();
 const app = express();
 const server = createServer(app);
 
-// Enhanced CORS configuration
+// CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(',');
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173').split(',');
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 const io = new Server(server, {
   cors: corsOptions
 });
 
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 3000;
+
+// Generate secure session secret if not provided
+const sessionSecret = process.env.SESSION_SECRET || (() => {
+  console.warn('⚠️  No SESSION_SECRET environment variable set. Using generated secret (not recommended for production)');
+  return crypto.randomBytes(64).toString('hex');
+})();
+
+// Ensure sessions directory exists
+const sessionsDir = path.join(__dirname, 'sessions');
+if (!fs.existsSync(sessionsDir)) {
+  fs.mkdirSync(sessionsDir, { recursive: true });
+}
 
 // Initialize database
 const db = new Database();
@@ -56,180 +96,183 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https:", "https://images.unsplash.com"],
       connectSrc: ["'self'", "ws:", "wss:"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
+      frameSrc: ["'none'"]
+    }
   },
-  crossOriginEmbedderPolicy: false,
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  }
+  crossOriginEmbedderPolicy: false
 }));
 
 app.use(cors(corsOptions));
 app.use(compression());
-app.use(morgan('combined', {
-  skip: function (req, res) { return res.statusCode < 400 }
-}));
+
+// Request logging
+if (process.env.LOG_REQUESTS !== 'false') {
+  app.use(morgan('combined'));
+}
 
 // Rate limiting
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: 'Too many requests from this IP, please try again later.',
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later',
+    retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+  },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
 const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS) || 5,
-  message: 'Too many login attempts, please try again later.',
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS) || 5, // Limit each IP to 5 login requests per windowMs
+  message: {
+    error: 'Too many login attempts from this IP, please try again later',
+    retryAfter: Math.ceil((parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+  },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true // Don't count successful logins
 });
 
-app.use(generalLimiter);
+app.use('/api/', generalLimiter);
+
+// Input sanitization middleware
+const sanitizeInput = (req, res, next) => {
+  if (req.body) {
+    for (const key in req.body) {
+      if (typeof req.body[key] === 'string') {
+        req.body[key] = xss(req.body[key]);
+      }
+    }
+  }
+  next();
+};
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(sanitizeInput);
 
-// Enhanced session configuration
+// Session configuration
 app.use(session({
+  secret: sessionSecret,
+  name: 'demoapp.sid', // Change default session name
   store: new FileStore({
-    path: './sessions',
-    ttl: parseInt(process.env.SESSION_TTL) || 86400, // 24 hours
+    path: sessionsDir,
+    ttl: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60, // 24 hours in seconds
     retries: 3,
-    logFn: function() {} // Disable file store logging
+    logFn: process.env.NODE_ENV === 'development' ? console.log : () => {}
   }),
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(64).toString('hex'),
   resave: false,
   saveUninitialized: false,
-  name: 'sessionId',
+  rolling: true, // Reset expiry on activity
   cookie: { 
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: parseInt(process.env.SESSION_TTL) * 1000 || 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'strict'
-  },
-  genid: function(req) {
-    return crypto.randomUUID();
+    secure: process.env.NODE_ENV === 'production' || process.env.SESSION_SECURE_COOKIE === 'true',
+    httpOnly: true, // Prevent XSS attacks
+    maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'strict' // CSRF protection
   }
 }));
 
-// Serve React frontend static files
-app.use(express.static(path.join(__dirname, 'frontend/dist')));
+// Serve static files from the current directory
+app.use(express.static('.'));
 
-// Serve legacy static files for backwards compatibility
-app.use('/legacy', express.static('.'));
-
-// Route for root - serve React app
+// Route for root - redirect to login
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+  res.redirect('/login/index.html');
 });
 
-// Legacy routes for old frontend
-app.get('/login/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'login/index.html'));
-});
-
-app.get('/users/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'old-vanilla-pages/users/index.html'));
-});
-
-// Authentication middleware
+// Authentication middleware with enhanced security
 const requireAuth = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Authentication required' });
   }
   
-  // Check session timeout
-  const now = Date.now();
-  const lastActivity = req.session.lastActivity || now;
-  const sessionTimeout = parseInt(process.env.SESSION_TIMEOUT_MS) || 30 * 60 * 1000; // 30 minutes
-  
-  if (now - lastActivity > sessionTimeout) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired' });
+  // Check session validity
+  if (req.session.lastActivity) {
+    const sessionTimeout = 30 * 60 * 1000; // 30 minutes of inactivity
+    if (Date.now() - req.session.lastActivity > sessionTimeout) {
+      req.session.destroy();
+      return res.status(401).json({ error: 'Session expired due to inactivity' });
+    }
   }
   
   // Update last activity
-  req.session.lastActivity = now;
+  req.session.lastActivity = Date.now();
   next();
 };
 
-// Input validation middleware
+// Input validation rules
 const loginValidation = [
   body('username')
     .trim()
     .isLength({ min: 1, max: 50 })
-    .matches(/^[a-zA-Z0-9_.-]+$/)
-    .withMessage('Username must be 1-50 characters and contain only letters, numbers, dots, dashes, and underscores'),
+    .matches(/^[a-zA-Z0-9_@.-]+$/)
+    .withMessage('Username must be 1-50 characters and contain only letters, numbers, _, @, ., -'),
   body('password')
     .isLength({ min: 1, max: 128 })
-    .withMessage('Password must be 1-128 characters')
+    .withMessage('Password is required and must be less than 128 characters')
 ];
 
 const userValidation = [
   body('username')
     .trim()
     .isLength({ min: 3, max: 50 })
-    .matches(/^[a-zA-Z0-9_.-]+$/)
-    .withMessage('Username must be 3-50 characters and contain only letters, numbers, dots, dashes, and underscores'),
+    .matches(/^[a-zA-Z0-9_@.-]+$/)
+    .withMessage('Username must be 3-50 characters and contain only letters, numbers, _, @, ., -'),
   body('email')
-    .trim()
     .isEmail()
     .normalizeEmail()
-    .withMessage('Valid email is required'),
-  body('firstName')
-    .trim()
-    .isLength({ min: 1, max: 50 })
-    .matches(/^[a-zA-Z\s'-]+$/)
-    .withMessage('First name must be 1-50 characters and contain only letters, spaces, apostrophes, and hyphens'),
-  body('lastName')
-    .trim()
-    .isLength({ min: 1, max: 50 })
-    .matches(/^[a-zA-Z\s'-]+$/)
-    .withMessage('Last name must be 1-50 characters and contain only letters, spaces, apostrophes, and hyphens'),
+    .withMessage('Must be a valid email address'),
   body('password')
     .optional()
     .isLength({ min: 8, max: 128 })
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must be 8-128 characters with at least one lowercase, uppercase, digit, and special character'),
+    .withMessage('Password must be 8-128 characters with at least one uppercase, lowercase, number, and special character'),
+  body('first_name')
+    .trim()
+    .escape()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('First name must be 1-50 characters'),
+  body('last_name')
+    .trim()
+    .escape()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Last name must be 1-50 characters'),
   body('department')
     .optional()
     .trim()
+    .escape()
     .isLength({ max: 100 })
-    .withMessage('Department must be no more than 100 characters'),
+    .withMessage('Department must be less than 100 characters'),
   body('role')
     .optional()
-    .isIn(['user', 'admin'])
-    .withMessage('Role must be either user or admin')
+    .isIn(['admin', 'moderator', 'user'])
+    .withMessage('Role must be admin, moderator, or user'),
+  body('status')
+    .optional()
+    .isIn(['active', 'pending', 'inactive'])
+    .withMessage('Status must be active, pending, or inactive')
 ];
 
+// Helper function to handle validation errors
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const errorMessages = errors.array().map(error => error.msg);
-    return res.status(400).json({ error: 'Validation failed', details: errorMessages });
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: errors.array().map(err => ({
+        field: err.path,
+        message: err.msg,
+        value: err.value
+      }))
+    });
   }
-  
-  // Sanitize input to prevent XSS
-  for (let key in req.body) {
-    if (typeof req.body[key] === 'string') {
-      req.body[key] = xss(req.body[key]);
-    }
-  }
-  
   next();
 };
 
@@ -290,34 +333,13 @@ app.post('/api/login', loginLimiter, loginValidation, handleValidationErrors, as
   }
 });
 
-app.post('/api/logout', requireAuth, (req, res) => {
-  try {
-    const username = req.session.username;
-    const loginTime = req.session.loginTime;
-    const sessionDuration = Date.now() - new Date(loginTime).getTime();
-    
-    // Log logout event
-    console.log(`User logout: ${username}, session duration: ${Math.round(sessionDuration / 1000)}s`);
-    
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Session destruction error:', err);
-        return res.status(500).json({ error: 'Logout failed' });
-      }
-      
-      res.clearCookie('sessionId', {
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-      });
-      
-      res.json({ success: true, message: 'Logout successful' });
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+app.post('/api/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Could not log out' });
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
 });
 
 // Test management routes
@@ -662,23 +684,13 @@ app.get('/api/users/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/users', requireAuth, userValidation, handleValidationErrors, async (req, res) => {
+app.post('/api/users', requireAuth, async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName, department, role, status } = req.body;
+    const { username, email, password, first_name, last_name, department, role, status } = req.body;
     
-    // Check if user has admin privileges
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin privileges required' });
-    }
-    
-    // Validate required fields (additional server-side check)
-    if (!username || !email || !password || !firstName || !lastName) {
+    // Validate required fields
+    if (!username || !email || !password || !first_name || !last_name) {
       return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    // Additional security checks
-    if (username.length > 50 || email.length > 255 || firstName.length > 50 || lastName.length > 50) {
-      return res.status(400).json({ error: 'Input parameters exceed maximum length' });
     }
     
     // Create user
@@ -686,15 +698,12 @@ app.post('/api/users', requireAuth, userValidation, handleValidationErrors, asyn
       username,
       email,
       password,
-      first_name: firstName,
-      last_name: lastName,
+      first_name,
+      last_name,
       department: department || null,
       role: role || 'user',
       status: status || 'active'
     });
-    
-    // Log user creation
-    console.log(`User created: ${username} by admin: ${req.session.username} from IP: ${req.ip}`);
     
     res.status(201).json({ id: userId, message: 'User created successfully' });
   } catch (error) {
@@ -702,22 +711,14 @@ app.post('/api/users', requireAuth, userValidation, handleValidationErrors, asyn
     if (error.message.includes('UNIQUE constraint failed')) {
       res.status(409).json({ error: 'Username or email already exists' });
     } else {
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Failed to create user' });
     }
   }
 });
 
-app.put('/api/users/:id', requireAuth, userValidation, handleValidationErrors, async (req, res) => {
+app.put('/api/users/:id', requireAuth, async (req, res) => {
   try {
-    const { username, email, firstName, lastName, department, role, status } = req.body;
-    
-    // Check if user has admin privileges or is updating their own profile
-    const isAdmin = req.session.role === 'admin';
-    const isOwnProfile = parseInt(req.params.id) === req.session.userId;
-    
-    if (!isAdmin && !isOwnProfile) {
-      return res.status(403).json({ error: 'Insufficient privileges' });
-    }
+    const { username, email, first_name, last_name, department, role, status } = req.body;
     
     // Check if user exists
     const existingUser = await db.getUserById(req.params.id);
@@ -725,23 +726,16 @@ app.put('/api/users/:id', requireAuth, userValidation, handleValidationErrors, a
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Non-admin users can only update certain fields
-    const updateData = {};
-    if (isAdmin) {
-      updateData.username = username;
-      updateData.email = email;
-      updateData.first_name = firstName;
-      updateData.last_name = lastName;
-      updateData.department = department;
-      updateData.role = role;
-      updateData.status = status;
-    } else {
-      // Regular users can only update personal info
-      updateData.email = email;
-      updateData.first_name = firstName;
-      updateData.last_name = lastName;
-      updateData.department = department;
-    }
+    // Update user (password updates should be handled separately for security)
+    const updateData = {
+      username,
+      email,
+      first_name,
+      last_name,
+      department,
+      role,
+      status
+    };
     
     // Remove undefined values
     Object.keys(updateData).forEach(key => {
@@ -750,65 +744,36 @@ app.put('/api/users/:id', requireAuth, userValidation, handleValidationErrors, a
       }
     });
     
-    // Additional security checks
-    if (updateData.username && updateData.username.length > 50) {
-      return res.status(400).json({ error: 'Username exceeds maximum length' });
-    }
-    
     await db.updateUser(req.params.id, updateData);
-    
-    // Log user update
-    console.log(`User updated: ${existingUser.username} by ${isAdmin ? 'admin' : 'user'}: ${req.session.username} from IP: ${req.ip}`);
-    
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
     if (error.message.includes('UNIQUE constraint failed')) {
       res.status(409).json({ error: 'Username or email already exists' });
     } else {
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Failed to update user' });
     }
   }
 });
 
 app.delete('/api/users/:id', requireAuth, async (req, res) => {
   try {
-    // Check if user has admin privileges
-    if (req.session.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin privileges required' });
-    }
-    
-    // Validate user ID parameter
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId) || userId <= 0) {
-      return res.status(400).json({ error: 'Invalid user ID' });
-    }
-    
     // Check if user exists
-    const existingUser = await db.getUserById(userId);
+    const existingUser = await db.getUserById(req.params.id);
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
     }
     
     // Prevent deletion of self (basic protection)
-    if (userId === req.session.userId) {
+    if (parseInt(req.params.id) === req.session.userId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
     
-    // Prevent deletion of other admins (add business logic as needed)
-    if (existingUser.role === 'admin') {
-      return res.status(400).json({ error: 'Cannot delete admin accounts' });
-    }
-    
-    await db.deleteUser(userId);
-    
-    // Log user deletion
-    console.log(`User deleted: ${existingUser.username} by admin: ${req.session.username} from IP: ${req.ip}`);
-    
+    await db.deleteUser(req.params.id);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
@@ -960,26 +925,13 @@ function emitTestUpdate(testId, update) {
 // Make emitTestUpdate available globally
 global.emitTestUpdate = emitTestUpdate;
 
-// Catch-all handler for React Router (SPA routing)
-app.get('*', (req, res, next) => {
-  // Skip API routes and legacy routes
-  if (req.path.startsWith('/api/') || req.path.startsWith('/legacy/')) {
-    return next();
-  }
-  
-  // Serve React app for all other routes
-  res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
-});
-
 server.listen(PORT, () => {
   console.log(`🚀 Demo App server running at http://localhost:${PORT}`);
-  console.log(`⚛️  React Frontend: http://localhost:${PORT}`);
-  console.log(`📱 Legacy Login: http://localhost:${PORT}/login/index.html`);
-  console.log(`👥 Legacy User Management: http://localhost:${PORT}/users/index.html`);
+  console.log(`📱 Login page: http://localhost:${PORT}/login/index.html`);
+  console.log(`👥 User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log(`🧪 Test Management: http://localhost:${PORT}/tests-management/index.html`);
   console.log(`⚙️ Settings: http://localhost:${PORT}/settings/index.html`);
   console.log(`🔌 WebSocket server ready for real-time updates`);
-  console.log(`🌐 Server configured for port: ${PORT} (React standard port)`);
   console.log('✨ Press Ctrl+C to stop the server');
 });

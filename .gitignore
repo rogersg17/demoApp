@@ -50,6 +50,11 @@ coverage/
 .env.test.local
 .env.production.local
 
+# Session storage
+sessions/
+*.session
+.env.production.local
+
 # Temporary folders
 tmp/
 temp/

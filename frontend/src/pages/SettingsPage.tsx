@@ -57,8 +57,8 @@ const defaultSettings: Settings = {
   verboseLogging: false,
   
   // Environment Configuration
-  baseUrl: 'http://localhost:3000',
-  apiEndpoint: 'http://localhost:3000/api',
+  baseUrl: 'http://localhost:8080',
+  apiEndpoint: 'http://localhost:8080/api',
   testEnvironment: 'development',
   
   // JIRA Integration
