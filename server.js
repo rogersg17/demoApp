@@ -83,7 +83,7 @@ app.use(morgan('combined', {
 // Rate limiting
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased from 100 to 1000
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -91,7 +91,7 @@ const generalLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS) || 20, // Increased from 5 to 20
   message: 'Too many login attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -439,6 +439,16 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
     
     console.log(`Starting test execution ${executionId}:`, command, args.join(' '));
     
+    // Emit test execution started event
+    emitTestUpdate(executionId, {
+      type: 'execution-started',
+      status: 'running',
+      startTime: new Date().toISOString(),
+      command: `${command} ${args.join(' ')}`,
+      testFiles: testFiles || [],
+      estimatedDuration: '30-60 seconds'
+    });
+    
     // Start the test execution
     const testProcess = spawn(command, args, {
       cwd: __dirname,
@@ -447,6 +457,8 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
     
     let stdout = '';
     let stderr = '';
+    let currentTest = null;
+    let testStartTime = null;
     
     const execution = {
       id: executionId,
@@ -455,25 +467,129 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
       process: testProcess,
       stdout: '',
       stderr: '',
-      results: null
+      results: null,
+      progress: {
+        completed: 0,
+        total: 0,
+        currentTest: null
+      }
     };
     
     testExecutions.set(executionId, execution);
     
     testProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-      execution.stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+      execution.stdout += chunk;
+      
+      // Parse real-time output for test progress
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          // Detect test start
+          if (line.includes('.spec.ts:')) {
+            const testMatch = line.match(/(\w+\.spec\.ts):(\d+):(\d+)\s+(.+)/);
+            if (testMatch) {
+              const [, file, lineNum, , testName] = testMatch;
+              currentTest = {
+                file,
+                line: lineNum,
+                name: testName,
+                startTime: new Date().toISOString()
+              };
+              testStartTime = Date.now();
+              execution.progress.currentTest = currentTest;
+              
+              emitTestUpdate(executionId, {
+                type: 'test-started',
+                test: currentTest,
+                progress: execution.progress
+              });
+            }
+          }
+          
+          // Detect test completion
+          if (line.includes('✓') || line.includes('✗') || line.includes('○')) {
+            if (currentTest) {
+              const duration = Date.now() - testStartTime;
+              const status = line.includes('✓') ? 'passed' : 
+                           line.includes('✗') ? 'failed' : 'skipped';
+              
+              execution.progress.completed++;
+              
+              emitTestUpdate(executionId, {
+                type: 'test-completed',
+                test: {
+                  ...currentTest,
+                  status,
+                  duration,
+                  endTime: new Date().toISOString()
+                },
+                progress: execution.progress
+              });
+              
+              currentTest = null;
+              testStartTime = null;
+            }
+          }
+          
+          // Extract total test count from summary lines
+          if (line.includes('Running') && line.includes('test')) {
+            const totalMatch = line.match(/Running (\d+) test/);
+            if (totalMatch) {
+              execution.progress.total = parseInt(totalMatch[1]);
+              emitTestUpdate(executionId, {
+                type: 'progress-update',
+                progress: execution.progress
+              });
+            }
+          }
+          
+          // Emit real-time log updates
+          emitTestUpdate(executionId, {
+            type: 'log-update',
+            timestamp: new Date().toISOString(),
+            source: 'stdout',
+            content: line,
+            currentTest: currentTest
+          });
+        }
+      }
     });
     
     testProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-      execution.stderr += data.toString();
+      const chunk = data.toString();
+      stderr += chunk;
+      execution.stderr += chunk;
+      
+      // Emit error logs in real-time
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          emitTestUpdate(executionId, {
+            type: 'log-update',
+            timestamp: new Date().toISOString(),
+            source: 'stderr',
+            content: line,
+            level: 'error'
+          });
+        }
+      }
     });
     
     testProcess.on('close', (code) => {
       execution.status = 'completed';
       execution.endTime = new Date();
       execution.exitCode = code;
+      
+      // Emit execution completion event
+      emitTestUpdate(executionId, {
+        type: 'execution-completed',
+        status: 'completed',
+        exitCode: code,
+        endTime: execution.endTime.toISOString(),
+        duration: execution.endTime - execution.startTime
+      });
       
       try {
         // Try to parse JSON output from Playwright
@@ -517,6 +633,20 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
           };
           console.log('Parsed results:', execution.results);
           
+          // Emit final results
+          emitTestUpdate(executionId, {
+            type: 'results-ready',
+            results: execution.results,
+            summary: {
+              total: execution.results.total,
+              passed: execution.results.passed,
+              failed: execution.results.failed,
+              skipped: execution.results.skipped,
+              duration: execution.results.duration,
+              success: code === 0
+            }
+          });
+          
           // Save latest results to file for persistence across server restarts
           try {
             const latestResults = {
@@ -540,6 +670,20 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
             duration: `${(execution.endTime - execution.startTime) / 1000}s`,
             suites: []
           };
+          
+          // Emit fallback results
+          emitTestUpdate(executionId, {
+            type: 'results-ready',
+            results: execution.results,
+            summary: {
+              total: execution.results.total,
+              passed: execution.results.passed,
+              failed: execution.results.failed,
+              skipped: execution.results.skipped,
+              duration: execution.results.duration,
+              success: code === 0
+            }
+          });
         }
       } catch (error) {
         console.error('Error parsing test results:', error);
@@ -551,6 +695,13 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
           duration: `${(execution.endTime - execution.startTime) / 1000}s`,
           error: error.message
         };
+        
+        // Emit error results
+        emitTestUpdate(executionId, {
+          type: 'execution-error',
+          error: error.message,
+          results: execution.results
+        });
       }
       
       console.log(`Test execution ${executionId} completed with exit code ${code}`);
@@ -560,6 +711,13 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
       execution.status = 'failed';
       execution.error = error.message;
       console.error(`Test execution ${executionId} failed:`, error);
+      
+      // Emit execution error event
+      emitTestUpdate(executionId, {
+        type: 'execution-error',
+        error: error.message,
+        status: 'failed'
+      });
     });
     
     res.json({
@@ -937,10 +1095,80 @@ app.get('*', (req, res) => {
 io.on('connection', (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
   
-  // Handle test execution status updates
+  // Handle test execution monitoring
   socket.on('joinTestExecution', (testId) => {
     socket.join(`test-${testId}`);
     console.log(`📊 Client joined test execution room: test-${testId}`);
+    
+    // Send current execution status if available
+    const execution = testExecutions.get(testId);
+    if (execution) {
+      socket.emit('testUpdate', {
+        testId,
+        type: 'execution-status',
+        status: execution.status,
+        startTime: execution.startTime,
+        endTime: execution.endTime,
+        progress: execution.progress || { completed: 0, total: 0, currentTest: null },
+        results: execution.results
+      });
+    }
+  });
+  
+  // Handle leaving test execution monitoring
+  socket.on('leaveTestExecution', (testId) => {
+    socket.leave(`test-${testId}`);
+    console.log(`📊 Client left test execution room: test-${testId}`);
+  });
+  
+  // Handle request for execution history
+  socket.on('getExecutionHistory', () => {
+    const history = Array.from(testExecutions.entries()).map(([id, execution]) => ({
+      id,
+      status: execution.status,
+      startTime: execution.startTime,
+      endTime: execution.endTime,
+      results: execution.results
+    }));
+    
+    socket.emit('executionHistory', history);
+  });
+  
+  // Handle live log subscription
+  socket.on('subscribeLogs', (testId) => {
+    socket.join(`logs-${testId}`);
+    console.log(`� Client subscribed to logs for: test-${testId}`);
+    
+    // Send recent logs if execution exists
+    const execution = testExecutions.get(testId);
+    if (execution && execution.stdout) {
+      const recentLogs = execution.stdout.split('\n').slice(-100); // Last 100 lines
+      socket.emit('logsHistory', {
+        testId,
+        logs: recentLogs.map((line, index) => ({
+          id: index,
+          timestamp: new Date().toISOString(),
+          source: 'stdout',
+          content: line
+        }))
+      });
+    }
+  });
+  
+  // Handle unsubscribing from logs
+  socket.on('unsubscribeLogs', (testId) => {
+    socket.leave(`logs-${testId}`);
+    console.log(`📝 Client unsubscribed from logs for: test-${testId}`);
+  });
+  
+  // Handle real-time activity tracking
+  socket.on('userActivity', (activity) => {
+    // Broadcast user activity to other connected clients
+    socket.broadcast.emit('userActivity', {
+      userId: socket.id,
+      activity,
+      timestamp: new Date().toISOString()
+    });
   });
   
   socket.on('disconnect', () => {
@@ -948,13 +1176,30 @@ io.on('connection', (socket) => {
   });
 });
 
-// Helper function to emit test updates
+// Enhanced helper function to emit test updates with better targeting
 function emitTestUpdate(testId, update) {
-  io.to(`test-${testId}`).emit('testUpdate', {
+  const payload = {
     testId,
     timestamp: new Date().toISOString(),
     ...update
-  });
+  };
+  
+  // Emit to test execution room
+  io.to(`test-${testId}`).emit('testUpdate', payload);
+  
+  // Also emit logs to log subscribers if it's a log update
+  if (update.type === 'log-update') {
+    io.to(`logs-${testId}`).emit('logUpdate', {
+      testId,
+      timestamp: payload.timestamp,
+      source: update.source,
+      content: update.content,
+      level: update.level || 'info',
+      currentTest: update.currentTest
+    });
+  }
+  
+  console.log(`📡 Emitted ${update.type} for test ${testId} to ${io.sockets.adapter.rooms.get(`test-${testId}`)?.size || 0} clients`);
 }
 
 // Make emitTestUpdate available globally

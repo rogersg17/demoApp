@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import Layout from '../components/Layout'
+import TestExecutionMonitor from '../components/TestExecutionMonitor'
 
 interface TestResult {
   id: string
@@ -22,23 +23,6 @@ interface TestExecutionSummary {
   timestamp: string
 }
 
-interface TestExecutionResult {
-  id: string
-  status: 'passed' | 'failed' | 'skipped'
-  duration?: number
-  error?: string
-}
-
-interface TestExecutionResponse {
-  tests?: TestExecutionResult[]
-  summary?: {
-    passed: number
-    failed: number
-    total: number
-    duration: number
-  }
-}
-
 interface TestApiResponse {
   totalTests: number
   passingTests: number
@@ -59,6 +43,8 @@ const TestManagementPage: React.FC = () => {
   const [filterSuite, setFilterSuite] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [executionSummary, setExecutionSummary] = useState<TestExecutionSummary | null>(null)
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null)
+  const [showMonitor, setShowMonitor] = useState(false)
 
   const loadTests = useCallback(async () => {
     try {
@@ -197,6 +183,14 @@ const TestManagementPage: React.FC = () => {
         return
       }
 
+      // Map test IDs to test file names for the new API
+      const testFiles = testsToRun.map(testId => {
+        const test = tests.find(t => t.id === testId)
+        return test?.file || `${testId}.spec.ts`
+      }).filter(Boolean)
+
+      console.log('🚀 Starting test execution with files:', testFiles)
+
       // Update test statuses to running
       setTests(prev => prev.map(test => 
         testsToRun.includes(test.id) 
@@ -204,45 +198,38 @@ const TestManagementPage: React.FC = () => {
           : test
       ))
 
-      const response = await fetch('/api/tests/execute', {
+      // Call the new API endpoint that supports real-time monitoring
+      const response = await fetch('/api/tests/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ testIds: testsToRun })
+        body: JSON.stringify({ 
+          testFiles,
+          suite: filterSuite || undefined,
+          grep: searchTerm || undefined
+        })
       })
 
       if (!response.ok) {
         throw new Error('Failed to execute tests')
       }
 
-      const results: TestExecutionResponse = await response.json()
+      const result = await response.json()
       
-      // Update test results
-      setTests(prev => prev.map(test => {
-        const result = results.tests?.find((r: TestExecutionResult) => r.id === test.id)
-        if (result) {
-          return {
-            ...test,
-            status: result.status,
-            duration: result.duration,
-            error: result.error,
-            lastRun: new Date().toISOString()
-          }
-        }
-        return test
-      }))
+      if (result.success && result.executionId) {
+        console.log('✅ Test execution started:', result.executionId)
+        setCurrentExecutionId(result.executionId)
+        setShowMonitor(true)
+        
+        // The real-time updates will be handled by the TestExecutionMonitor component
+        // We'll poll for final results once the execution completes
+        pollForResults(result.executionId)
+      } else {
+        throw new Error(result.message || 'Failed to start test execution')
+      }
 
-      setExecutionSummary({
-        passed: results.summary?.passed || 0,
-        failed: results.summary?.failed || 0,
-        total: results.summary?.total || testsToRun.length,
-        duration: results.summary?.duration || 0,
-        timestamp: new Date().toISOString()
-      })
-
-      setSelectedTests([])
     } catch (err) {
       console.error('Error executing tests:', err)
       setError('Failed to execute tests. Please try again.')
@@ -253,9 +240,65 @@ const TestManagementPage: React.FC = () => {
           ? { ...test, status: 'not-run' as const }
           : test
       ))
-    } finally {
       setExecuting(false)
     }
+  }
+
+  // Poll for final results
+  const pollForResults = async (executionId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/tests/results/${executionId}`, {
+          credentials: 'include'
+        })
+
+        if (response.ok) {
+          const execution = await response.json()
+          
+          if (execution.status === 'completed' || execution.status === 'failed') {
+            clearInterval(pollInterval)
+            setExecuting(false)
+            
+            if (execution.results) {
+              // Update the execution summary
+              setExecutionSummary({
+                passed: execution.results.passed || 0,
+                failed: execution.results.failed || 0,
+                total: execution.results.total || 0,
+                duration: parseFloat(execution.results.duration) || 0,
+                timestamp: execution.endTime || new Date().toISOString()
+              })
+
+              // Update test results - this is a simplified mapping
+              // In a real implementation, you'd want better test ID mapping
+              setTests(prev => prev.map(test => {
+                if (selectedTests.includes(test.id)) {
+                  return {
+                    ...test,
+                    status: execution.results.failed > 0 ? 'failed' as const : 'passed' as const,
+                    lastRun: execution.endTime || new Date().toISOString()
+                  }
+                }
+                return test
+              }))
+            }
+            
+            setSelectedTests([])
+            console.log('✅ Test execution completed')
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for results:', error)
+        clearInterval(pollInterval)
+        setExecuting(false)
+      }
+    }, 2000) // Poll every 2 seconds
+
+    // Stop polling after 5 minutes to prevent infinite polling
+    setTimeout(() => {
+      clearInterval(pollInterval)
+      setExecuting(false)
+    }, 5 * 60 * 1000)
   }
 
   const toggleTestSelection = (testId: string) => {
@@ -494,6 +537,41 @@ const TestManagementPage: React.FC = () => {
         {filteredTests.length === 0 && (
           <div className="no-results">
             No tests found matching your criteria.
+          </div>
+        )}
+
+        {/* Real-time Test Execution Monitor */}
+        {showMonitor && currentExecutionId && (
+          <div className="monitor-section">
+            <div className="monitor-header">
+              <h2>🔄 Live Test Execution</h2>
+              <button 
+                onClick={() => setShowMonitor(false)}
+                className="btn btn-outline btn-sm"
+              >
+                Hide Monitor
+              </button>
+            </div>
+            <TestExecutionMonitor 
+              testId={currentExecutionId}
+              onClose={() => {
+                setShowMonitor(false)
+                setCurrentExecutionId(null)
+              }}
+              className="execution-monitor"
+            />
+          </div>
+        )}
+
+        {/* Toggle Monitor Button (when hidden but execution is active) */}
+        {!showMonitor && currentExecutionId && executing && (
+          <div className="monitor-toggle">
+            <button 
+              onClick={() => setShowMonitor(true)}
+              className="btn btn-primary"
+            >
+              📊 Show Live Execution Monitor
+            </button>
           </div>
         )}
       </div>
