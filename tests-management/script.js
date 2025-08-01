@@ -4,6 +4,7 @@ let currentTests = [];
 let testResults = null;
 let currentExecutionTestIds = []; // Store test IDs for current execution
 let latestExecutionResults = { passed: 0, failed: 0, total: 0 }; // Track latest execution summary
+let testExecutionSettings = {}; // Store test execution settings
 
 // Utility function to format dates
 function formatDate(dateString) {
@@ -41,27 +42,101 @@ function formatStatusDisplay(status) {
     }
 }
 
+// Authentication check function
+async function checkAuth() {
+    const loggedInUser = sessionStorage.getItem('loggedInUser');
+    
+    // If we have sessionStorage data, use it
+    if (loggedInUser) {
+        document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+        return true;
+    }
+    
+    // Otherwise, check if we have a valid server session
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'HEAD', // Just check if we can access a protected endpoint
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            // We have a valid session, but missing sessionStorage data
+            document.getElementById('welcomeMessage').textContent = 'Welcome back!';
+            return true;
+        } else {
+            // No valid session, redirect to login
+            window.location.href = '../login/index.html';
+            return false;
+        }
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '../login/index.html';
+        return false;
+    }
+}
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', async function() {
-    // Check if user is logged in
-    const loggedInUser = sessionStorage.getItem('loggedInUser');
-    if (!loggedInUser) {
-        window.location.href = '../login/index.html';
-        return;
-    }
-
-    // Display welcome message
-    document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+    // Check authentication
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) return; // Don't continue if auth failed
     
+    // Load settings first, then test data
+    await loadExecutionSettings();
     await loadTestData();
     setupEventListeners();
     renderTests();
 });
 
+// Load test execution settings
+async function loadExecutionSettings() {
+    try {
+        // Try to load from server first
+        const response = await fetch('/api/settings', {
+            credentials: 'include' // Include cookies for session
+        });
+        if (response.ok) {
+            testExecutionSettings = await response.json();
+            console.log('✅ Loaded test execution settings from server');
+        } else {
+            // Fallback to localStorage
+            const localSettings = localStorage.getItem('testExecutionSettings');
+            if (localSettings) {
+                testExecutionSettings = JSON.parse(localSettings);
+                console.log('✅ Loaded test execution settings from localStorage');
+            } else {
+                testExecutionSettings = getDefaultSettings();
+                console.log('⚙️ Using default test execution settings');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading execution settings:', error);
+        testExecutionSettings = getDefaultSettings();
+        console.log('⚙️ Using default settings due to error');
+    }
+}
+
+// Get default settings
+function getDefaultSettings() {
+    return {
+        defaultBrowser: 'chromium',
+        headlessMode: true,
+        maxRetries: 2,
+        parallelWorkers: 4,
+        testTimeout: 30000,
+        reportFormat: 'html',
+        screenshotMode: 'only-on-failure',
+        verboseLogging: false,
+        jiraEnabled: false
+    };
+}
+
 // Load test data from API
 async function loadTestData() {
     try {
-        const response = await fetch('/api/tests');
+        const response = await fetch('/api/tests', {
+            credentials: 'include' // Include cookies for session
+        });
         if (!response.ok) {
             if (response.status === 401) {
                 window.location.href = '/login/index.html';
@@ -71,9 +146,16 @@ async function loadTestData() {
         }
         
         testResults = await response.json();
+        console.log('🔍 API Response received:', {
+            totalTests: testResults.totalTests,
+            testsArrayLength: testResults.tests ? testResults.tests.length : 0,
+            passingTests: testResults.passingTests,
+            failingTests: testResults.failingTests
+        });
         
         // Use real test data from API if available, otherwise generate mock data
         if (testResults.tests && testResults.tests.length > 0) {
+            console.log('✅ Using real test data from API');
             allTests = testResults.tests.map((test, index) => ({
                 id: index + 1,
                 name: test.name,
@@ -84,7 +166,9 @@ async function loadTestData() {
                 lastRun: test.lastRun || null,
                 tags: ['automated']
             }));
+            console.log(`📝 Mapped ${allTests.length} tests from API`);
         } else {
+            console.log('⚠️ No tests in API response, generating mock data');
             // Generate mock data, but if we have recent test results, update some tests accordingly
             allTests = generateTestData();
             
@@ -95,6 +179,9 @@ async function loadTestData() {
         }
         
         currentTests = [...allTests];
+        console.log(`🎯 Final test count: ${currentTests.length}`);
+        
+        console.log('Calling updateSummaryStats()...');
         updateSummaryStats();
     } catch (error) {
         console.error('Error loading test data:', error);
@@ -334,14 +421,22 @@ function renderTests() {
     });
     
     const tbody = document.getElementById('testTableBody');
+    if (!tbody) {
+        console.error('❌ testTableBody element not found!');
+        return;
+    }
+    
+    console.log('✅ Found testTableBody element');
     tbody.innerHTML = '';
     
     if (currentTests.length === 0) {
+        console.log('⚠️ No tests to display');
         tbody.innerHTML = '<tr><td colspan="7" class="no-tests">No tests match current filters</td></tr>';
         return;
     }
     
-    currentTests.forEach(test => {
+    console.log(`📝 Rendering ${currentTests.length} tests...`);
+    currentTests.forEach((test, index) => {
         const row = document.createElement('tr');
         const dateRun = test.lastRun ? formatDate(test.lastRun) : 'Not run';
         const statusDisplay = formatStatusDisplay(test.status);
@@ -434,15 +529,21 @@ async function runTests(scope = 'all') {
         // Disable run buttons during execution
         setRunButtonsEnabled(false);
         
+        // Include execution settings in the request
+        const requestBody = {
+            testFiles: scope === 'all' ? [] : getSelectedTestFiles(),
+            suite: scope,
+            settings: testExecutionSettings
+        };
+        
+        console.log('📤 Sending test execution request with settings:', requestBody);
+        
         const response = await fetch('/api/tests/run', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                testFiles: scope === 'all' ? [] : getSelectedTestFiles(),
-                suite: scope
-            })
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {

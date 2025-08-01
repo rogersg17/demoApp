@@ -115,6 +115,34 @@ body::before {
   gap: 1.5rem;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  text-decoration: none;
+  transition: var(--transition);
+  font-size: 1.1rem;
+}
+
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  color: var(--primary-color);
+}
+
 .back-btn {
   display: flex;
   align-items: center;

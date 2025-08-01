@@ -45,6 +45,8 @@ The application will be available at:
 - 🔐 **Login Page**: http://localhost:3000/login/index.html
 - 👥 **User Management**: http://localhost:3000/users/index.html
 - 📊 **Analytics & Reports**: http://localhost:3000/reports/index.html
+- 🧪 **Test Management**: http://localhost:3000/tests-management/index.html
+- ⚙️ **Test Settings**: http://localhost:3000/settings/index.html
 
 ### Sample Accounts
 
@@ -95,6 +97,8 @@ npm run test:report
 ├── users/                 # User management interface
 ├── mainPage/              # Main dashboard
 ├── reports/               # Analytics dashboard with charts
+├── tests-management/      # Test management and execution interface
+├── settings/              # Test execution settings configuration
 ├── tests/                 # Playwright tests
 ├── page-objects/          # Page Object Model classes
 ├── test-results/          # Test execution results
@@ -122,6 +126,18 @@ npm run test:report
 - `GET /api/analytics/users-by-status` - Status distribution
 - `GET /api/analytics/user-growth` - User growth over time
 - `GET /api/analytics/user-activity` - Activity patterns
+
+### Test Management
+- `GET /api/tests` - Fetch test data and results
+- `POST /api/tests/run` - Execute test suites
+- `GET /api/tests/results/:executionId` - Get test execution status
+- `GET /api/tests/executions` - Get test execution history
+
+### Settings
+- `GET /api/settings` - Get test execution configuration
+- `POST /api/settings` - Save test execution settings
+- `GET /api/health` - Health check endpoint
+- `POST /api/jira/test-connection` - Test JIRA integration
 
 ## Database Schema
 

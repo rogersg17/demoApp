@@ -5,7 +5,8 @@ let filteredUsers = [];
 // Initialize the page
 document.addEventListener('DOMContentLoaded', async function() {
   // Check authentication
-  checkAuth();
+  const isAuthenticated = await checkAuth();
+  if (!isAuthenticated) return; // Don't continue if auth failed
   
   // Initialize event listeners
   initializeEventListeners();
@@ -17,22 +18,46 @@ document.addEventListener('DOMContentLoaded', async function() {
   document.body.classList.add('loaded');
 });
 
-function checkAuth() {
+async function checkAuth() {
   const loggedInUser = sessionStorage.getItem('loggedInUser');
   
-  if (!loggedInUser) {
-    window.location.href = '../login/index.html';
-    return;
+  // If we have sessionStorage data, use it
+  if (loggedInUser) {
+    document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+    return true;
   }
   
-  document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
+  // Otherwise, check if we have a valid server session
+  try {
+    const response = await fetch('/api/users', {
+      method: 'HEAD', // Just check if we can access the endpoint
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      // We have a valid session, but missing sessionStorage data
+      // Set a generic welcome message and continue
+      document.getElementById('welcomeMessage').textContent = 'Welcome back!';
+      return true;
+    } else {
+      // No valid session, redirect to login
+      window.location.href = '../login/index.html';
+      return false;
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    window.location.href = '../login/index.html';
+    return false;
+  }
 }
 
 // API Functions
 async function loadUsers() {
   try {
     showLoading(true);
-    const response = await fetch('/api/users');
+    const response = await fetch('/api/users', {
+      credentials: 'include' // Include cookies for session
+    });
     
     if (!response.ok) {
       if (response.status === 401) {

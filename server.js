@@ -409,6 +409,240 @@ app.get('/api/analytics/users', requireAuth, async (req, res) => {
   }
 });
 
+// User Management routes
+app.get('/api/users', requireAuth, async (req, res) => {
+  try {
+    const users = await db.getAllUsers();
+    // Remove passwords from response for security
+    const safeUsers = users.map(user => {
+      const { password, ...safeUser } = user;
+      return safeUser;
+    });
+    res.json(safeUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.get('/api/users/:id', requireAuth, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+app.post('/api/users', requireAuth, async (req, res) => {
+  try {
+    const { username, email, password, first_name, last_name, department, role, status } = req.body;
+    
+    // Validate required fields
+    if (!username || !email || !password || !first_name || !last_name) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Create user
+    const userId = await db.createUser({
+      username,
+      email,
+      password,
+      first_name,
+      last_name,
+      department: department || null,
+      role: role || 'user',
+      status: status || 'active'
+    });
+    
+    res.status(201).json({ id: userId, message: 'User created successfully' });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({ error: 'Username or email already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  }
+});
+
+app.put('/api/users/:id', requireAuth, async (req, res) => {
+  try {
+    const { username, email, first_name, last_name, department, role, status } = req.body;
+    
+    // Check if user exists
+    const existingUser = await db.getUserById(req.params.id);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update user (password updates should be handled separately for security)
+    const updateData = {
+      username,
+      email,
+      first_name,
+      last_name,
+      department,
+      role,
+      status
+    };
+    
+    // Remove undefined values
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+    
+    await db.updateUser(req.params.id, updateData);
+    res.json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({ error: 'Username or email already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to update user' });
+    }
+  }
+});
+
+app.delete('/api/users/:id', requireAuth, async (req, res) => {
+  try {
+    // Check if user exists
+    const existingUser = await db.getUserById(req.params.id);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Prevent deletion of self (basic protection)
+    if (parseInt(req.params.id) === req.session.userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    await db.deleteUser(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Settings routes
+app.get('/api/settings', requireAuth, async (req, res) => {
+  try {
+    const settingsPath = path.join(__dirname, 'config', 'test-settings.json');
+    
+    // Check if settings file exists
+    if (fs.existsSync(settingsPath)) {
+      const settingsData = await fsPromises.readFile(settingsPath, 'utf8');
+      const settings = JSON.parse(settingsData);
+      res.json(settings);
+    } else {
+      // Return empty object if no settings file exists
+      res.json({});
+    }
+  } catch (error) {
+    console.error('Error loading settings:', error);
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+app.post('/api/settings', requireAuth, async (req, res) => {
+  try {
+    const settings = req.body;
+    const configDir = path.join(__dirname, 'config');
+    const settingsPath = path.join(configDir, 'test-settings.json');
+    
+    // Ensure config directory exists
+    if (!fs.existsSync(configDir)) {
+      await fsPromises.mkdir(configDir, { recursive: true });
+    }
+    
+    // Validate settings structure (basic validation)
+    if (typeof settings !== 'object' || settings === null) {
+      return res.status(400).json({ error: 'Invalid settings format' });
+    }
+    
+    // Add metadata
+    const settingsWithMeta = {
+      ...settings,
+      lastModified: new Date().toISOString(),
+      modifiedBy: req.session.username || 'unknown'
+    };
+    
+    // Save settings to file
+    await fsPromises.writeFile(settingsPath, JSON.stringify(settingsWithMeta, null, 2));
+    
+    console.log(`Settings updated by ${req.session.username}`);
+    res.json({ success: true, message: 'Settings saved successfully' });
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+// Health check endpoint for settings page
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// JIRA connection test endpoint
+app.post('/api/jira/test-connection', requireAuth, async (req, res) => {
+  try {
+    const { url, username, token } = req.body;
+    
+    if (!url || !username || !token) {
+      return res.status(400).json({ error: 'Missing JIRA connection parameters' });
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(url);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid JIRA URL' });
+    }
+    
+    // Test connection by making a simple API call to JIRA
+    const testUrl = `${url}/rest/api/2/myself`;
+    const authHeader = Buffer.from(`${username}:${token}`).toString('base64');
+    
+    const fetch = require('node-fetch');
+    const response = await fetch(testUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    });
+    
+    if (response.ok) {
+      res.json({ success: true, message: 'JIRA connection successful' });
+    } else {
+      res.status(response.status).json({ 
+        error: 'JIRA connection failed', 
+        details: response.statusText 
+      });
+    }
+  } catch (error) {
+    console.error('Error testing JIRA connection:', error);
+    res.status(500).json({ 
+      error: 'Failed to test JIRA connection',
+      details: error.message
+    });
+  }
+});
+
 // Catch-all route for SPA behavior
 app.get('*', (req, res) => {
   // If the request is for a static file that doesn't exist, send 404
@@ -426,5 +660,6 @@ app.listen(PORT, () => {
   console.log(`👥 User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log(`🧪 Test Management: http://localhost:${PORT}/tests-management/index.html`);
+  console.log(`⚙️ Settings: http://localhost:${PORT}/settings/index.html`);
   console.log('✨ Press Ctrl+C to stop the server');
 });

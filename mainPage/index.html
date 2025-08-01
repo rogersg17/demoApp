@@ -65,6 +65,13 @@
       type="button">
       <i class="fas fa-vial" aria-hidden="true"></i>
     </button>
+    <button 
+      class="sidebar-icon" 
+      data-page="settings"
+      aria-label="Settings"
+      type="button">
+      <i class="fas fa-cog" aria-hidden="true"></i>
+    </button>
   </nav>
 
   <main class="main-content" role="main" aria-labelledby="dashboard-heading">
@@ -91,6 +98,12 @@
         <i class="fas fa-vial" aria-hidden="true"></i>
         <h3 id="tests-title">Test Management</h3>
         <p id="tests-desc">Manage Playwright test suites, execute tests, and monitor test results to ensure application quality and reliability.</p>
+      </article>
+      
+      <article class="card" tabindex="0" role="button" aria-labelledby="settings-title" aria-describedby="settings-desc">
+        <i class="fas fa-cog" aria-hidden="true"></i>
+        <h3 id="settings-title">Settings</h3>
+        <p id="settings-desc">Configure test execution parameters, browser settings, reporting options, and integrations for optimal testing performance.</p>
       </article>
     </section>
   </main>
@@ -166,6 +179,14 @@
             setTimeout(() => {
               window.location.href = '../tests-management/index.html';
             }, 300);
+          } else if (page === 'settings') {
+            // Navigate to settings page
+            this.style.background = 'var(--primary-gradient)';
+            this.style.color = 'white';
+            
+            setTimeout(() => {
+              window.location.href = '../settings/index.html';
+            }, 300);
           }
         });
       });
@@ -200,6 +221,11 @@
             this.style.transform = 'scale(0.98)';
             setTimeout(() => {
               window.location.href = '../tests-management/index.html';
+            }, 200);
+          } else if (cardTitle === 'Settings') {
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              window.location.href = '../settings/index.html';
             }, 200);
           }
         });
