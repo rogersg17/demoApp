@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useDispatch } from 'react-redux'
 import webSocketService from '../services/websocket'
+import { updateTestStatus } from '../store/slices/testSlice'
 import type { TestUpdate, LogUpdate, ExecutionHistory } from '../services/websocket'
 
 export interface TestExecutionState {
@@ -45,6 +47,8 @@ export function useTestMonitoring(testId: string | null, options: UseTestMonitor
     maxLogLines = 1000,
     enableLogs = true
   } = options
+
+  const dispatch = useDispatch()
 
   const [state, setState] = useState<TestExecutionState>({
     status: 'idle',
@@ -103,6 +107,14 @@ export function useTestMonitoring(testId: string | null, options: UseTestMonitor
           }
 
         case 'test-completed':
+          // Update Redux store with test status and duration
+          if (update.test && update.test.status) {
+            // For now, skip individual test updates since we need the test index to match the ID format
+            // The test IDs are constructed as ${file}_${index} but we only have file and name from WebSocket
+            // TODO: Improve test ID matching or pass the test ID in WebSocket updates
+            console.log('Test completed:', update.test.name, 'Duration:', update.test.duration);
+          }
+          
           return {
             ...newState,
             progress: newProgress

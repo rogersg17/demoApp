@@ -12,6 +12,7 @@ export interface TestExecutionSettings {
   video: boolean
   screenshots: boolean
   trace: boolean
+  liveLogs: boolean
 }
 
 interface SettingsState {
@@ -32,6 +33,7 @@ const defaultSettings: TestExecutionSettings = {
   video: false,
   screenshots: true,
   trace: false,
+  liveLogs: true, // Enable live logs by default
 }
 
 const initialState: SettingsState = {

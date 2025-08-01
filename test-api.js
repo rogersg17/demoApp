@@ -5,20 +5,43 @@ async function testAPI() {
     try {
         console.log('🧪 Testing the test execution API...\n');
         
+        // 0. First authenticate
+        console.log('0. Authenticating...');
+        const loginResponse = await fetch('http://localhost:5173/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'admin', password: 'admin123' })
+        });
+        const loginData = await loginResponse.json();
+        
+        if (!loginData.success) {
+            throw new Error('Login failed');
+        }
+        
+        console.log(`   ✅ Logged in as ${loginData.user.username}\n`);
+        
+        // Extract session cookie
+        const setCookieHeader = loginResponse.headers.get('set-cookie');
+        const sessionCookie = setCookieHeader ? setCookieHeader.split(';')[0] : '';
+        
         // 1. First get the tests list
         console.log('1. Fetching tests list...');
-        const testsResponse = await fetch('http://localhost:3000/api/tests');
+        const testsResponse = await fetch('http://localhost:5173/api/tests', {
+            headers: { 'Cookie': sessionCookie }
+        });
         const testsData = await testsResponse.json();
         console.log(`   Found ${testsData.totalTests} tests\n`);
         
-        // 2. Start a test execution (run just the jira-demo.spec.ts file)
+        // 2. Start a test execution (run just a simple test)
         console.log('2. Starting test execution...');
-        const runResponse = await fetch('http://localhost:3000/api/tests/run', {
+        const runResponse = await fetch('http://localhost:5173/api/tests/run', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Cookie': sessionCookie
+            },
             body: JSON.stringify({
-                testFiles: ['jira-demo.spec.ts'],
-                suite: 'api-test'
+                testIds: ['login-functional.spec.ts_0'] // Run TC001
             })
         });
         const runData = await runResponse.json();
@@ -34,7 +57,9 @@ async function testAPI() {
             await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
             attempts++;
             
-            const statusResponse = await fetch(`http://localhost:3000/api/tests/results/${runData.executionId}`);
+            const statusResponse = await fetch(`http://localhost:5173/api/tests/results/${runData.executionId}`, {
+                headers: { 'Cookie': sessionCookie }
+            });
             const statusData = await statusResponse.json();
             
             console.log(`   Attempt ${attempts}: Status = ${statusData.status}`);

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import Layout from '../components/Layout'
+import { updateTestExecutionSetting } from '../store/slices/settingsSlice'
+import type { RootState } from '../store/store'
 
 interface Settings {
   // Browser Configuration
@@ -18,6 +21,7 @@ interface Settings {
   screenshotMode: string
   videoRecording: boolean
   verboseLogging: boolean
+  liveLogs: boolean
   
   // Environment Configuration
   baseUrl: string
@@ -55,6 +59,7 @@ const defaultSettings: Settings = {
   screenshotMode: 'only-on-failure',
   videoRecording: false,
   verboseLogging: false,
+  liveLogs: true,
   
   // Environment Configuration
   baseUrl: 'http://localhost:8080',
@@ -76,6 +81,9 @@ const defaultSettings: Settings = {
 }
 
 const SettingsPage: React.FC = () => {
+  const dispatch = useDispatch()
+  const reduxLiveLogs = useSelector((state: RootState) => state.settings.testExecution.liveLogs)
+  
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -85,6 +93,11 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     loadSettings()
   }, [])
+
+  // Sync liveLogs setting with Redux store
+  useEffect(() => {
+    setSettings(prev => ({ ...prev, liveLogs: reduxLiveLogs }))
+  }, [reduxLiveLogs])
 
   const loadSettings = async () => {
     try {
@@ -160,6 +173,11 @@ const SettingsPage: React.FC = () => {
       ...prev,
       [key]: value
     }))
+    
+    // Sync liveLogs setting with Redux store
+    if (key === 'liveLogs') {
+      dispatch(updateTestExecutionSetting({ key: 'liveLogs', value: value as boolean }))
+    }
   }
 
   if (loading) {
@@ -314,6 +332,28 @@ const SettingsPage: React.FC = () => {
                 />
                 Verbose Logging
               </label>
+            </div>
+            <div className="setting-group">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={settings.liveLogs}
+                  onChange={(e) => updateSetting('liveLogs', e.target.checked)}
+                />
+                Real-time Live Logs
+              </label>
+              <small 
+                className="setting-description"
+                style={{ 
+                  display: 'block', 
+                  marginTop: '4px', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  fontStyle: 'italic'
+                }}
+              >
+                Enable live streaming of test execution logs in real-time monitoring
+              </small>
             </div>
           </div>
 

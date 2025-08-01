@@ -12,10 +12,10 @@ class LoginPage {
     this.usernameInput = page.locator('#username');
     this.passwordInput = page.locator('#password');
     this.loginButton = page.locator('button[type="submit"]');
-    this.loginForm = page.locator('.login-form');
+    this.loginForm = page.locator('#loginForm');
     this.errorMessage = page.locator('.error-message');
     this.successMessage = page.locator('.success-message');
-    this.pageHeading = page.locator('.login-heading');
+    this.pageHeading = page.locator('#login-heading');
     
     // Field error locators for React app
     this.usernameError = page.locator('.input-group:has(#username) .field-error');

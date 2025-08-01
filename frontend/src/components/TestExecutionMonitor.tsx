@@ -1,6 +1,8 @@
 import React from 'react'
+import { useSelector } from 'react-redux'
 import useTestMonitoring from '../hooks/useTestMonitoring'
 import type { TestExecutionState } from '../hooks/useTestMonitoring'
+import type { RootState } from '../store/store'
 import './TestExecutionMonitor.css'
 
 interface TestExecutionMonitorProps {
@@ -14,10 +16,12 @@ const TestExecutionMonitor: React.FC<TestExecutionMonitorProps> = ({
   onClose,
   className = ''
 }) => {
+  const liveLogs = useSelector((state: RootState) => state.settings.testExecution.liveLogs)
+  
   const { state, actions, utils } = useTestMonitoring(testId, {
     autoScrollLogs: true,
     maxLogLines: 500,
-    enableLogs: true
+    enableLogs: liveLogs
   })
 
   if (!testId) {
@@ -191,7 +195,12 @@ const TestExecutionMonitor: React.FC<TestExecutionMonitorProps> = ({
       {/* Live Logs */}
       <div className="logs-section">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-gray-700">Live Logs</h4>
+          <div className="flex items-center space-x-3">
+            <h4 className="font-medium text-gray-700">Live Logs</h4>
+            <span className={`text-sm px-2 py-1 rounded ${liveLogs ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+              {liveLogs ? '🟢 Enabled' : '🔴 Disabled'}
+            </span>
+          </div>
           <div className="flex space-x-2">
             <button
               onClick={actions.clearLogs}
@@ -210,7 +219,13 @@ const TestExecutionMonitor: React.FC<TestExecutionMonitorProps> = ({
         </div>
         
         <div className="logs-container">
-          {state.logs.length === 0 ? (
+          {!liveLogs ? (
+            <div className="no-logs logs-disabled">
+              <p className="text-gray-500 text-center py-8">
+                📝 Live logs are disabled. Go to <strong>Settings</strong> to enable real-time test execution logs.
+              </p>
+            </div>
+          ) : state.logs.length === 0 ? (
             <div className="no-logs">
               <p className="text-gray-500 text-center py-8">
                 {state.status === 'running' ? 'Waiting for logs...' : 'No logs available'}

@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-08-01T19:54:59.457Z",
+  "timestamp": "2025-08-01T20:09:12.759Z",
   "results": {
     "total": 12,
-    "passed": 0,
-    "failed": 12,
+    "passed": 12,
+    "failed": 0,
     "skipped": 0,
-    "duration": "21.653709000000003s",
+    "duration": "20.036036s",
     "suites": [
       {
         "title": "login-functional.spec.ts",
@@ -29,7 +29,7 @@
                 "specs": [
                   {
                     "title": "TC001: Login with admin credentials",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -42,48 +42,18 @@
                           {
                             "workerIndex": 0,
                             "parallelIndex": 0,
-                            "status": "failed",
-                            "duration": 9302,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 6593,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.801Z",
+                            "startTime": "2025-08-01T20:08:53.746Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-51188-ogin-with-admin-credentials-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-7fe8e325fdde66e7a55f",
@@ -93,7 +63,7 @@
                   },
                   {
                     "title": "TC002: Login with regular user credentials",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -106,48 +76,18 @@
                           {
                             "workerIndex": 1,
                             "parallelIndex": 1,
-                            "status": "failed",
-                            "duration": 9770,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 6624,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.827Z",
+                            "startTime": "2025-08-01T20:08:53.767Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-74e4d-th-regular-user-credentials-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-87fa47fb59004971e57b",
@@ -157,7 +97,7 @@
                   },
                   {
                     "title": "TC003: Login with moderator user credentials",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -170,48 +110,18 @@
                           {
                             "workerIndex": 2,
                             "parallelIndex": 2,
-                            "status": "failed",
-                            "duration": 9463,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 6619,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.834Z",
+                            "startTime": "2025-08-01T20:08:53.801Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-51d5e--moderator-user-credentials-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-4e78df0197f8afa19959",
@@ -221,7 +131,7 @@
                   },
                   {
                     "title": "TC004: Login with HR user credentials",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -234,48 +144,18 @@
                           {
                             "workerIndex": 3,
                             "parallelIndex": 3,
-                            "status": "failed",
-                            "duration": 9118,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 6627,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.788Z",
+                            "startTime": "2025-08-01T20:08:53.759Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-61db5-in-with-HR-user-credentials-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-13f31312011641b6d0c1",
@@ -285,7 +165,7 @@
                   },
                   {
                     "title": "TC005: Login with case-sensitive username",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -298,48 +178,18 @@
                           {
                             "workerIndex": 4,
                             "parallelIndex": 4,
-                            "status": "failed",
-                            "duration": 9543,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 6304,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.843Z",
+                            "startTime": "2025-08-01T20:08:53.754Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-4c134-ith-case-sensitive-username-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-e38469f94fcd2df6e975",
@@ -357,7 +207,7 @@
                 "specs": [
                   {
                     "title": "TC006: Login with invalid username",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -370,48 +220,18 @@
                           {
                             "workerIndex": 5,
                             "parallelIndex": 5,
-                            "status": "failed",
-                            "duration": 9603,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 4656,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.864Z",
+                            "startTime": "2025-08-01T20:08:53.757Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-690e5-Login-with-invalid-username-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-ffb437caeb6b1ee19d44",
@@ -421,7 +241,7 @@
                   },
                   {
                     "title": "TC007: Login with valid username but wrong password",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -434,48 +254,18 @@
                           {
                             "workerIndex": 6,
                             "parallelIndex": 6,
-                            "status": "failed",
-                            "duration": 8986,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 4954,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.912Z",
+                            "startTime": "2025-08-01T20:08:53.770Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-23839-username-but-wrong-password-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-134190b1bc01f2fafd2d",
@@ -485,7 +275,7 @@
                   },
                   {
                     "title": "TC008: Login with empty username",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -498,48 +288,18 @@
                           {
                             "workerIndex": 7,
                             "parallelIndex": 7,
-                            "status": "failed",
-                            "duration": 9472,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 4332,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:38.884Z",
+                            "startTime": "2025-08-01T20:08:53.825Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-dccc7-8-Login-with-empty-username-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-587c3a96ab6ebc7e30e7",
@@ -549,7 +309,7 @@
                   },
                   {
                     "title": "TC009: Login with empty password",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -560,50 +320,20 @@
                         "projectName": "msedge",
                         "results": [
                           {
-                            "workerIndex": 8,
-                            "parallelIndex": 3,
-                            "status": "failed",
-                            "duration": 8457,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "workerIndex": 5,
+                            "parallelIndex": 5,
+                            "status": "passed",
+                            "duration": 3400,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:49.525Z",
+                            "startTime": "2025-08-01T20:08:58.750Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-07711-9-Login-with-empty-password-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-7d0bec4865d64fdd6a41",
@@ -613,7 +343,7 @@
                   },
                   {
                     "title": "TC010: Login with both fields empty",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -624,50 +354,20 @@
                         "projectName": "msedge",
                         "results": [
                           {
-                            "workerIndex": 9,
-                            "parallelIndex": 0,
-                            "status": "failed",
-                            "duration": 8439,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "workerIndex": 7,
+                            "parallelIndex": 7,
+                            "status": "passed",
+                            "duration": 3383,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:49.628Z",
+                            "startTime": "2025-08-01T20:08:58.970Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-6c8fe-ogin-with-both-fields-empty-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-1da1d2d8ef6e3ecb29e6",
@@ -677,7 +377,7 @@
                   },
                   {
                     "title": "TC011: Login with case-sensitive password failure",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -688,50 +388,20 @@
                         "projectName": "msedge",
                         "results": [
                           {
-                            "workerIndex": 10,
-                            "parallelIndex": 2,
-                            "status": "failed",
-                            "duration": 8433,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "workerIndex": 6,
+                            "parallelIndex": 6,
+                            "status": "passed",
+                            "duration": 3432,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:50.260Z",
+                            "startTime": "2025-08-01T20:08:59.167Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-1035c--sensitive-password-failure-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-f98c22c958ab27231be4",
@@ -741,7 +411,7 @@
                   },
                   {
                     "title": "TC012: Login with whitespace-only credentials",
-                    "ok": false,
+                    "ok": true,
                     "tags": [],
                     "tests": [
                       {
@@ -752,50 +422,20 @@
                         "projectName": "msedge",
                         "results": [
                           {
-                            "workerIndex": 11,
+                            "workerIndex": 4,
                             "parallelIndex": 4,
-                            "status": "failed",
-                            "duration": 8395,
-                            "error": {
-                              "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n",
-                              "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5",
-                              "location": {
-                                "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                "column": 36,
-                                "line": 56
-                              },
-                              "snippet": "\u001b[90m   at \u001b[39m..\\page-objects\\LoginPage.js:56\n\n\u001b[0m \u001b[90m 54 |\u001b[39m \u001b[90m   */\u001b[39m\n \u001b[90m 55 |\u001b[39m   \u001b[36masync\u001b[39m waitForPageLoad() {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 56 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpageHeading)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 57 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mloginForm)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 58 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39musernameInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 59 |\u001b[39m     \u001b[36mawait\u001b[39m expect(\u001b[36mthis\u001b[39m\u001b[33m.\u001b[39mpasswordInput)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
-                            },
-                            "errors": [
-                              {
-                                "location": {
-                                  "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                                  "column": 36,
-                                  "line": 56
-                                },
-                                "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('.login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('.login-heading')\u001b[22m\n\n\n   at ..\\page-objects\\LoginPage.js:56\n\n  54 |    */\n  55 |   async waitForPageLoad() {\n> 56 |     await expect(this.pageHeading).toBeVisible();\n     |                                    ^\n  57 |     await expect(this.loginForm).toBeVisible();\n  58 |     await expect(this.usernameInput).toBeVisible();\n  59 |     await expect(this.passwordInput).toBeVisible();\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-functional.spec.ts:9:5"
-                              }
-                            ],
+                            "status": "passed",
+                            "duration": 3375,
+                            "errors": [],
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-01T19:54:50.408Z",
+                            "startTime": "2025-08-01T20:09:00.418Z",
                             "annotations": [],
-                            "attachments": [
-                              {
-                                "name": "error-context",
-                                "contentType": "text/markdown",
-                                "path": "C:\\MyRepositories\\demoApp\\test-results\\login-functional-Login-Fun-4858f-whitespace-only-credentials-msedge\\error-context.md"
-                              }
-                            ],
-                            "errorLocation": {
-                              "file": "C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js",
-                              "column": 36,
-                              "line": 56
-                            }
+                            "attachments": []
                           }
                         ],
-                        "status": "unexpected"
+                        "status": "expected"
                       }
                     ],
                     "id": "6734f6c9b2a5d73d52db-21725a7ae140a228ca51",
@@ -811,5 +451,5 @@
       }
     ]
   },
-  "exitCode": 1
+  "exitCode": 0
 }

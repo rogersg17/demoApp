@@ -269,14 +269,20 @@ const TestManagementPage: React.FC = () => {
                 timestamp: execution.endTime || new Date().toISOString()
               })
 
-              // Update test results - this is a simplified mapping
-              // In a real implementation, you'd want better test ID mapping
+              // Update test results - improved mapping with duration tracking
+              // Calculate average duration per test for executed tests
+              const avgDurationPerTest = execution.results.total > 0 
+                ? parseFloat(execution.results.duration) / execution.results.total 
+                : 0
+
               setTests(prev => prev.map(test => {
                 if (selectedTests.includes(test.id)) {
                   return {
                     ...test,
                     status: execution.results.failed > 0 ? 'failed' as const : 'passed' as const,
-                    lastRun: execution.endTime || new Date().toISOString()
+                    lastRun: execution.endTime || new Date().toISOString(),
+                    // Use average duration for individual tests since we don't have precise mapping
+                    duration: avgDurationPerTest > 0 ? Math.round(avgDurationPerTest * 1000) : undefined
                   }
                 }
                 return test
