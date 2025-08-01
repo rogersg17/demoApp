@@ -15,11 +15,11 @@
 <body>
   <header class="header" role="banner">
     <div class="header-left">
-      <a href="../tests-management/index.html" class="back-btn">
+      <a href="../mainPage/index.html" class="back-btn">
         <i class="fas fa-arrow-left"></i>
-        Back to Test Management
+        Back to Dashboard
       </a>
-      <h1 class="page-title">Test Execution Settings</h1>
+      <h1 class="page-title">Settings</h1>
     </div>
     <div class="user-info" id="welcomeMessage">Welcome, User!</div>
   </header>
@@ -27,16 +27,18 @@
   <main class="main-content">
     <!-- Settings Form -->
     <section class="settings-section" aria-label="Test Execution Configuration">
-      <div class="settings-card">
-        <div class="card-header">
-          <h2><i class="fas fa-cog"></i> Execution Parameters</h2>
-          <p>Configure how tests are executed in your environment</p>
-        </div>
+      <form id="settingsForm" class="settings-form">
         
-        <form id="settingsForm" class="settings-form">
-          <!-- Browser Configuration -->
-          <div class="setting-group">
-            <h3><i class="fas fa-browser"></i> Browser Configuration</h3>
+        <!-- Settings Grid -->
+        <div class="settings-grid">
+          
+          <!-- Browser Configuration Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fas fa-browser"></i> Browser Configuration</h2>
+              <p>Configure browser settings for test execution</p>
+            </div>
+            
             <div class="setting-item">
               <label for="defaultBrowser">Default Browser</label>
               <select id="defaultBrowser" name="defaultBrowser">
@@ -47,7 +49,7 @@
               <span class="setting-description">Browser to use for test execution</span>
             </div>
             
-            <div class="setting-item">
+            <div class="setting-item checkbox-item">
               <label for="headlessMode">Headless Mode</label>
               <input type="checkbox" id="headlessMode" name="headlessMode" checked>
               <span class="setting-description">Run tests without opening browser windows</span>
@@ -60,9 +62,13 @@
             </div>
           </div>
 
-          <!-- Test Execution -->
-          <div class="setting-group">
-            <h3><i class="fas fa-play"></i> Test Execution</h3>
+          <!-- Test Execution Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fas fa-play"></i> Test Execution</h2>
+              <p>Configure test execution parameters and performance settings</p>
+            </div>
+            
             <div class="setting-item">
               <label for="maxRetries">Max Retries</label>
               <input type="number" id="maxRetries" name="maxRetries" value="2" min="0" max="5">
@@ -88,9 +94,13 @@
             </div>
           </div>
 
-          <!-- Reporting & Output -->
-          <div class="setting-group">
-            <h3><i class="fas fa-chart-bar"></i> Reporting & Output</h3>
+          <!-- Reporting & Output Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fas fa-chart-bar"></i> Reporting & Output</h2>
+              <p>Configure report formats and output options</p>
+            </div>
+            
             <div class="setting-item">
               <label for="reportFormat">Report Format</label>
               <select id="reportFormat" name="reportFormat">
@@ -112,22 +122,26 @@
               <span class="setting-description">When to capture screenshots during tests</span>
             </div>
             
-            <div class="setting-item">
+            <div class="setting-item checkbox-item">
               <label for="videoRecording">Video Recording</label>
               <input type="checkbox" id="videoRecording" name="videoRecording">
               <span class="setting-description">Record videos of test execution</span>
             </div>
             
-            <div class="setting-item">
+            <div class="setting-item checkbox-item">
               <label for="verboseLogging">Verbose Logging</label>
               <input type="checkbox" id="verboseLogging" name="verboseLogging">
               <span class="setting-description">Enable detailed console output</span>
             </div>
           </div>
 
-          <!-- Environment Variables -->
-          <div class="setting-group">
-            <h3><i class="fas fa-server"></i> Environment Configuration</h3>
+          <!-- Environment Configuration Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fas fa-server"></i> Environment Configuration</h2>
+              <p>Configure environment URLs and testing context</p>
+            </div>
+            
             <div class="setting-item">
               <label for="baseUrl">Base URL</label>
               <input type="url" id="baseUrl" name="baseUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
@@ -151,50 +165,58 @@
             </div>
           </div>
 
-          <!-- JIRA Integration -->
-          <div class="setting-group">
-            <h3><i class="fab fa-jira"></i> JIRA Integration</h3>
-            <div class="setting-item">
+          <!-- JIRA Integration Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fab fa-jira"></i> JIRA Integration</h2>
+              <p>Configure JIRA integration for test result tracking</p>
+            </div>
+            
+            <div class="setting-item checkbox-item">
               <label for="jiraEnabled">Enable JIRA Integration</label>
               <input type="checkbox" id="jiraEnabled" name="jiraEnabled">
               <span class="setting-description">Automatically create/update JIRA issues for test results</span>
             </div>
             
-            <div class="setting-item jira-setting" style="display: none;">
+            <div class="setting-item jira-setting">
               <label for="jiraUrl">JIRA URL</label>
               <input type="url" id="jiraUrl" name="jiraUrl" placeholder="https://your-company.atlassian.net">
               <span class="setting-description">Your JIRA instance URL</span>
             </div>
             
-            <div class="setting-item jira-setting" style="display: none;">
+            <div class="setting-item jira-setting">
               <label for="jiraProject">JIRA Project Key</label>
               <input type="text" id="jiraProject" name="jiraProject" placeholder="TEST" pattern="[A-Z]+" maxlength="10">
               <span class="setting-description">JIRA project key for test issues</span>
             </div>
             
-            <div class="setting-item jira-setting" style="display: none;">
+            <div class="setting-item jira-setting">
               <label for="jiraUsername">JIRA Username</label>
               <input type="email" id="jiraUsername" name="jiraUsername" placeholder="your-email@company.com">
               <span class="setting-description">Your JIRA username/email</span>
             </div>
             
-            <div class="setting-item jira-setting" style="display: none;">
+            <div class="setting-item jira-setting">
               <label for="jiraApiToken">JIRA API Token</label>
               <input type="password" id="jiraApiToken" name="jiraApiToken" placeholder="Enter your JIRA API token">
               <span class="setting-description">API token for JIRA authentication</span>
             </div>
           </div>
 
-          <!-- Advanced Settings -->
-          <div class="setting-group">
-            <h3><i class="fas fa-tools"></i> Advanced Settings</h3>
-            <div class="setting-item">
+          <!-- Advanced Settings Panel -->
+          <div class="settings-panel">
+            <div class="panel-header">
+              <h2><i class="fas fa-tools"></i> Advanced Settings</h2>
+              <p>Advanced configuration options for power users</p>
+            </div>
+            
+            <div class="setting-item checkbox-item">
               <label for="fullyParallel">Fully Parallel</label>
               <input type="checkbox" id="fullyParallel" name="fullyParallel">
               <span class="setting-description">Run tests in parallel across all projects</span>
             </div>
             
-            <div class="setting-item">
+            <div class="setting-item checkbox-item">
               <label for="forbidOnly">Forbid test.only</label>
               <input type="checkbox" id="forbidOnly" name="forbidOnly" checked>
               <span class="setting-description">Fail if test.only is found in code</span>
@@ -210,26 +232,28 @@
               <span class="setting-description">When to update visual comparison snapshots</span>
             </div>
             
-            <div class="setting-item">
+            <div class="setting-item checkbox-item">
               <label for="ignoreHttpsErrors">Ignore HTTPS Errors</label>
               <input type="checkbox" id="ignoreHttpsErrors" name="ignoreHttpsErrors">
               <span class="setting-description">Ignore SSL certificate errors during tests</span>
             </div>
           </div>
-
-          <!-- Action Buttons -->
-          <div class="form-actions">
-            <button type="button" id="resetBtn" class="btn btn-secondary">
-              <i class="fas fa-undo"></i> Reset to Defaults
-            </button>
-            <button type="button" id="testConnectionBtn" class="btn btn-info">
-              <i class="fas fa-wifi"></i> Test Connection
-            </button>
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-save"></i> Save Settings
-            </button>
-          </div>
-        </form>
+          
+        </div>
+        
+      </form>
+      
+      <!-- Action Buttons -->
+      <div class="form-actions">
+        <button type="button" id="resetBtn" class="btn btn-secondary">
+          <i class="fas fa-undo"></i> Reset to Defaults
+        </button>
+        <button type="button" id="testConnectionBtn" class="btn btn-info">
+          <i class="fas fa-wifi"></i> Test Connection
+        </button>
+        <button type="submit" form="settingsForm" class="btn btn-primary">
+          <i class="fas fa-save"></i> Save Settings
+        </button>
       </div>
     </section>
 

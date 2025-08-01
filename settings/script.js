@@ -2,6 +2,30 @@
 let settings = {};
 let isLoading = false;
 
+// Tab switching functionality
+function initializeTabs() {
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.settings-panel');
+  
+  // Handle tab clicks
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetTab = button.getAttribute('data-tab');
+      
+      // Remove active class from all tabs and panels
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      panels.forEach(panel => panel.classList.remove('active'));
+      
+      // Add active class to clicked tab and corresponding panel
+      button.classList.add('active');
+      const targetPanel = document.getElementById(`${targetTab}-panel`);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+    });
+  });
+}
+
 // Default configuration
 const defaultSettings = {
   // Browser Configuration
@@ -48,6 +72,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.location.href = '../login/index.html';
     return;
   }
+
+  // Initialize tab functionality
+  initializeTabs();
 
   // Display welcome message
   document.getElementById('welcomeMessage').textContent = `Welcome, ${loggedInUser}!`;
