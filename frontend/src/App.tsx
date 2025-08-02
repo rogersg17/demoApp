@@ -6,6 +6,7 @@ import type { RootState, AppDispatch } from './store/store'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import TestManagementPage from './pages/TestManagementPage'
+import FlakyTestsPage from './pages/FlakyTestsPage'
 import SettingsPage from './pages/SettingsPage'
 import UserManagementPage from './pages/UserManagementPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -48,6 +49,14 @@ function App() {
         element={
           <ProtectedRoute>
             <TestManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/flaky-tests"
+        element={
+          <ProtectedRoute>
+            <FlakyTestsPage />
           </ProtectedRoute>
         }
       />

@@ -75,6 +75,9 @@ class Database {
     // Azure DevOps integration tables
     this.initializeAdoTables();
 
+    // Flaky test detection tables
+    this.initializeFlakyTestTables();
+
     // Insert sample data after tables are created
     setTimeout(() => {
       this.insertSampleData();
@@ -209,6 +212,90 @@ class Database {
     `, (err) => {
       if (err) console.error('Error creating ado_test_details table:', err);
       else console.log('✅ ADO test details table ready');
+    });
+  }
+
+  initializeFlakyTestTables() {
+    // Flaky test tracking table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS flaky_tests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_name TEXT NOT NULL UNIQUE,
+        flaky_score REAL DEFAULT 0,
+        classification TEXT DEFAULT 'stable',
+        confidence REAL DEFAULT 0,
+        last_analyzed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        pattern_type TEXT,
+        analysis_data TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating flaky_tests table:', err);
+      else console.log('✅ Flaky tests table ready');
+    });
+
+    // Test execution history table for detailed tracking
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_execution_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_name TEXT NOT NULL,
+        test_suite TEXT,
+        outcome TEXT NOT NULL,
+        duration_ms INTEGER,
+        error_message TEXT,
+        stack_trace TEXT,
+        environment TEXT DEFAULT 'default',
+        browser TEXT,
+        execution_id TEXT,
+        build_id TEXT,
+        started_at DATETIME,
+        completed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_execution_history table:', err);
+      else console.log('✅ Test execution history table ready');
+    });
+
+    // Test stability metrics for trend analysis
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_stability_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_name TEXT NOT NULL,
+        date DATE NOT NULL,
+        total_executions INTEGER DEFAULT 0,
+        passed_executions INTEGER DEFAULT 0,
+        failed_executions INTEGER DEFAULT 0,
+        skipped_executions INTEGER DEFAULT 0,
+        pass_rate REAL DEFAULT 0,
+        avg_duration_ms REAL DEFAULT 0,
+        failure_patterns TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(test_name, date)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_stability_metrics table:', err);
+      else console.log('✅ Test stability metrics table ready');
+    });
+
+    // Flaky test analysis runs for tracking analysis history
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS flaky_analysis_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        analysis_type TEXT DEFAULT 'full',
+        total_tests INTEGER DEFAULT 0,
+        flaky_tests_found INTEGER DEFAULT 0,
+        potentially_flaky_tests INTEGER DEFAULT 0,
+        stable_tests INTEGER DEFAULT 0,
+        analysis_duration_ms INTEGER,
+        started_at DATETIME,
+        completed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating flaky_analysis_runs table:', err);
+      else console.log('✅ Flaky analysis runs table ready');
     });
   }
 
@@ -871,6 +958,231 @@ class Database {
       const params = projectId ? [projectId, cutoffDate.toISOString()] : [cutoffDate.toISOString()];
       
       this.db.get(query, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  }
+
+  // Flaky Test Detection methods
+  async createTestExecutionRecord(testData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO test_execution_history (
+          test_name, test_suite, outcome, duration_ms, error_message,
+          stack_trace, environment, browser, execution_id, build_id,
+          started_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        testData.testName,
+        testData.testSuite,
+        testData.outcome,
+        testData.durationMs,
+        testData.errorMessage,
+        testData.stackTrace,
+        testData.environment || 'default',
+        testData.browser,
+        testData.executionId,
+        testData.buildId,
+        testData.startedAt,
+        testData.completedAt
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...testData });
+      });
+    });
+  }
+
+  async getTestExecutionHistory(testName, limit = 50) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_execution_history 
+        WHERE test_name = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `, [testName, limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getAllTestExecutionHistory(limit = 1000) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_execution_history 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `, [limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getAllUniqueTestNames() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT DISTINCT test_name FROM test_execution_history 
+        ORDER BY test_name
+      `, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows.map(row => row.test_name));
+      });
+    });
+  }
+
+  async upsertFlakyTest(flakyTestData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT OR REPLACE INTO flaky_tests (
+          test_name, flaky_score, classification, confidence,
+          pattern_type, analysis_data, last_analyzed, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [
+        flakyTestData.testName,
+        flakyTestData.flakyScore,
+        flakyTestData.classification,
+        flakyTestData.confidence,
+        flakyTestData.patternType,
+        JSON.stringify(flakyTestData.analysisData)
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...flakyTestData });
+      });
+    });
+  }
+
+  async getFlakyTests() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM flaky_tests 
+        ORDER BY flaky_score DESC, last_analyzed DESC
+      `, (err, rows) => {
+        if (err) reject(err);
+        else {
+          const tests = rows.map(row => ({
+            ...row,
+            analysis_data: row.analysis_data ? JSON.parse(row.analysis_data) : null
+          }));
+          resolve(tests);
+        }
+      });
+    });
+  }
+
+  async getFlakyTestByName(testName) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT * FROM flaky_tests WHERE test_name = ?
+      `, [testName], (err, row) => {
+        if (err) reject(err);
+        else {
+          if (row) {
+            row.analysis_data = row.analysis_data ? JSON.parse(row.analysis_data) : null;
+          }
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  async updateTestStabilityMetrics(metricsData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT OR REPLACE INTO test_stability_metrics (
+          test_name, date, total_executions, passed_executions,
+          failed_executions, skipped_executions, pass_rate,
+          avg_duration_ms, failure_patterns
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        metricsData.testName,
+        metricsData.date,
+        metricsData.totalExecutions,
+        metricsData.passedExecutions,
+        metricsData.failedExecutions,
+        metricsData.skippedExecutions,
+        metricsData.passRate,
+        metricsData.avgDurationMs,
+        JSON.stringify(metricsData.failurePatterns)
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...metricsData });
+      });
+    });
+  }
+
+  async getTestStabilityMetrics(testName, days = 30) {
+    return new Promise((resolve, reject) => {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      
+      this.db.all(`
+        SELECT * FROM test_stability_metrics 
+        WHERE test_name = ? AND date >= ?
+        ORDER BY date DESC
+      `, [testName, cutoffDate.toISOString().split('T')[0]], (err, rows) => {
+        if (err) reject(err);
+        else {
+          const metrics = rows.map(row => ({
+            ...row,
+            failure_patterns: row.failure_patterns ? JSON.parse(row.failure_patterns) : null
+          }));
+          resolve(metrics);
+        }
+      });
+    });
+  }
+
+  async createFlakyAnalysisRun(runData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO flaky_analysis_runs (
+          analysis_type, total_tests, flaky_tests_found,
+          potentially_flaky_tests, stable_tests, analysis_duration_ms,
+          started_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        runData.analysisType,
+        runData.totalTests,
+        runData.flakyTestsFound,
+        runData.potentiallyFlakyTests,
+        runData.stableTests,
+        runData.analysisDurationMs,
+        runData.startedAt,
+        runData.completedAt
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...runData });
+      });
+    });
+  }
+
+  async getRecentFlakyAnalysisRuns(limit = 10) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM flaky_analysis_runs 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `, [limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getFlakyTestStatistics() {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT 
+          COUNT(*) as total_tests,
+          SUM(CASE WHEN classification = 'flaky' THEN 1 ELSE 0 END) as flaky_tests,
+          SUM(CASE WHEN classification = 'potentially_flaky' THEN 1 ELSE 0 END) as potentially_flaky_tests,
+          SUM(CASE WHEN classification = 'stable' THEN 1 ELSE 0 END) as stable_tests,
+          AVG(flaky_score) as avg_flaky_score,
+          MAX(last_analyzed) as last_analysis_date
+        FROM flaky_tests
+      `, (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });

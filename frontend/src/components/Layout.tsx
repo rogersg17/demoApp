@@ -73,6 +73,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span>Tests</span>
         </Link>
         <Link 
+          to="/flaky-tests" 
+          className={`nav-link ${isActivePage('/flaky-tests') ? 'active' : ''}`}
+          title="Flaky Test Detection"
+        >
+          <i className="fas fa-exclamation-triangle"></i>
+          <span>Flaky Tests</span>
+        </Link>
+        <Link 
           to="/users" 
           className={`nav-link ${isActivePage('/users') ? 'active' : ''}`}
           title="User Management"

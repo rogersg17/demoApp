@@ -48,6 +48,9 @@ const PORT = process.env.PORT || 5173;
 // Initialize database
 const db = new Database();
 
+// Make database available to routes
+app.locals.db = db;
+
 // Store for active test executions
 const testExecutions = new Map();
 
@@ -1096,6 +1099,15 @@ try {
   console.log('✅ Azure DevOps routes loaded successfully');
 } catch (error) {
   console.warn('⚠️ Azure DevOps routes not loaded:', error.message);
+}
+
+// Flaky Test Detection routes
+try {
+  const flakyTestRoutes = require('./routes/flakyTestRoutes');
+  app.use('/api/flaky-tests', flakyTestRoutes);
+  console.log('✅ Flaky Test Detection routes loaded successfully');
+} catch (error) {
+  console.warn('⚠️ Flaky Test Detection routes not loaded:', error.message);
 }
 
 // Catch-all route for SPA behavior

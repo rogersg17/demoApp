@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-08-02T13:30:16.997Z",
+  "timestamp": "2025-08-02T14:31:12.149Z",
   "results": {
     "total": 9,
     "passed": 0,
     "failed": 9,
     "skipped": 0,
-    "duration": "21.376133999999997s",
+    "duration": "20.737398000000002s",
     "suites": [
       {
         "title": "login-accessibility.spec.ts",
@@ -43,7 +43,7 @@
                             "workerIndex": 0,
                             "parallelIndex": 0,
                             "status": "failed",
-                            "duration": 10108,
+                            "duration": 9822,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -67,7 +67,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.651Z",
+                            "startTime": "2025-08-02T14:30:52.377Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -107,7 +107,7 @@
                             "workerIndex": 1,
                             "parallelIndex": 1,
                             "status": "failed",
-                            "duration": 9983,
+                            "duration": 9544,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -131,7 +131,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.628Z",
+                            "startTime": "2025-08-02T14:30:52.400Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -171,7 +171,7 @@
                             "workerIndex": 2,
                             "parallelIndex": 2,
                             "status": "failed",
-                            "duration": 9678,
+                            "duration": 9854,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -195,7 +195,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.678Z",
+                            "startTime": "2025-08-02T14:30:52.392Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -235,7 +235,7 @@
                             "workerIndex": 3,
                             "parallelIndex": 3,
                             "status": "failed",
-                            "duration": 9780,
+                            "duration": 9832,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -259,7 +259,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.684Z",
+                            "startTime": "2025-08-02T14:30:52.394Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -299,7 +299,7 @@
                             "workerIndex": 4,
                             "parallelIndex": 4,
                             "status": "failed",
-                            "duration": 9382,
+                            "duration": 9318,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -323,7 +323,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.723Z",
+                            "startTime": "2025-08-02T14:30:52.390Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -371,7 +371,7 @@
                             "workerIndex": 5,
                             "parallelIndex": 5,
                             "status": "failed",
-                            "duration": 10009,
+                            "duration": 9312,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -395,7 +395,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.660Z",
+                            "startTime": "2025-08-02T14:30:52.386Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -435,7 +435,7 @@
                             "workerIndex": 6,
                             "parallelIndex": 6,
                             "status": "failed",
-                            "duration": 9366,
+                            "duration": 9489,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -459,7 +459,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.721Z",
+                            "startTime": "2025-08-02T14:30:52.434Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -499,7 +499,7 @@
                             "workerIndex": 7,
                             "parallelIndex": 7,
                             "status": "failed",
-                            "duration": 9872,
+                            "duration": 9522,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -523,7 +523,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:29:56.661Z",
+                            "startTime": "2025-08-02T14:30:52.421Z",
                             "annotations": [],
                             "attachments": [
                               {
@@ -561,9 +561,9 @@
                         "results": [
                           {
                             "workerIndex": 8,
-                            "parallelIndex": 1,
+                            "parallelIndex": 4,
                             "status": "failed",
-                            "duration": 8346,
+                            "duration": 8352,
                             "error": {
                               "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n",
                               "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: locator('#login-heading')\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#login-heading')\u001b[22m\n\n    at LoginPage.waitForPageLoad (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:56:36)\n    at LoginPage.goto (C:\\MyRepositories\\demoApp\\page-objects\\LoginPage.js:49:16)\n    at C:\\MyRepositories\\demoApp\\tests\\login-accessibility.spec.ts:9:5",
@@ -587,7 +587,7 @@
                             "stdout": [],
                             "stderr": [],
                             "retry": 0,
-                            "startTime": "2025-08-02T13:30:08.163Z",
+                            "startTime": "2025-08-02T14:31:03.231Z",
                             "annotations": [],
                             "attachments": [
                               {
