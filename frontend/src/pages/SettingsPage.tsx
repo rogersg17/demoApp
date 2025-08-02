@@ -35,6 +35,13 @@ interface Settings {
   jiraUsername: string
   jiraApiToken: string
   
+  // Azure DevOps Integration
+  adoEnabled: boolean
+  adoOrganization: string
+  adoProject: string
+  adoPat: string
+  adoWebhookSecret: string
+  
   // Advanced Settings
   fullyParallel: boolean
   forbidOnly: boolean
@@ -73,6 +80,13 @@ const defaultSettings: Settings = {
   jiraUsername: '',
   jiraApiToken: '',
   
+  // Azure DevOps Integration
+  adoEnabled: false,
+  adoOrganization: '',
+  adoProject: '',
+  adoPat: '',
+  adoWebhookSecret: '',
+  
   // Advanced Settings
   fullyParallel: false,
   forbidOnly: true,
@@ -89,6 +103,8 @@ const SettingsPage: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [testingJira, setTestingJira] = useState(false)
+  const [testingAdo, setTestingAdo] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -177,6 +193,70 @@ const SettingsPage: React.FC = () => {
     // Sync liveLogs setting with Redux store
     if (key === 'liveLogs') {
       dispatch(updateTestExecutionSetting({ key: 'liveLogs', value: value as boolean }))
+    }
+  }
+
+  const testJiraConnection = async () => {
+    try {
+      setTestingJira(true)
+      setError(null)
+      
+      const response = await fetch('/api/jira/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          url: settings.jiraUrl,
+          username: settings.jiraUsername,
+          token: settings.jiraApiToken
+        })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        setSuccess('JIRA connection successful!')
+      } else {
+        setError(`JIRA connection failed: ${result.error}`)
+      }
+    } catch (err) {
+      setError('Failed to test JIRA connection')
+    } finally {
+      setTestingJira(false)
+    }
+  }
+
+  const testAdoConnection = async () => {
+    try {
+      setTestingAdo(true)
+      setError(null)
+      
+      const response = await fetch('/api/ado/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          organization: settings.adoOrganization,
+          project: settings.adoProject,
+          pat: settings.adoPat
+        })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        setSuccess('Azure DevOps connection successful!')
+      } else {
+        setError(`Azure DevOps connection failed: ${result.error}`)
+      }
+    } catch (err) {
+      setError('Failed to test Azure DevOps connection')
+    } finally {
+      setTestingAdo(false)
     }
   }
 
@@ -444,6 +524,119 @@ const SettingsPage: React.FC = () => {
                 disabled={!settings.jiraEnabled}
               />
             </div>
+            {settings.jiraEnabled && (
+              <div className="setting-group">
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={testJiraConnection}
+                  disabled={testingJira || !settings.jiraUrl || !settings.jiraUsername || !settings.jiraApiToken}
+                >
+                  {testingJira ? 'Testing...' : 'Test JIRA Connection'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Azure DevOps Integration Panel */}
+          <div className="settings-panel">
+            <h3>Azure DevOps Integration</h3>
+            <div className="setting-group">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={settings.adoEnabled}
+                  onChange={(e) => updateSetting('adoEnabled', e.target.checked)}
+                />
+                Enable Azure DevOps Integration
+              </label>
+              <small 
+                className="setting-description"
+                style={{ 
+                  display: 'block', 
+                  marginTop: '4px', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  fontStyle: 'italic'
+                }}
+              >
+                Monitor Azure DevOps pipelines as projects with real-time build results
+              </small>
+            </div>
+            <div className="setting-group">
+              <label>Organization URL</label>
+              <input 
+                type="url" 
+                value={settings.adoOrganization}
+                onChange={(e) => updateSetting('adoOrganization', e.target.value)}
+                placeholder="https://dev.azure.com/yourorganization"
+                disabled={!settings.adoEnabled}
+              />
+            </div>
+            <div className="setting-group">
+              <label>Project Name</label>
+              <input 
+                type="text" 
+                value={settings.adoProject}
+                onChange={(e) => updateSetting('adoProject', e.target.value)}
+                placeholder="YourProjectName"
+                disabled={!settings.adoEnabled}
+              />
+            </div>
+            <div className="setting-group">
+              <label>Personal Access Token (PAT)</label>
+              <input 
+                type="password" 
+                value={settings.adoPat}
+                onChange={(e) => updateSetting('adoPat', e.target.value)}
+                placeholder="Your Azure DevOps PAT"
+                disabled={!settings.adoEnabled}
+              />
+              <small 
+                className="setting-description"
+                style={{ 
+                  display: 'block', 
+                  marginTop: '4px', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem'
+                }}
+              >
+                Required scopes: Build (Read), Test Management (Read), Work Items (Read & Write)
+              </small>
+            </div>
+            <div className="setting-group">
+              <label>Webhook Secret (Optional)</label>
+              <input 
+                type="password" 
+                value={settings.adoWebhookSecret}
+                onChange={(e) => updateSetting('adoWebhookSecret', e.target.value)}
+                placeholder="Webhook signature validation secret"
+                disabled={!settings.adoEnabled}
+              />
+              <small 
+                className="setting-description"
+                style={{ 
+                  display: 'block', 
+                  marginTop: '4px', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem'
+                }}
+              >
+                Used to validate webhook signatures from Azure DevOps
+              </small>
+            </div>
+            {settings.adoEnabled && (
+              <div className="setting-group">
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={testAdoConnection}
+                  disabled={testingAdo || !settings.adoOrganization || !settings.adoProject || !settings.adoPat}
+                >
+                  {testingAdo ? 'Testing...' : 'Test Azure DevOps Connection'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Advanced Settings Panel */}

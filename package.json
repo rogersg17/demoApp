@@ -51,6 +51,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "azure-devops-node-api": "^12.5.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

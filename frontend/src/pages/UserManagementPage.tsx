@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 
 interface User {
@@ -24,7 +25,19 @@ interface UserApiData {
   last_login: string | null
 }
 
+interface NewUser {
+  username: string
+  email: string
+  firstName: string
+  lastName: string
+  password: string
+  department: string
+  role: string
+  status: string
+}
+
 const UserManagementPage: React.FC = () => {
+  const navigate = useNavigate()
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +45,19 @@ const UserManagementPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addingUser, setAddingUser] = useState(false)
+  const [addUserError, setAddUserError] = useState<string | null>(null)
+  const [newUser, setNewUser] = useState<NewUser>({
+    username: '',
+    email: '',
+    firstName: '',
+    lastName: '',
+    password: '',
+    department: '',
+    role: 'user',
+    status: 'active'
+  })
 
   const formatLastActive = (lastLogin: string | null) => {
     if (!lastLogin) return 'Never'
@@ -58,7 +84,7 @@ const UserManagementPage: React.FC = () => {
       
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = '/login'
+          navigate('/login')
           return
         }
         throw new Error('Failed to load users')
@@ -127,6 +153,117 @@ const UserManagementPage: React.FC = () => {
     return { total, active, admins, inactive }
   }
 
+  const validateUser = (user: NewUser): string | null => {
+    // Username validation
+    if (!user.username || user.username.length < 3 || user.username.length > 50) {
+      return 'Username must be 3-50 characters long'
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(user.username)) {
+      return 'Username can only contain letters, numbers, dots, dashes, and underscores'
+    }
+
+    // Email validation
+    if (!user.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) {
+      return 'Please enter a valid email address'
+    }
+
+    // First name validation
+    if (!user.firstName || user.firstName.length < 1 || user.firstName.length > 50) {
+      return 'First name must be 1-50 characters long'
+    }
+    if (!/^[a-zA-Z\s'-]+$/.test(user.firstName)) {
+      return 'First name can only contain letters, spaces, apostrophes, and hyphens'
+    }
+
+    // Last name validation
+    if (!user.lastName || user.lastName.length < 1 || user.lastName.length > 50) {
+      return 'Last name must be 1-50 characters long'
+    }
+    if (!/^[a-zA-Z\s'-]+$/.test(user.lastName)) {
+      return 'Last name can only contain letters, spaces, apostrophes, and hyphens'
+    }
+
+    // Password validation
+    if (!user.password || user.password.length < 8 || user.password.length > 128) {
+      return 'Password must be 8-128 characters long'
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/.test(user.password)) {
+      return 'Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character (@$!%*?&)'
+    }
+
+    // Department validation (optional)
+    if (user.department && user.department.length > 100) {
+      return 'Department must be no more than 100 characters'
+    }
+
+    return null
+  }
+
+  const handleAddUser = async () => {
+    try {
+      setAddingUser(true)
+      setAddUserError(null)
+
+      // Client-side validation
+      const validationError = validateUser(newUser)
+      if (validationError) {
+        setAddUserError(validationError)
+        return
+      }
+
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(newUser)
+      })
+
+      if (response.ok) {
+        await response.json()
+        setShowAddModal(false)
+        setNewUser({
+          username: '',
+          email: '',
+          firstName: '',
+          lastName: '',
+          password: '',
+          department: '',
+          role: 'user',
+          status: 'active'
+        })
+        await loadUsers()
+      } else {
+        const errorData = await response.json()
+        if (errorData.details && Array.isArray(errorData.details)) {
+          setAddUserError(errorData.details.join('. '))
+        } else {
+          setAddUserError(errorData.error || 'Failed to create user')
+        }
+      }
+    } catch (err) {
+      setAddUserError('Failed to create user')
+    } finally {
+      setAddingUser(false)
+    }
+  }
+
+  const handleCancelAdd = () => {
+    setShowAddModal(false)
+    setAddUserError(null)
+    setNewUser({
+      username: '',
+      email: '',
+      firstName: '',
+      lastName: '',
+      password: '',
+      department: '',
+      role: 'user',
+      status: 'active'
+    })
+  }
+
   const stats = getStats()
 
   if (loading) {
@@ -153,8 +290,18 @@ const UserManagementPage: React.FC = () => {
     <Layout>
       <div className="users-container">
         <header className="page-header">
-          <h1>User Management</h1>
-          <p>Manage user accounts and permissions</p>
+          <div className="header-content">
+            <div>
+              <h1>User Management</h1>
+              <p>Manage user accounts and permissions</p>
+            </div>
+            <button 
+              className="btn btn-primary"
+              onClick={() => setShowAddModal(true)}
+            >
+              Add User
+            </button>
+          </div>
         </header>
         
         {/* Stats Cards */}
@@ -255,6 +402,120 @@ const UserManagementPage: React.FC = () => {
         {filteredUsers.length === 0 && (
           <div className="no-results">
             No users found matching your criteria.
+          </div>
+        )}
+
+        {/* Add User Modal */}
+        {showAddModal && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <div className="modal-header">
+                <h3>Add New User</h3>
+                <button 
+                  className="modal-close"
+                  onClick={handleCancelAdd}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                {addUserError && (
+                  <div className="alert alert-error">{addUserError}</div>
+                )}
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Username</label>
+                    <input 
+                      type="text"
+                      value={newUser.username}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="3-50 chars: letters, numbers, dots, dashes, underscores"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input 
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="user@example.com"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>First Name</label>
+                    <input 
+                      type="text"
+                      value={newUser.firstName}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, firstName: e.target.value }))}
+                      placeholder="Letters, spaces, apostrophes, hyphens only"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Last Name</label>
+                    <input 
+                      type="text"
+                      value={newUser.lastName}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, lastName: e.target.value }))}
+                      placeholder="Letters, spaces, apostrophes, hyphens only"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Password</label>
+                    <input 
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="8+ chars: uppercase, lowercase, number, special char"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input 
+                      type="text"
+                      value={newUser.department}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, department: e.target.value }))}
+                      placeholder="Enter department"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Role</label>
+                    <select 
+                      value={newUser.role}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select 
+                      value={newUser.status}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, status: e.target.value }))}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-secondary"
+                  onClick={handleCancelAdd}
+                  disabled={addingUser}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleAddUser}
+                  disabled={addingUser}
+                >
+                  {addingUser ? 'Creating...' : 'Create User'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import TestExecutionMonitor from '../components/TestExecutionMonitor'
 
@@ -33,6 +34,7 @@ interface TestApiResponse {
 }
 
 const TestManagementPage: React.FC = () => {
+  const navigate = useNavigate()
   const [tests, setTests] = useState<TestResult[]>([])
   const [filteredTests, setFilteredTests] = useState<TestResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,7 +61,7 @@ const TestManagementPage: React.FC = () => {
       if (!response.ok) {
         if (response.status === 401) {
           console.log('🔐 Authentication required, redirecting to login')
-          window.location.href = '/login'
+          navigate('/login')
           return
         }
         throw new Error(`Failed to load tests: ${response.status} ${response.statusText}`)

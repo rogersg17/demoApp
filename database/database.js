@@ -72,10 +72,144 @@ class Database {
       else console.log('✅ Activity logs table ready');
     });
 
+    // Azure DevOps integration tables
+    this.initializeAdoTables();
+
     // Insert sample data after tables are created
     setTimeout(() => {
       this.insertSampleData();
     }, 100);
+  }
+
+  initializeAdoTables() {
+    // Project Configurations table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS project_configurations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        build_definition_id INTEGER UNIQUE,
+        ado_project_id TEXT,
+        ado_project_name TEXT,
+        repository_name TEXT,
+        repository_type TEXT,
+        path TEXT,
+        enabled BOOLEAN DEFAULT 1,
+        configuration TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating project_configurations table:', err);
+      else console.log('✅ Project configurations table ready');
+    });
+
+    // ADO Builds table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS ado_builds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ado_build_id INTEGER UNIQUE,
+        ado_project_id TEXT,
+        build_definition_id INTEGER,
+        build_number TEXT,
+        status TEXT,
+        result TEXT,
+        start_time DATETIME,
+        finish_time DATETIME,
+        duration INTEGER,
+        source_branch TEXT,
+        source_version TEXT,
+        repository_name TEXT,
+        definition_name TEXT,
+        requested_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating ado_builds table:', err);
+      else console.log('✅ ADO builds table ready');
+    });
+
+    // ADO Test Results table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS ado_test_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ado_build_id INTEGER,
+        test_run_id INTEGER,
+        run_name TEXT,
+        state TEXT,
+        total_tests INTEGER,
+        passed_tests INTEGER,
+        failed_tests INTEGER,
+        skipped_tests INTEGER,
+        duration_ms INTEGER,
+        started_date DATETIME,
+        completed_date DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ado_build_id) REFERENCES ado_builds(ado_build_id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating ado_test_results table:', err);
+      else console.log('✅ ADO test results table ready');
+    });
+
+    // Project Status Summary table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS project_status (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT UNIQUE,
+        project_name TEXT,
+        build_definition_id INTEGER,
+        last_build_id INTEGER,
+        overall_health TEXT,
+        success_rate REAL,
+        total_tests INTEGER,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES project_configurations(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating project_status table:', err);
+      else console.log('✅ Project status table ready');
+    });
+
+    // ADO Build Tasks table for detailed build information
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS ado_build_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ado_build_id INTEGER,
+        task_id TEXT,
+        task_name TEXT,
+        status TEXT,
+        result TEXT,
+        start_time DATETIME,
+        finish_time DATETIME,
+        duration INTEGER,
+        error_count INTEGER DEFAULT 0,
+        warning_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ado_build_id) REFERENCES ado_builds(ado_build_id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating ado_build_tasks table:', err);
+      else console.log('✅ ADO build tasks table ready');
+    });
+
+    // ADO Test Details table for individual test results
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS ado_test_details (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_run_id INTEGER,
+        test_id TEXT,
+        test_case_title TEXT,
+        outcome TEXT,
+        duration_ms INTEGER,
+        error_message TEXT,
+        stack_trace TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_run_id) REFERENCES ado_test_results(test_run_id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating ado_test_details table:', err);
+      else console.log('✅ ADO test details table ready');
+    });
   }
 
   async insertSampleData() {
@@ -487,6 +621,258 @@ class Database {
       `, [userId, action, description, ipAddress], function(err) {
         if (err) reject(err);
         else resolve({ logId: this.lastID });
+      });
+    });
+  }
+
+  // Azure DevOps methods
+  async createProjectConfiguration(projectData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO project_configurations (
+          id, name, build_definition_id, ado_project_id, ado_project_name,
+          repository_name, repository_type, path, enabled, configuration
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        projectData.id,
+        projectData.name,
+        projectData.buildDefinitionId,
+        projectData.adoProjectId,
+        projectData.adoProjectName,
+        projectData.repositoryName,
+        projectData.repositoryType,
+        projectData.path,
+        projectData.enabled,
+        JSON.stringify(projectData.configuration)
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: projectData.id, ...projectData });
+      });
+    });
+  }
+
+  async getProjectConfigurations() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM project_configurations WHERE enabled = 1
+        ORDER BY created_at DESC
+      `, (err, rows) => {
+        if (err) reject(err);
+        else {
+          const projects = rows.map(row => ({
+            ...row,
+            configuration: JSON.parse(row.configuration || '{}')
+          }));
+          resolve(projects);
+        }
+      });
+    });
+  }
+
+  async updateProjectConfiguration(projectId, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const values = [];
+      
+      Object.keys(updates).forEach(key => {
+        if (updates[key] !== undefined && key !== 'id') {
+          if (key === 'configuration') {
+            fields.push(`${key} = ?`);
+            values.push(JSON.stringify(updates[key]));
+          } else {
+            fields.push(`${key} = ?`);
+            values.push(updates[key]);
+          }
+        }
+      });
+      
+      if (fields.length === 0) {
+        resolve({ id: projectId, ...updates });
+        return;
+      }
+      
+      fields.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(projectId);
+      
+      this.db.run(`
+        UPDATE project_configurations SET ${fields.join(', ')} WHERE id = ?
+      `, values, function(err) {
+        if (err) reject(err);
+        else resolve({ id: projectId, ...updates });
+      });
+    });
+  }
+
+  async deleteProjectConfiguration(projectId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`DELETE FROM project_configurations WHERE id = ?`, [projectId], function(err) {
+        if (err) reject(err);
+        else resolve({ deleted: this.changes > 0 });
+      });
+    });
+  }
+
+  async createAdoBuild(buildData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO ado_builds (
+          ado_build_id, ado_project_id, build_definition_id, build_number,
+          status, result, start_time, finish_time, duration, source_branch,
+          source_version, repository_name, definition_name, requested_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        buildData.buildId,
+        buildData.projectId,
+        buildData.buildDefinitionId,
+        buildData.buildNumber,
+        buildData.status,
+        buildData.result,
+        buildData.startTime,
+        buildData.finishTime,
+        buildData.duration,
+        buildData.sourceBranch,
+        buildData.sourceVersion,
+        buildData.repository,
+        buildData.definitionName,
+        buildData.requestedBy
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...buildData });
+      });
+    });
+  }
+
+  async createAdoTestResult(testResultData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT INTO ado_test_results (
+          ado_build_id, test_run_id, run_name, state, total_tests,
+          passed_tests, failed_tests, skipped_tests, duration_ms,
+          started_date, completed_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        testResultData.adoBuildId,
+        testResultData.testRunId,
+        testResultData.runName,
+        testResultData.state,
+        testResultData.totalTests,
+        testResultData.passedTests,
+        testResultData.failedTests,
+        testResultData.skippedTests,
+        testResultData.durationMs,
+        testResultData.startedDate,
+        testResultData.completedDate
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, ...testResultData });
+      });
+    });
+  }
+
+  async getProjectStatus(projectId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT ps.*, pc.name as project_name, pc.build_definition_id
+        FROM project_status ps
+        JOIN project_configurations pc ON ps.project_id = pc.id
+        WHERE ps.project_id = ?
+      `, [projectId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  }
+
+  async updateProjectStatus(projectId, statusData) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        INSERT OR REPLACE INTO project_status (
+          project_id, project_name, build_definition_id, last_build_id,
+          overall_health, success_rate, total_tests, last_updated
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `, [
+        projectId,
+        statusData.projectName,
+        statusData.buildDefinitionId,
+        statusData.lastBuildId,
+        statusData.overallHealth,
+        statusData.successRate,
+        statusData.totalTests
+      ], function(err) {
+        if (err) reject(err);
+        else resolve({ projectId, ...statusData });
+      });
+    });
+  }
+
+  async getRecentBuilds(projectId, limit = 10) {
+    return new Promise((resolve, reject) => {
+      const query = projectId 
+        ? `SELECT * FROM ado_builds WHERE ado_project_id = ? ORDER BY start_time DESC LIMIT ?`
+        : `SELECT * FROM ado_builds ORDER BY start_time DESC LIMIT ?`;
+      
+      const params = projectId ? [projectId, limit] : [limit];
+      
+      this.db.all(query, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getBuildsByDefinition(buildDefinitionId, limit = 50) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM ado_builds 
+        WHERE build_definition_id = ? 
+        ORDER BY start_time DESC 
+        LIMIT ?
+      `, [buildDefinitionId, limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getTestResultsByBuild(adoBuildId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM ado_test_results 
+        WHERE ado_build_id = ?
+        ORDER BY started_date DESC
+      `, [adoBuildId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  async getBuildStatistics(projectId, days = 30) {
+    return new Promise((resolve, reject) => {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      
+      const query = projectId 
+        ? `SELECT 
+             COUNT(*) as total_builds,
+             SUM(CASE WHEN result = 'succeeded' THEN 1 ELSE 0 END) as successful_builds,
+             SUM(CASE WHEN result = 'failed' THEN 1 ELSE 0 END) as failed_builds,
+             AVG(duration) as avg_duration
+           FROM ado_builds 
+           WHERE ado_project_id = ? AND start_time >= ?`
+        : `SELECT 
+             COUNT(*) as total_builds,
+             SUM(CASE WHEN result = 'succeeded' THEN 1 ELSE 0 END) as successful_builds,
+             SUM(CASE WHEN result = 'failed' THEN 1 ELSE 0 END) as failed_builds,
+             AVG(duration) as avg_duration
+           FROM ado_builds 
+           WHERE start_time >= ?`;
+      
+      const params = projectId ? [projectId, cutoffDate.toISOString()] : [cutoffDate.toISOString()];
+      
+      this.db.get(query, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
       });
     });
   }

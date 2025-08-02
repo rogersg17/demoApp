@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Azure DevOps Settings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"], input[type="url"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .description {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Azure DevOps Integration Test</h1>
+        <p>Test the Azure DevOps integration settings and API endpoints.</p>
+
+        <div id="status" class="status">
+            <strong>Connection Status:</strong> <span id="connectionStatus">Not tested</span>
+        </div>
+
+        <form id="adoForm">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="adoEnabled"> Enable Azure DevOps Integration
+                </label>
+                <div class="description">Monitor Azure DevOps pipelines as projects with real-time build results</div>
+            </div>
+
+            <div class="form-group">
+                <label for="adoOrganization">Organization URL</label>
+                <input type="url" id="adoOrganization" placeholder="https://dev.azure.com/yourorganization">
+            </div>
+
+            <div class="form-group">
+                <label for="adoProject">Project Name</label>
+                <input type="text" id="adoProject" placeholder="YourProjectName">
+            </div>
+
+            <div class="form-group">
+                <label for="adoPat">Personal Access Token (PAT)</label>
+                <input type="password" id="adoPat" placeholder="Your Azure DevOps PAT">
+                <div class="description">Required scopes: Build (Read), Test Management (Read), Work Items (Read & Write)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="adoWebhookSecret">Webhook Secret (Optional)</label>
+                <input type="password" id="adoWebhookSecret" placeholder="Webhook signature validation secret">
+                <div class="description">Used to validate webhook signatures from Azure DevOps</div>
+            </div>
+
+            <button type="button" id="testConnection">Test Connection</button>
+            <button type="button" id="saveConfig">Save Configuration</button>
+            <button type="button" id="loadConfig">Load Configuration</button>
+        </form>
+
+        <div id="message"></div>
+
+        <div style="margin-top: 30px;">
+            <h3>Available API Endpoints:</h3>
+            <ul>
+                <li><strong>POST /api/ado/test-connection</strong> - Test Azure DevOps connection</li>
+                <li><strong>GET /api/ado/configuration</strong> - Get current configuration</li>
+                <li><strong>POST /api/ado/configuration</strong> - Save configuration</li>
+                <li><strong>GET /api/ado/build-definitions</strong> - List available pipelines</li>
+                <li><strong>GET /api/ado/projects</strong> - List configured projects</li>
+                <li><strong>GET /api/ado/health</strong> - Service health check</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('adoForm');
+        const messageDiv = document.getElementById('message');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // Update enabled state
+        document.getElementById('adoEnabled').addEventListener('change', function() {
+            const enabled = this.checked;
+            document.getElementById('adoOrganization').disabled = !enabled;
+            document.getElementById('adoProject').disabled = !enabled;
+            document.getElementById('adoPat').disabled = !enabled;
+            document.getElementById('adoWebhookSecret').disabled = !enabled;
+            document.getElementById('testConnection').disabled = !enabled;
+        });
+
+        // Test connection
+        document.getElementById('testConnection').addEventListener('click', async function() {
+            const button = this;
+            const originalText = button.textContent;
+            
+            try {
+                button.textContent = 'Testing...';
+                button.disabled = true;
+                messageDiv.innerHTML = '';
+
+                const response = await fetch('/api/ado/test-connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        organization: document.getElementById('adoOrganization').value,
+                        project: document.getElementById('adoProject').value,
+                        pat: document.getElementById('adoPat').value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    messageDiv.innerHTML = '<div class="success">✅ Azure DevOps connection successful!</div>';
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.style.color = 'green';
+                } else {
+                    messageDiv.innerHTML = `<div class="error">❌ Connection failed: ${result.error || result.message}</div>`;
+                    connectionStatus.textContent = 'Failed';
+                    connectionStatus.style.color = 'red';
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                connectionStatus.textContent = 'Error';
+                connectionStatus.style.color = 'red';
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
+
+        // Save configuration
+        document.getElementById('saveConfig').addEventListener('click', async function() {
+            const button = this;
+            const originalText = button.textContent;
+            
+            try {
+                button.textContent = 'Saving...';
+                button.disabled = true;
+                messageDiv.innerHTML = '';
+
+                const response = await fetch('/api/ado/configuration', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        organization: document.getElementById('adoOrganization').value,
+                        project: document.getElementById('adoProject').value,
+                        pat: document.getElementById('adoPat').value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageDiv.innerHTML = '<div class="success">✅ Configuration saved successfully!</div>';
+                } else {
+                    messageDiv.innerHTML = `<div class="error">❌ Save failed: ${result.error || result.message}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
+
+        // Load configuration
+        document.getElementById('loadConfig').addEventListener('click', async function() {
+            const button = this;
+            const originalText = button.textContent;
+            
+            try {
+                button.textContent = 'Loading...';
+                button.disabled = true;
+                messageDiv.innerHTML = '';
+
+                const response = await fetch('/api/ado/configuration', {
+                    credentials: 'include'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('adoOrganization').value = result.organization || '';
+                    document.getElementById('adoProject').value = result.project || '';
+                    document.getElementById('adoEnabled').checked = result.isConnected || false;
+                    
+                    // Trigger change event
+                    document.getElementById('adoEnabled').dispatchEvent(new Event('change'));
+                    
+                    messageDiv.innerHTML = '<div class="success">✅ Configuration loaded!</div>';
+                    connectionStatus.textContent = result.isConnected ? 'Configured' : 'Not configured';
+                    connectionStatus.style.color = result.isConnected ? 'green' : 'orange';
+                } else {
+                    messageDiv.innerHTML = `<div class="error">❌ Load failed: ${result.error || result.message}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
+
+        // Load configuration on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('loadConfig').click();
+        });
+    </script>
+</body>
+</html>

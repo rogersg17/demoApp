@@ -8,7 +8,6 @@
 - **Test Trend Analysis**: Visual charts showing test success rates over time
   - Line charts for pass/fail rates by day/week/month
   - Heat maps showing test stability across different time periods
-  - Comparative analysis between test suites and environments
   
 - **Flaky Test Detection**: Automatically identify tests that pass/fail inconsistently
   - Statistical analysis of test result patterns

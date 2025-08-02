@@ -30,6 +30,13 @@ A modern full-stack web application with comprehensive user management, analytic
 - **Test Management**: Built-in test execution and reporting interface
 - **CI/CD Ready**: GitHub Actions integration with automated reporting
 
+### 🔄 **Azure DevOps Integration**
+- **Pipeline Monitoring**: Monitor Azure DevOps build pipelines as projects
+- **Real-time Build Results**: Automatic consumption of build and test results
+- **Project Dashboard**: Comprehensive pipeline health monitoring
+- **Webhook Integration**: Real-time notifications for build completions
+- **Historical Analytics**: Trend analysis and performance metrics
+
 ### 🗄️ **Database & API**
 - **SQLite Database**: Persistent data storage with proper schema design
 - **RESTful API**: Comprehensive API endpoints for all operations
@@ -89,7 +96,6 @@ npm run build
 The application will be available at:
 - 🌐 **Backend API**: http://localhost:3000
 - ⚛️ **React Frontend**: http://localhost:5173 (development)
-- 🔐 **Legacy Login**: http://localhost:3000/login/index.html
 - 👥 **User Management**: http://localhost:3000/users/index.html
 - 📊 **Analytics & Reports**: http://localhost:3000/reports/index.html
 - 🧪 **Test Management**: http://localhost:3000/tests-management/index.html
@@ -143,6 +149,82 @@ npm run setup-jira
 npm run test-jira-setup
 ```
 
+### Azure DevOps Integration Setup
+
+#### 1. Configure Azure DevOps Connection
+
+```bash
+# Copy the Azure DevOps configuration template
+cp .env.ado.example .env.ado
+```
+
+Edit `.env.ado` with your Azure DevOps details:
+
+```bash
+# Azure DevOps Configuration
+ADO_ORGANIZATION=https://dev.azure.com/yourorganization
+ADO_PROJECT=YourProjectName
+ADO_PAT=your-personal-access-token-here
+ADO_ENABLED=true
+
+# Enable webhook and result consumption
+ADO_CONSUME_BUILD_RESULTS=true
+ADO_BUILD_COMPLETE_WEBHOOK=true
+ADO_WEBHOOK_SECRET=generate-a-secure-random-string
+```
+
+#### 2. Create Personal Access Token (PAT)
+
+1. Go to Azure DevOps → User Settings → Personal Access Tokens
+2. Create a new token with these scopes:
+   - **Build**: Read
+   - **Test Management**: Read
+   - **Work Items**: Read & Write (optional)
+3. Copy the token to your `.env.ado` file
+
+#### 3. Configure Webhooks in Azure DevOps
+
+1. Go to your Azure DevOps project
+2. Navigate to Project Settings → Service Hooks
+3. Create a new subscription:
+   - **Service**: Web Hooks
+   - **Event**: Build completed
+   - **URL**: `http://your-server-url/api/ado/webhooks/build-complete`
+   - **Secret**: Use the same value as `ADO_WEBHOOK_SECRET`
+
+#### 4. Set Up Pipeline Monitoring
+
+1. Start the application: `npm start`
+2. Login with admin credentials
+3. Navigate to Settings page
+4. Configure Azure DevOps connection
+5. Select build definitions to monitor as projects
+6. View real-time pipeline status on the dashboard
+
+#### 5. API Endpoints
+
+**Azure DevOps Configuration:**
+- `POST /api/ado/test-connection` - Test Azure DevOps connection
+- `GET/POST /api/ado/configuration` - Manage ADO settings
+
+**Project Management:**
+- `GET /api/ado/build-definitions` - List available pipelines
+- `POST /api/ado/projects` - Configure pipeline as project
+- `GET /api/ado/projects` - List configured projects
+- `PUT /api/ado/projects/:id` - Update project configuration
+- `DELETE /api/ado/projects/:id` - Remove project monitoring
+
+**Dashboard & Analytics:**
+- `GET /api/ado/dashboard` - Overall pipeline dashboard
+- `GET /api/ado/project/:id` - Specific project details
+- `GET /api/ado/project/:id/trends` - Historical trends
+- `GET /api/ado/project/:id/builds` - Build history
+- `GET /api/ado/project/:id/tests` - Test results
+
+**Webhooks:**
+- `POST /api/ado/webhooks/build-complete` - Receive build completion events
+- `GET /api/ado/webhooks/health` - Webhook service health check
+
 ## Tech Stack
 
 ### Frontend
@@ -163,6 +245,7 @@ npm run test-jira-setup
 ### Testing & DevOps
 - **Playwright**: Cross-browser automated testing
 - **JIRA Integration**: Automatic issue creation for test failures
+- **Azure DevOps Integration**: Pipeline monitoring and build result consumption
 - **TypeScript**: Type checking and compilation
 - **Custom Reporters**: JIRA reporter with file attachments
 - **CI/CD Ready**: GitHub Actions integration
@@ -180,6 +263,17 @@ npm run test-jira-setup
 ├── database/
 │   ├── database.js           # SQLite database class and schema
 │   └── app.db               # SQLite database file (auto-generated)
+├── lib/                     # Core libraries
+│   └── ado-client.js         # Azure DevOps API client
+├── services/                # Business logic services
+│   ├── ado-build-consumer.js # Build result consumption service
+│   ├── ado-build-definition.js # Build definition discovery
+│   ├── ado-pipeline.js       # Pipeline monitoring service
+│   └── ado-project-configuration.js # Project configuration management
+├── routes/                  # API route handlers
+│   ├── ado-webhooks.js       # Azure DevOps webhook endpoints
+│   ├── ado-project-config.js # Project configuration API
+│   └── ado-dashboard.js      # Dashboard and analytics API
 ├── frontend/                 # React frontend application
 │   ├── src/
 │   │   ├── components/       # Reusable React components
@@ -210,7 +304,9 @@ npm run test-jira-setup
 ├── test-results/            # Test execution results
 ├── playwright-report/       # HTML test reports
 ├── playwright.config.ts     # Standard Playwright configuration
-└── playwright.config.jira.ts # JIRA-enabled Playwright configuration
+├── playwright.config.jira.ts # JIRA-enabled Playwright configuration
+├── .env.ado.example         # Azure DevOps configuration template
+└── .env.jira.example        # JIRA configuration template
 ```
 
 ## API Endpoints
@@ -246,10 +342,27 @@ npm run test-jira-setup
 - `GET /api/health` - Health check endpoint
 - `POST /api/jira/test-connection` - Test JIRA integration
 
+### Azure DevOps Integration
+- `POST /api/ado/test-connection` - Test Azure DevOps connection
+- `GET/POST /api/ado/configuration` - Manage ADO settings
+- `GET /api/ado/build-definitions` - List available pipelines
+- `POST /api/ado/projects` - Configure pipeline as project
+- `GET /api/ado/projects` - List configured projects
+- `PUT /api/ado/projects/:id` - Update project configuration
+- `DELETE /api/ado/projects/:id` - Remove project monitoring
+- `GET /api/ado/dashboard` - Overall pipeline dashboard
+- `GET /api/ado/project/:id` - Specific project details
+- `GET /api/ado/project/:id/trends` - Historical trends
+- `GET /api/ado/project/:id/builds` - Build history
+- `GET /api/ado/project/:id/tests` - Test results
+- `POST /api/ado/webhooks/build-complete` - Receive build completion events
+
 ### Real-time Features (WebSocket)
 - `connection` - Establish real-time connection
 - `user-activity` - Live user activity updates
 - `test-progress` - Real-time test execution updates
+- `ado:build-complete` - Azure DevOps build completion notifications
+- `ado:build-error` - Azure DevOps build processing errors
 
 ## Database Schema
 
@@ -276,6 +389,14 @@ npm run test-jira-setup
 - Login/logout events with timestamps and metadata
 - IP address and user agent logging for security
 - Integration with real-time analytics system
+
+### Azure DevOps Tables
+- **Project Configurations**: Stores configured pipeline projects with settings
+- **ADO Builds**: Build execution data from Azure DevOps pipelines
+- **ADO Test Results**: Test run summaries and metrics
+- **Project Status**: Real-time project health and success rate tracking
+- **ADO Build Tasks**: Detailed task execution information
+- **ADO Test Details**: Individual test case results and outcomes
 
 ## Security Features
 
@@ -323,16 +444,36 @@ The SQLite database is automatically created and populated with sample data on f
 4. **Documentation**: Update this README and add inline code documentation
 
 ### Environment Variables
-- `PORT` - Server port (default: 3000)
+
+#### Core Application
+- `PORT` - Server port (default: 5173)
 - `NODE_ENV` - Environment mode (development/production)
+- `SESSION_SECRET` - Secret key for session encryption
+- `SESSION_TTL` - Session timeout in seconds
+
+#### JIRA Integration (`.env.jira`)
 - `JIRA_URL` - JIRA instance URL for test reporting
 - `JIRA_USERNAME` - JIRA username for API access
 - `JIRA_API_TOKEN` - JIRA API token for authentication
 - `JIRA_PROJECT_KEY` - JIRA project key for issue creation
 - `JIRA_ENABLED` - Enable/disable JIRA integration (true/false)
 
+#### Azure DevOps Integration (`.env.ado`)
+- `ADO_ORGANIZATION` - Azure DevOps organization URL
+- `ADO_PROJECT` - Default Azure DevOps project name
+- `ADO_PAT` - Personal Access Token for API authentication
+- `ADO_ENABLED` - Enable/disable Azure DevOps integration (true/false)
+- `ADO_WEBHOOK_SECRET` - Secret for webhook signature validation
+- `ADO_CONSUME_BUILD_RESULTS` - Enable automatic build result consumption
+- `ADO_BUILD_COMPLETE_WEBHOOK` - Enable build completion webhooks
+- `ADO_DEBUG` - Enable debug logging for Azure DevOps operations
+
 ### Deployment Notes
 - **Frontend Build**: Run `npm run build` in the `frontend/` directory for production
-- **Environment Files**: Use `.env.jira` for JIRA configuration (excluded from git)
+- **Environment Files**: 
+  - Use `.env.jira` for JIRA configuration (excluded from git)
+  - Use `.env.ado` for Azure DevOps configuration (excluded from git)
 - **Static Assets**: Frontend build outputs to `frontend/dist/` for production serving
 - **Database**: SQLite database file (`database/app.db`) persists data between deployments
+- **Azure DevOps Webhooks**: Configure webhooks to point to your deployed server URL
+- **Security**: Ensure webhook secrets and PATs are securely stored in production

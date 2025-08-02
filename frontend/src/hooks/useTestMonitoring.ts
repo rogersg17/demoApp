@@ -1,7 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useDispatch } from 'react-redux'
 import webSocketService from '../services/websocket'
-import { updateTestStatus } from '../store/slices/testSlice'
 import type { TestUpdate, LogUpdate, ExecutionHistory } from '../services/websocket'
 
 export interface TestExecutionState {
@@ -47,8 +45,6 @@ export function useTestMonitoring(testId: string | null, options: UseTestMonitor
     maxLogLines = 1000,
     enableLogs = true
   } = options
-
-  const dispatch = useDispatch()
 
   const [state, setState] = useState<TestExecutionState>({
     status: 'idle',

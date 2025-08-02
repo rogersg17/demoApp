@@ -118,11 +118,16 @@ const authSlice = createSlice({
         sessionStorage.removeItem('loggedInUser')
       })
       // Check Auth
+      .addCase(checkAuth.pending, (state) => {
+        state.isLoading = true
+      })
       .addCase(checkAuth.fulfilled, (state, action) => {
+        state.isLoading = false
         state.user = action.payload
         state.isAuthenticated = true
       })
       .addCase(checkAuth.rejected, (state) => {
+        state.isLoading = false
         state.user = null
         state.isAuthenticated = false
       })

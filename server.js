@@ -1080,14 +1080,32 @@ app.post('/api/jira/test-connection', requireAuth, async (req, res) => {
   }
 });
 
+// Azure DevOps routes
+try {
+  const adoWebhooksRouter = require('./routes/ado-webhooks');
+  const adoProjectConfigRouter = require('./routes/ado-project-config');
+  const adoDashboardRouter = require('./routes/ado-dashboard');
+
+  // Store io instance for webhook access
+  app.set('io', io);
+
+  app.use('/api/ado/webhooks', adoWebhooksRouter);
+  app.use('/api/ado', adoProjectConfigRouter);
+  app.use('/api/ado', adoDashboardRouter);
+
+  console.log('✅ Azure DevOps routes loaded successfully');
+} catch (error) {
+  console.warn('⚠️ Azure DevOps routes not loaded:', error.message);
+}
+
 // Catch-all route for SPA behavior
 app.get('*', (req, res) => {
   // If the request is for a static file that doesn't exist, send 404
   if (req.path.includes('.')) {
     res.status(404).send('File not found');
   } else {
-    // For non-file requests, redirect to login (could be enhanced for SPA routing)
-    res.redirect('/login/index.html');
+    // For all other routes, serve the React SPA index.html to enable client-side routing
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
   }
 });
 
