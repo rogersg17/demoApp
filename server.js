@@ -1093,12 +1093,19 @@ try {
   app.set('io', io);
 
   app.use('/api/ado/webhooks', adoWebhooksRouter);
-  app.use('/api/ado', adoProjectConfigRouter);
-  app.use('/api/ado', adoDashboardRouter);
-
-  console.log('✅ Azure DevOps routes loaded successfully');
+  app.use('/api/ado/project-config', adoProjectConfigRouter);
+  app.use('/api/ado/dashboard', adoDashboardRouter);
 } catch (error) {
-  console.warn('⚠️ Azure DevOps routes not loaded:', error.message);
+  console.warn('⚠️ Azure DevOps routes not available:', error.message);
+}
+
+// ADR-001: Git Integration routes for TMS
+try {
+  const gitWebhooksRouter = require('./routes/git-webhooks');
+  app.use('/api/git', gitWebhooksRouter);
+  console.log('✅ Git integration routes loaded');
+} catch (error) {
+  console.warn('⚠️ Git integration routes not available:', error.message);
 }
 
 // Flaky Test Detection routes

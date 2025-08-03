@@ -78,6 +78,9 @@ class Database {
     // Flaky test detection tables
     this.initializeFlakyTestTables();
 
+    // ADR-001: TMS tables for test code and metadata separation
+    this.initializeTMSTables();
+
     // Insert sample data after tables are created
     setTimeout(() => {
       this.insertSampleData();
@@ -1196,6 +1199,515 @@ class Database {
       } else {
         console.log('Database connection closed.');
       }
+    });
+  }
+
+  // ADR-001: Initialize TMS tables for test code and metadata separation
+  initializeTMSTables() {
+    // Git repositories table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS git_repositories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        default_branch TEXT DEFAULT 'main',
+        webhook_secret TEXT,
+        last_sync DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating git_repositories table:', err);
+      else console.log('✅ Git repositories table ready');
+    });
+
+    // Test metadata table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_metadata (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id TEXT UNIQUE NOT NULL,
+        file_path TEXT NOT NULL,
+        test_name TEXT NOT NULL,
+        description TEXT,
+        tags TEXT, -- JSON string for tags array
+        priority TEXT DEFAULT 'medium',
+        owner TEXT,
+        repository_id INTEGER,
+        line_number INTEGER,
+        test_type TEXT DEFAULT 'functional',
+        framework TEXT,
+        created_from_execution BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (repository_id) REFERENCES git_repositories(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_metadata table:', err);
+      else console.log('✅ Test metadata table ready');
+    });
+
+    // Platform integrations table
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS platform_integrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        platform_type TEXT NOT NULL, -- 'jira', 'ado', 'github', 'gitlab'
+        configuration TEXT NOT NULL, -- JSON string for configuration
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating platform_integrations table:', err);
+      else console.log('✅ Platform integrations table ready');
+    });
+
+    // Test executions table (correlates test metadata with platform executions)
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_executions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        test_id TEXT NOT NULL,
+        execution_id TEXT NOT NULL, -- Platform-specific execution ID
+        platform_type TEXT NOT NULL,
+        platform_execution_id TEXT,
+        status TEXT NOT NULL,
+        start_time DATETIME,
+        end_time DATETIME,
+        duration_ms INTEGER,
+        error_message TEXT,
+        metadata TEXT, -- JSON string for additional metadata
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (test_id) REFERENCES test_metadata(test_id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_executions table:', err);
+      else console.log('✅ Test executions table ready');
+    });
+
+    // Test file changes tracking
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_file_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repository_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        change_type TEXT NOT NULL, -- 'added', 'modified', 'removed'
+        commit_hash TEXT,
+        commit_author TEXT,
+        commit_message TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processed BOOLEAN DEFAULT 0,
+        FOREIGN KEY (repository_id) REFERENCES git_repositories(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_file_changes table:', err);
+      else console.log('✅ Test file changes table ready');
+    });
+
+    // Create indexes for better performance after a short delay to ensure tables are created
+    setTimeout(() => this.createTMSIndexes(), 100);
+  }
+
+  createTMSIndexes() {
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_test_metadata_test_id ON test_metadata(test_id)',
+      'CREATE INDEX IF NOT EXISTS idx_test_metadata_file_path ON test_metadata(file_path)', 
+      'CREATE INDEX IF NOT EXISTS idx_test_metadata_repository_id ON test_metadata(repository_id)',
+      'CREATE INDEX IF NOT EXISTS idx_test_executions_test_id ON test_executions(test_id)',
+      'CREATE INDEX IF NOT EXISTS idx_test_executions_platform_type ON test_executions(platform_type)',
+      'CREATE INDEX IF NOT EXISTS idx_test_executions_status ON test_executions(status)',
+      'CREATE INDEX IF NOT EXISTS idx_test_file_changes_repository_id ON test_file_changes(repository_id)',
+      'CREATE INDEX IF NOT EXISTS idx_test_file_changes_processed ON test_file_changes(processed)',
+      'CREATE INDEX IF NOT EXISTS idx_git_repositories_name ON git_repositories(name)'
+    ];
+
+    indexes.forEach(indexSql => {
+      this.db.run(indexSql, (err) => {
+        if (err) {
+          // Only log error if it's not a "table doesn't exist" error
+          if (!err.message.includes('no such table')) {
+            console.error('Error creating index:', err);
+          }
+        }
+      });
+    });
+  }
+
+  // TMS Database Methods
+
+  // Git Repository Methods
+  createGitRepository(repositoryData) {
+    return new Promise((resolve, reject) => {
+      const { name, url, default_branch, webhook_secret } = repositoryData;
+      this.db.run(`
+        INSERT INTO git_repositories (name, url, default_branch, webhook_secret)
+        VALUES (?, ?, ?, ?)
+      `, [name, url, default_branch, webhook_secret], function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  }
+
+  getGitRepository(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT * FROM git_repositories WHERE id = ?
+      `, [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  }
+
+  getAllGitRepositories() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM git_repositories ORDER BY created_at DESC
+      `, [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  updateGitRepository(id, updates) {
+    return new Promise((resolve, reject) => {
+      const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+      const values = Object.values(updates);
+      values.push(id);
+
+      this.db.run(`
+        UPDATE git_repositories 
+        SET ${fields}, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `, values, function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  updateGitRepositorySync(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        UPDATE git_repositories 
+        SET last_sync = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `, [id], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  deleteGitRepository(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        DELETE FROM git_repositories WHERE id = ?
+      `, [id], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  // Test Metadata Methods
+  createOrUpdateTestMetadata(testData) {
+    return new Promise((resolve, reject) => {
+      const {
+        test_id, file_path, test_name, description, tags, priority,
+        owner, repository_id, line_number, test_type, framework, created_from_execution
+      } = testData;
+
+      const tagsJson = Array.isArray(tags) ? JSON.stringify(tags) : tags;
+
+      this.db.run(`
+        INSERT OR REPLACE INTO test_metadata 
+        (test_id, file_path, test_name, description, tags, priority, owner, 
+         repository_id, line_number, test_type, framework, created_from_execution, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `, [test_id, file_path, test_name, description, tagsJson, priority, 
+          owner, repository_id, line_number, test_type, framework, created_from_execution || 0], 
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  }
+
+  getTestMetadata(testId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT * FROM test_metadata WHERE test_id = ?
+      `, [testId], (err, row) => {
+        if (err) reject(err);
+        else {
+          if (row && row.tags) {
+            try {
+              row.tags = JSON.parse(row.tags);
+            } catch (e) {
+              row.tags = [];
+            }
+          }
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  getAllTestMetadata() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_metadata ORDER BY updated_at DESC
+      `, [], (err, rows) => {
+        if (err) reject(err);
+        else {
+          rows.forEach(row => {
+            if (row.tags) {
+              try {
+                row.tags = JSON.parse(row.tags);
+              } catch (e) {
+                row.tags = [];
+              }
+            }
+          });
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  getTestsByRepository(repositoryId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_metadata 
+        WHERE repository_id = ? 
+        ORDER BY file_path, test_name
+      `, [repositoryId], (err, rows) => {
+        if (err) reject(err);
+        else {
+          rows.forEach(row => {
+            if (row.tags) {
+              try {
+                row.tags = JSON.parse(row.tags);
+              } catch (e) {
+                row.tags = [];
+              }
+            }
+          });
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  removeTestsByFilePath(repositoryId, filePath) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        DELETE FROM test_metadata 
+        WHERE repository_id = ? AND file_path = ?
+      `, [repositoryId, filePath], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  deactivateTestsByFilePath(repositoryId, filePath) {
+    return new Promise((resolve, reject) => {
+      // For now, we'll delete them. In the future, we might want to mark as inactive
+      this.removeTestsByFilePath(repositoryId, filePath)
+        .then(resolve)
+        .catch(reject);
+    });
+  }
+
+  searchTests(criteria) {
+    return new Promise((resolve, reject) => {
+      let sql = 'SELECT * FROM test_metadata WHERE 1=1';
+      const params = [];
+
+      if (criteria.testName) {
+        sql += ' AND test_name LIKE ?';
+        params.push(`%${criteria.testName}%`);
+      }
+
+      if (criteria.filePath) {
+        sql += ' AND file_path LIKE ?';
+        params.push(`%${criteria.filePath}%`);
+      }
+
+      if (criteria.framework) {
+        sql += ' AND framework = ?';
+        params.push(criteria.framework);
+      }
+
+      if (criteria.testType) {
+        sql += ' AND test_type = ?';
+        params.push(criteria.testType);
+      }
+
+      if (criteria.repositoryId) {
+        sql += ' AND repository_id = ?';
+        params.push(criteria.repositoryId);
+      }
+
+      sql += ' ORDER BY updated_at DESC';
+
+      if (criteria.limit) {
+        sql += ' LIMIT ?';
+        params.push(criteria.limit);
+      }
+
+      this.db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else {
+          rows.forEach(row => {
+            if (row.tags) {
+              try {
+                row.tags = JSON.parse(row.tags);
+              } catch (e) {
+                row.tags = [];
+              }
+            }
+          });
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  // Test Execution Methods
+  createTestExecution(executionData) {
+    return new Promise((resolve, reject) => {
+      const {
+        test_id, execution_id, platform_type, platform_execution_id,
+        status, start_time, end_time, duration_ms, error_message, metadata
+      } = executionData;
+
+      const metadataJson = typeof metadata === 'object' ? JSON.stringify(metadata) : metadata;
+
+      this.db.run(`
+        INSERT INTO test_executions 
+        (test_id, execution_id, platform_type, platform_execution_id, status, 
+         start_time, end_time, duration_ms, error_message, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [test_id, execution_id, platform_type, platform_execution_id, status,
+          start_time, end_time, duration_ms, error_message, metadataJson], 
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  }
+
+  getTestExecutions(testId, limit = 50) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_executions 
+        WHERE test_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `, [testId, limit], (err, rows) => {
+        if (err) reject(err);
+        else {
+          rows.forEach(row => {
+            if (row.metadata) {
+              try {
+                row.metadata = JSON.parse(row.metadata);
+              } catch (e) {
+                row.metadata = {};
+              }
+            }
+          });
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  // Platform Integration Methods
+  createPlatformIntegration(integrationData) {
+    return new Promise((resolve, reject) => {
+      const { platform_type, configuration, is_active } = integrationData;
+      const configJson = typeof configuration === 'object' ? JSON.stringify(configuration) : configuration;
+
+      this.db.run(`
+        INSERT INTO platform_integrations (platform_type, configuration, is_active)
+        VALUES (?, ?, ?)
+      `, [platform_type, configJson, is_active || 1], function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  }
+
+  getPlatformIntegrations() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM platform_integrations 
+        WHERE is_active = 1 
+        ORDER BY platform_type
+      `, [], (err, rows) => {
+        if (err) reject(err);
+        else {
+          rows.forEach(row => {
+            if (row.configuration) {
+              try {
+                row.configuration = JSON.parse(row.configuration);
+              } catch (e) {
+                row.configuration = {};
+              }
+            }
+          });
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  // Test File Changes Methods
+  recordTestFileChange(changeData) {
+    return new Promise((resolve, reject) => {
+      const {
+        repository_id, file_path, change_type, commit_hash,
+        commit_author, commit_message, timestamp
+      } = changeData;
+
+      this.db.run(`
+        INSERT INTO test_file_changes 
+        (repository_id, file_path, change_type, commit_hash, commit_author, commit_message, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [repository_id, file_path, change_type, commit_hash, commit_author, commit_message, timestamp], 
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  }
+
+  getUnprocessedTestFileChanges() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM test_file_changes 
+        WHERE processed = 0 
+        ORDER BY timestamp ASC
+      `, [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+
+  markTestFileChangeProcessed(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run(`
+        UPDATE test_file_changes 
+        SET processed = 1 
+        WHERE id = ?
+      `, [id], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
     });
   }
 }

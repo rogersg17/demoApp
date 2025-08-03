@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "adrVersion": "ADR-001",
+  "tmsConfig": {
+    "mode": "observer_orchestrator",
+    "architecture": "test_code_metadata_separation",
+    "implementation": {
+      "phase": "Phase 1 - Foundation Infrastructure",
+      "completedOn": "2025-08-03",
+      "components": [
+        "git-integration",
+        "test-discovery", 
+        "test-identification",
+        "database-schema",
+        "webhook-infrastructure"
+      ]
+    }
+  },
+  "repositories": [],
+  "platformIntegrations": {
+    "jira": {
+      "enabled": false,
+      "configured": false
+    },
+    "azureDevOps": {
+      "enabled": false, 
+      "configured": false
+    },
+    "github": {
+      "enabled": false,
+      "configured": false
+    },
+    "gitlab": {
+      "enabled": false,
+      "configured": false
+    }
+  },
+  "testFrameworks": {
+    "supported": [
+      "playwright",
+      "jest", 
+      "mocha",
+      "cypress",
+      "vitest",
+      "jasmine"
+    ],
+    "detected": []
+  },
+  "statistics": {
+    "repositoriesRegistered": 0,
+    "testsDiscovered": 0,
+    "testFilesScanned": 0,
+    "executionsCorrelated": 0,
+    "lastUpdated": "2025-08-03T00:00:00.000Z"
+  }
+}
