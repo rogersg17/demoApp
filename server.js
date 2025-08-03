@@ -1300,6 +1300,21 @@ try {
   console.warn('⚠️ MVP Workflow Automation routes not available:', error.message);
 }
 
+// MVP Dashboard routes (Week 6)
+try {
+  // Add database middleware for all /api/mvp-dashboard routes
+  app.use('/api/mvp-dashboard', (req, res, next) => {
+    req.db = db.db; // Access the sqlite3 database instance
+    next();
+  });
+  
+  const mvpDashboardRouter = require('./routes/mvp-dashboard');
+  app.use('/api/mvp-dashboard', mvpDashboardRouter);
+  console.log('✅ MVP Dashboard routes loaded');
+} catch (error) {
+  console.warn('⚠️ MVP Dashboard routes not available:', error.message);
+}
+
 // Catch-all route for SPA behavior
 app.get('*', (req, res) => {
   // If the request is for a static file that doesn't exist, send 404
