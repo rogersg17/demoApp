@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-const { LoginPage } = require('../page-objects/LoginPage.js');
+const { LoginPage } = require('../../page-objects/LoginPage.js');
 
 test.describe('Login Message Display Tests', () => {
   let loginPage: any;

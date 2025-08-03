@@ -30,7 +30,8 @@ async function validateFiles() {
     let allFilesExist = true;
     
     for (const file of requiredFiles) {
-        const exists = fs.existsSync(file);
+        const filePath = path.join(__dirname, '../../', file);
+        const exists = fs.existsSync(filePath);
         console.log(`  ${exists ? '✅' : '❌'} ${file}`);
         if (!exists) allFilesExist = false;
     }
@@ -42,7 +43,7 @@ async function validateDatabase() {
     console.log('\n📊 2. Database Schema Validation');
     
     try {
-        const Database = require('./database/database');
+        const Database = require('../../database/database');
         const db = new Database();
         
         // Initialize database
@@ -86,12 +87,12 @@ async function validateServices() {
     console.log('\n🔧 3. Service Import Validation');
     
     const services = [
-        { name: 'GitIntegrationService', path: './services/git-integration' },
-        { name: 'TestDiscoveryService', path: './services/test-discovery' },
-        { name: 'TestIdentifierService', path: './services/test-identifier' },
-        { name: 'TestScannerService', path: './services/test-scanner' },
-        { name: 'TestCorrelationService', path: './utils/test-correlation' },
-        { name: 'TestParser', path: './utils/test-parser' }
+        { name: 'GitIntegrationService', path: '../../services/git-integration' },
+        { name: 'TestDiscoveryService', path: '../../services/test-discovery' },
+        { name: 'TestIdentifierService', path: '../../services/test-identifier' },
+        { name: 'TestScannerService', path: '../../services/test-scanner' },
+        { name: 'TestCorrelationService', path: '../../utils/test-correlation' },
+        { name: 'TestParser', path: '../../utils/test-parser' }
     ];
     
     let allServicesValid = true;
