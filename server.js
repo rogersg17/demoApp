@@ -278,6 +278,10 @@ app.get('/', (req, res) => {
 });
 
 // Legacy routes for old frontend
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'login/index.html'));
+});
+
 app.get('/login/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'login/index.html'));
 });

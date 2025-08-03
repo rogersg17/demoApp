@@ -22,10 +22,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 
   const response = await fetch(url, defaultOptions)
   
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
-  
+  // Return response without throwing error - let calling code handle status
   return response
 }
 
