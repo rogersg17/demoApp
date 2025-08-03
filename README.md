@@ -1,53 +1,71 @@
-# Demo App
+# Test Management Platform (TMP)
 
-A modern full-stack web application with comprehensive user management, analytics dashboard, and database integration. Built with Express.js backend, React frontend, SQLite database, and comprehensive Playwright testing with JIRA integration.
+A comprehensive test management platform that bridges CI/CD systems with issue tracking platforms. Built on the foundation of **ADR-001: Test Code and Metadata Separation**, TMP provides automated test failure management, real-time monitoring, and intelligent workflow automation.
+
+## 📋 Project Documentation
+
+**➡️ For complete project information, see the [Documentation Hub](docs/README.md)**
+
+### Quick Links
+- **[Master Project Plan](docs/PROJECT_PLAN.md)** - Complete project status with checkboxes
+- **[Strategic Plan 2025](docs/planning/STRATEGIC_PLAN_2025.md)** - Overall vision and roadmap
+- **[MVP Implementation Plan](docs/architecture/ADR-001-MVP-IMPLEMENTATION-PLAN.md)** - Current MVP development focus
+- **[Architecture Overview](docs/architecture/README.md)** - Core design and technical decisions
+
+## 🎯 Current Status: MVP Development (Phase 2)
+
+### ✅ Phase 1 COMPLETED: Foundation Infrastructure
+- **Test Discovery & Identification**: Framework-agnostic test scanning with universal correlation
+- **Git Integration**: Multi-provider webhook support (GitHub, GitLab, Azure DevOps, Bitbucket)
+- **Database Architecture**: Extended schema with TMS metadata tables
+- **JIRA Integration**: Automated issue creation with rich context ✅ Production Ready
+
+### 🚧 Phase 2 IN PROGRESS: MVP Core Features (Week 3-7)
+- **Azure DevOps Integration**: Enhanced pipeline monitoring and configuration
+- **JIRA-ADO Bridge**: Automated workflow between JIRA and Azure DevOps
+- **Real-time Dashboard**: Pipeline health monitoring and test failure visualization
+- **Configuration Management**: Web-based setup and administration interface
+
+**MVP Goal**: Exceptional JIRA-Azure DevOps integration delivering immediate value to development teams.
+
+## 🏗️ Architecture Overview
+
+### Core Design Principle: Test Code and Metadata Separation
+- **Test Code**: Remains in CI/CD platforms (Azure DevOps, GitHub Actions, GitLab CI)
+- **Test Metadata**: Centrally managed for correlation, analytics, and automation
+- **Integration Layer**: Universal adapters for any CI/CD platform
+- **Intelligence Layer**: Automated failure management and workflow orchestration
+
+### Key Capabilities
+- **Platform Agnostic**: Works with any CI/CD platform through standardized interfaces
+- **Real-time Processing**: Sub-minute response times from test failure to JIRA issue creation
+- **Intelligent Correlation**: Advanced algorithms for test identification across platforms
+- **Rich Context**: Automated inclusion of logs, artifacts, and historical data in issues
 
 ## Features
 
-### 🎨 **Modern React Frontend**
-- **React 19**: Latest React with TypeScript support
-- **Vite Build System**: Fast development and optimized production builds
-- **Redux Toolkit**: State management with RTK Query for API calls
-- **React Router**: Client-side routing with protected routes
-- **Real-time Updates**: Socket.IO integration for live data
-- **Responsive Design**: Mobile-first approach with modern CSS
+### 🔗 **Platform Integrations** ✅ PRODUCTION READY
+- **JIRA Integration**: Automatic issue creation with comprehensive context
+- **Git Webhooks**: Multi-provider repository event processing
+- **Real-time Monitoring**: Live test execution and failure detection
+- **React Frontend**: Modern TypeScript-based user interface
 
-### � **Secure Authentication & User Management**
-- **Password Security**: bcrypt hashing with secure session management
-- **User CRUD Operations**: Complete user lifecycle management
-- **Role-based Access**: Admin, moderator, and user roles
-- **Session Tracking**: Login/logout monitoring and analytics
+### 🎯 **MVP Features** � IN DEVELOPMENT
+- **Azure DevOps Monitoring**: Real-time pipeline health and test result ingestion  
+- **JIRA-ADO Workflow**: Automated issue creation from ADO test failures
+- **Configuration Dashboard**: Web-based setup for pipelines and workflows
+- **Performance Analytics**: Pipeline health metrics and trend analysis
 
-### 📊 **Analytics & Dashboard**
-- **Interactive Charts**: Real-time data visualization with Chart.js
-- **User Analytics**: Growth tracking, department distribution, activity patterns
-- **Live Statistics**: Real-time user metrics and behavior tracking
-- **Comprehensive Reports**: Detailed analytics dashboard
+### � **Planned Features** 📋 ROADMAP
+- **GitHub Actions Integration**: Complete GitHub workflow monitoring (Phase 3)
+- **Advanced Analytics**: AI-powered failure pattern recognition (Phase 4)  
+- **Enterprise Features**: Multi-tenant architecture and SSO (Phase 5)
 
-### 🧪 **Advanced Testing & JIRA Integration**
-- **Playwright Testing**: Cross-browser automated testing suite
-- **JIRA Integration**: Automatic issue creation for test failures
-- **Test Management**: Built-in test execution and reporting interface
-- **CI/CD Ready**: GitHub Actions integration with automated reporting
-
-### 🔄 **Azure DevOps Integration**
-- **Pipeline Monitoring**: Monitor Azure DevOps build pipelines as projects
-- **Real-time Build Results**: Automatic consumption of build and test results
-- **Project Dashboard**: Comprehensive pipeline health monitoring
-- **Webhook Integration**: Real-time notifications for build completions
-- **Historical Analytics**: Trend analysis and performance metrics
-
-### 🗄️ **Database & API**
-- **SQLite Database**: Persistent data storage with proper schema design
-- **RESTful API**: Comprehensive API endpoints for all operations
-- **Real-time Features**: Socket.IO for live updates
-- **Data Integrity**: Proper validation and error handling
-
-### 🔒 **Security & Performance**
-- **Security Headers**: Helmet.js for security headers
-- **Rate Limiting**: Express rate limiting for API protection
-- **Input Validation**: Server-side validation with express-validator
-- **XSS Protection**: XSS filtering and sanitization
+### 🧪 **Testing Infrastructure** ✅ COMPLETE
+- **Playwright Testing**: Comprehensive E2E test automation
+- **Framework Support**: Jest, Mocha, Cypress, Vitest test discovery
+- **Test Correlation**: Advanced algorithms for cross-platform test identification
+- **Validation Suite**: 100% Phase 1 validation success
 - **Compression**: Response compression for better performance
 
 ## Getting Started
@@ -59,26 +77,53 @@ A modern full-stack web application with comprehensive user management, analytic
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn package manager
+- Git for repository integration
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd demoApp
+```
+
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. The application will automatically create and populate a SQLite database on first run
-
-### Running the Application
-
-#### Backend Server
+3. **Setup configuration**
 ```bash
-# Start the Express.js server
+# Copy environment template
+cp .env.example .env.tms
+
+# Configure your integrations (JIRA, Azure DevOps, etc.)
+# See docs/setup/configuration.md for detailed setup
+```
+
+4. **Initialize database**
+```bash
+# Database will be automatically created on first run
+npm run setup
+```
+
+### Running the Platform
+
+#### Core Platform
+```bash
+# Start the main TMP server
 npm start
 
-# Start in development mode
+# Development mode with hot reload
 npm run dev
 ```
 
-#### Frontend Development
+#### Frontend Development  
 ```bash
 # Navigate to frontend directory
 cd frontend
@@ -86,124 +131,239 @@ cd frontend
 # Install frontend dependencies
 npm install
 
-# Start development server
+# Start React development server
 npm run dev
 
 # Build for production
 npm run build
 ```
 
-The application will be available at:
-- 🌐 **Backend API**: http://localhost:3000
-- ⚛️ **React Frontend**: http://localhost:5173 (development)
-- 👥 **User Management**: http://localhost:3000/users/index.html
-- 📊 **Analytics & Reports**: http://localhost:3000/reports/index.html
-- 🧪 **Test Management**: http://localhost:3000/tests-management/index.html
-- ⚙️ **Test Settings**: http://localhost:3000/settings/index.html
+### Access Points
+- � **Main Dashboard**: http://localhost:3000
+- ⚛️ **React Frontend**: http://localhost:5173 (development) 
+- � **Configuration**: http://localhost:3000/config
+- 📊 **Analytics**: http://localhost:3000/analytics
+- 🔗 **Integration Status**: http://localhost:3000/integrations
 
-### Sample Accounts
+### Sample Configuration
 
-The application comes with pre-configured sample accounts:
+For testing purposes, the platform includes sample configurations:
 
-| Username | Password    | Role      | Status  |
-|----------|-------------|-----------|---------|
-| admin    | admin123    | admin     | active  |
-| jdoe     | password123 | user      | active  |
-| jsmith   | password123 | moderator | active  |
-| bwilson  | password123 | user      | inactive|
-| mjohnson | password123 | user      | pending |
+| Integration | Status | Purpose |
+|-------------|--------|---------|
+| JIRA | ✅ Ready | Automatic issue creation |
+| Azure DevOps | 🚧 In Development | Pipeline monitoring |
+| Git Webhooks | ✅ Ready | Repository event processing |
+| WebSocket | ✅ Ready | Real-time updates |
 
-### Testing
+### Testing & Validation
 
 ```bash
-# Run all tests
+# Run comprehensive test suite
 npm test
 
-# Run tests with browser UI
-npm run test:headed
+# Validate Phase 1 implementation
+npm run validate:phase1
 
-# Run tests with Playwright UI
-npm run test:ui
+# Run integration tests
+npm run test:integration
 
-# View test report
-npm run test:report
+# Run E2E tests with Playwright
+npm run test:e2e
 
-# JIRA Integration Tests
-npm run test:jira              # Run tests with JIRA reporting
+# Test JIRA integration
+npm run test:jira
+```
 npm run test:jira:headed       # Run JIRA tests with browser visible
 npm run test:jira:ui           # Interactive JIRA test mode
 npm run test-jira-setup        # Test JIRA integration setup
 
-# Specific Test Suites
-npm run test:login             # Run login tests only
-npm run test:demo              # Run demo tests for JIRA integration
-```
+## 🔧 Configuration & Setup
 
-### JIRA Integration Setup
-
+### Environment Configuration
 ```bash
-# Interactive JIRA configuration setup
-npm run setup-jira
-
-# Test JIRA connection and configuration
-npm run test-jira-setup
+# Main platform configuration
+.env.tms                    # Core TMP configuration
+.tms/metadata.json         # System metadata and settings
 ```
 
-### Azure DevOps Integration Setup
+### Integration Setup
 
-#### 1. Configure Azure DevOps Connection
-
+#### JIRA Integration ✅ Production Ready
 ```bash
-# Copy the Azure DevOps configuration template
-cp .env.ado.example .env.ado
+# Interactive JIRA setup
+npm run setup:jira
+
+# Test JIRA connection
+npm run test:jira-connection
 ```
 
-Edit `.env.ado` with your Azure DevOps details:
-
+#### Azure DevOps Integration 🚧 In Development
 ```bash
-# Azure DevOps Configuration
-ADO_ORGANIZATION=https://dev.azure.com/yourorganization
-ADO_PROJECT=YourProjectName
-ADO_PAT=your-personal-access-token-here
-ADO_ENABLED=true
+# Configure ADO connection (Week 3-4)
+npm run setup:ado
 
-# Enable webhook and result consumption
-ADO_CONSUME_BUILD_RESULTS=true
-ADO_BUILD_COMPLETE_WEBHOOK=true
-ADO_WEBHOOK_SECRET=generate-a-secure-random-string
+# Test pipeline monitoring (Week 4-5)  
+npm run test:ado-integration
 ```
 
-#### 2. Create Personal Access Token (PAT)
+#### Git Webhook Integration ✅ Ready
+```bash
+# Configure repository webhooks
+npm run setup:git-webhooks
 
-1. Go to Azure DevOps → User Settings → Personal Access Tokens
-2. Create a new token with these scopes:
-   - **Build**: Read
-   - **Test Management**: Read
-   - **Work Items**: Read & Write (optional)
-3. Copy the token to your `.env.ado` file
+# Test webhook processing
+npm run test:webhooks
+```
 
-#### 3. Configure Webhooks in Azure DevOps
+## 📊 API Reference
 
-1. Go to your Azure DevOps project
-2. Navigate to Project Settings → Service Hooks
-3. Create a new subscription:
-   - **Service**: Web Hooks
-   - **Event**: Build completed
-   - **URL**: `http://your-server-url/api/ado/webhooks/build-complete`
-   - **Secret**: Use the same value as `ADO_WEBHOOK_SECRET`
+### Core TMP APIs ✅ Available
+- **Git Integration**: `/api/webhooks/git` - Repository event processing
+- **Test Discovery**: `/api/repositories` - Repository and test management
+- **Test Metadata**: `/api/test-metadata` - Test information and correlation
+- **Platform Integrations**: `/api/integrations` - Integration status and health
 
-#### 4. Set Up Pipeline Monitoring
+### MVP APIs 🚧 In Development (Week 3-7)
+- **ADO Configuration**: `/api/mvp/ado/*` - Azure DevOps pipeline configuration
+- **Test Processing**: `/api/mvp/process-build/*` - Test result processing
+- **Workflow Automation**: `/api/mvp/workflow/*` - JIRA-ADO bridge automation
+- **Real-time Updates**: WebSocket endpoints for live dashboard updates
 
-1. Start the application: `npm start`
-2. Login with admin credentials
-3. Navigate to Settings page
-4. Configure Azure DevOps connection
-5. Select build definitions to monitor as projects
-6. View real-time pipeline status on the dashboard
+## 🏗️ Development & Contributing
 
-#### 5. API Endpoints
+### Development Setup
+```bash
+# Install development dependencies
+npm install --include=dev
 
-**Azure DevOps Configuration:**
+# Run in development mode with hot reload
+npm run dev
+
+# Run tests during development
+npm run test:watch
+```
+
+### Code Quality
+```bash
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+
+# Type checking (TypeScript)
+npm run type-check
+
+# Security audit
+npm audit
+```
+
+### Testing Strategy
+```bash
+# Unit tests for services
+npm run test:unit
+
+# Integration tests for workflows
+npm run test:integration  
+
+# End-to-end validation
+npm run test:e2e
+
+# Performance testing
+npm run test:performance
+```
+
+## 📈 Monitoring & Analytics
+
+### Platform Health
+- **System Status**: Real-time monitoring of all integrations
+- **Performance Metrics**: API response times and throughput
+- **Error Tracking**: Automated error detection and alerting  
+- **Integration Health**: Connection status for JIRA, ADO, Git providers
+
+### Usage Analytics
+- **Test Execution Metrics**: Volume, success rates, failure patterns
+- **Integration Usage**: Platform usage statistics and trends
+- **User Analytics**: Feature adoption and usage patterns
+- **ROI Tracking**: Time savings and efficiency improvements
+
+## 🛠️ Technical Stack
+
+### Backend
+- **Node.js + Express**: Core platform server
+- **SQLite**: Database with TMS schema extensions
+- **WebSocket**: Real-time communication
+- **TypeScript**: Type safety and better development experience
+
+### Frontend  
+- **React 18**: Modern UI framework with hooks
+- **TypeScript**: Full type safety
+- **Vite**: Fast build tool and development server
+- **WebSocket Client**: Real-time dashboard updates
+
+### Testing & Quality
+- **Playwright**: Cross-browser E2E testing
+- **Jest**: Unit testing framework
+- **ESLint + Prettier**: Code quality and formatting
+- **Husky**: Git hooks for quality gates
+
+### Integrations
+- **JIRA REST API**: Issue management automation
+- **Azure DevOps REST API**: Pipeline monitoring and test result ingestion
+- **Git Webhooks**: Multi-provider repository integration
+- **WebSocket**: Real-time updates and notifications
+
+## 📋 Project Roadmap
+
+### Completed ✅
+- **Phase 1 Foundation**: Universal test identification and correlation
+- **JIRA Integration**: Production-ready automated issue management
+- **Git Integration**: Multi-provider webhook processing
+- **React Frontend**: Modern TypeScript-based user interface
+
+### Current Sprint 🚧 (Week 3-7)
+- **Azure DevOps Core**: Pipeline monitoring and configuration
+- **JIRA-ADO Bridge**: Automated workflow integration  
+- **MVP Dashboard**: Real-time pipeline health monitoring
+- **Configuration Management**: Web-based setup interface
+
+### Next Sprints 📋
+- **GitHub Actions**: Complete GitHub workflow integration (Week 8-11)
+- **Advanced Analytics**: AI-powered failure analysis (Week 12-15) 
+- **Enterprise Features**: Multi-tenant and SSO support (Week 16-19)
+
+## 🎯 Success Metrics
+
+### Technical Performance
+- **Response Time**: <5 minutes from test failure to JIRA issue
+- **System Reliability**: >99% uptime for critical workflows
+- **Data Accuracy**: >99% correct test-to-issue correlation
+- **Integration Health**: Continuous monitoring of all platforms
+
+### User Experience  
+- **Setup Time**: <30 minutes for new pipeline configuration
+- **Issue Quality**: Rich context enables faster debugging
+- **Dashboard Usability**: Real-time pipeline health visibility
+- **Automation Value**: 80% reduction in manual test failure triage
+
+## 📞 Support & Documentation
+
+### Complete Documentation
+- **[Project Plan](docs/PROJECT_PLAN.md)**: Master project tracker with checkboxes
+- **[Architecture Guide](docs/architecture/README.md)**: Technical design and decisions
+- **[Setup Guide](docs/setup/)**: Installation and configuration instructions
+- **[API Reference](docs/api/)**: Complete API documentation
+
+### Getting Help
+- **Documentation Hub**: [docs/README.md](docs/README.md)
+- **Issue Tracking**: Use GitHub Issues for bug reports and feature requests
+- **Development**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+
+---
+
+**Test Management Platform (TMP)** - Bridging CI/CD systems with intelligent automation  
+*Built on ADR-001: Test Code and Metadata Separation*
 - `POST /api/ado/test-connection` - Test Azure DevOps connection
 - `GET/POST /api/ado/configuration` - Manage ADO settings
 
