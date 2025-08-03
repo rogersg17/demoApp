@@ -43,6 +43,22 @@ class MVPWebSocketService extends EventEmitter {
             this.broadcastToSubscribers('jira-monitoring', 'jiraIssueUpdated', data);
         });
 
+        // Week 5: Workflow automation events
+        this.on('workflowExecuted', (data) => {
+            this.broadcastToSubscribers('workflow-monitoring', 'workflowExecuted', data);
+            this.broadcastToSubscribers('jira-monitoring', 'workflowExecuted', data);
+        });
+
+        this.on('duplicateDetected', (data) => {
+            this.broadcastToSubscribers('duplicate-monitoring', 'duplicateDetected', data);
+            this.broadcastToSubscribers('jira-monitoring', 'duplicateDetected', data);
+        });
+
+        this.on('correlationCompleted', (data) => {
+            this.broadcastToSubscribers('correlation-monitoring', 'correlationCompleted', data);
+            this.broadcastToSubscribers('failure-monitoring', 'correlationCompleted', data);
+        });
+
         // Processing events
         this.on('buildProcessingStarted', (data) => {
             this.broadcastToSubscribers('processing-monitoring', 'buildProcessingStarted', data);
@@ -371,6 +387,19 @@ class MVPWebSocketService extends EventEmitter {
 
     emitJiraIssueUpdated(data) {
         this.emit('jiraIssueUpdated', data);
+    }
+
+    // Week 5: Workflow automation events
+    emitWorkflowExecuted(data) {
+        this.emit('workflowExecuted', data);
+    }
+
+    emitDuplicateDetected(data) {
+        this.emit('duplicateDetected', data);
+    }
+
+    emitCorrelationCompleted(data) {
+        this.emit('correlationCompleted', data);
     }
 
     // Processing events

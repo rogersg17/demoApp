@@ -48,12 +48,15 @@ const PORT = process.env.PORT || 5173;
 // Initialize database
 const db = new Database();
 
-// Initialize MVP services (Week 3 & 4)
+// Initialize MVP services (Week 3, 4 & 5)
 let mvpAdoConfigService = null;
 let mvpPipelineMonitorService = null;
 let testFailureProcessor = null;
 let enhancedJiraIntegration = null;
 let mvpWebSocketService = null;
+let mvpJiraAdoBridge = null;
+let adoTestCorrelation = null;
+let duplicateDetector = null;
 
 try {
   // Week 3 services
@@ -65,6 +68,11 @@ try {
   const EnhancedJiraIntegration = require('./services/enhanced-jira-integration');
   const MVPWebSocketService = require('./websocket/mvp-updates');
   
+  // Week 5 services
+  const MVPJiraAdoBridge = require('./services/mvp-jira-ado-bridge');
+  const AdoTestCorrelation = require('./utils/ado-test-correlation');
+  const DuplicateDetector = require('./services/duplicate-detector');
+  
   // Initialize services
   mvpAdoConfigService = new MVPAdoConfigService(db);
   mvpPipelineMonitorService = new MVPPipelineMonitorService(db, mvpAdoConfigService);
@@ -72,15 +80,37 @@ try {
   enhancedJiraIntegration = new EnhancedJiraIntegration(db, testFailureProcessor);
   mvpWebSocketService = new MVPWebSocketService(io);
   
+  // Initialize Week 5 services
+  adoTestCorrelation = new AdoTestCorrelation(db.getDatabase());
+  duplicateDetector = new DuplicateDetector(db.getDatabase());
+  mvpJiraAdoBridge = new MVPJiraAdoBridge(db.getDatabase(), {
+    testFailureProcessor,
+    enhancedJiraIntegration,
+    adoTestCorrelation,
+    duplicateDetector
+  });
+  
   // Set up service dependencies
   mvpWebSocketService.setServices({
     pipelineMonitor: mvpPipelineMonitorService,
     testFailureProcessor: testFailureProcessor,
-    configService: mvpAdoConfigService
+    configService: mvpAdoConfigService,
+    jiraAdoBridge: mvpJiraAdoBridge
   });
   
   // Set up cross-service communication
   testFailureProcessor.setJiraIntegration(enhancedJiraIntegration);
+  
+  // Set up Week 5 JIRA-ADO Bridge integration
+  if (mvpPipelineMonitorService && mvpJiraAdoBridge) {
+    mvpPipelineMonitorService.on('build_completed', async (buildData) => {
+      try {
+        await mvpJiraAdoBridge.processBuildCompletion(buildData);
+      } catch (error) {
+        console.error('Error processing build completion in JIRA-ADO bridge:', error);
+      }
+    });
+  }
   
   // Set up WebSocket integration for Week 3 pipeline monitoring
   if (mvpPipelineMonitorService) {
@@ -135,7 +165,22 @@ try {
     });
   }
   
-  console.log('✅ MVP services (Week 3 & 4) initialized successfully');
+  // Set up WebSocket integration for Week 5 JIRA-ADO Bridge
+  if (mvpJiraAdoBridge) {
+    mvpJiraAdoBridge.on('workflow_executed', (data) => {
+      mvpWebSocketService.emitWorkflowExecuted(data);
+    });
+
+    mvpJiraAdoBridge.on('duplicate_detected', (data) => {
+      mvpWebSocketService.emitDuplicateDetected(data);
+    });
+
+    mvpJiraAdoBridge.on('correlation_completed', (data) => {
+      mvpWebSocketService.emitCorrelationCompleted(data);
+    });
+  }
+  
+  console.log('✅ MVP services (Week 3, 4 & 5) initialized successfully');
 } catch (error) {
   console.warn('⚠️ MVP services not available:', error.message);
 }
@@ -1237,6 +1282,22 @@ try {
   console.log('✅ Flaky Test Detection routes loaded successfully');
 } catch (error) {
   console.warn('⚠️ Flaky Test Detection routes not loaded:', error.message);
+}
+
+// MVP Workflow Automation routes (Week 5)
+try {
+  const workflowAutomationRouter = require('./routes/workflow-automation');
+  
+  // Add database middleware for workflow routes
+  workflowAutomationRouter.use((req, res, next) => {
+    req.db = db.getDatabase();
+    next();
+  });
+  
+  app.use('/api/workflow', workflowAutomationRouter);
+  console.log('✅ MVP Workflow Automation routes loaded');
+} catch (error) {
+  console.warn('⚠️ MVP Workflow Automation routes not available:', error.message);
 }
 
 // Catch-all route for SPA behavior
