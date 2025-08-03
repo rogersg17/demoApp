@@ -527,7 +527,7 @@ app.get('/api/tests', requireAuth, async (req, res) => {
       // Try to load results from file (for persistence across server restarts)
       console.log('🔍 No in-memory results found, checking file...');
       try {
-        const savedResults = JSON.parse(fs.readFileSync(path.join(__dirname, 'latest-test-results.json'), 'utf8'));
+        const savedResults = JSON.parse(fs.readFileSync(path.join(__dirname, 'tests/test-data/results/latest-test-results.json'), 'utf8'));
         testResults.passingTests = savedResults.results.passed;
         testResults.failingTests = savedResults.results.failed;
         testResults.skippedTests = savedResults.results.skipped;
@@ -794,7 +794,7 @@ app.post('/api/tests/run', requireAuth, async (req, res) => {
               results: execution.results,
               exitCode: code
             };
-            fs.writeFileSync(path.join(__dirname, 'latest-test-results.json'), JSON.stringify(latestResults, null, 2));
+            fs.writeFileSync(path.join(__dirname, 'tests/test-data/results/latest-test-results.json'), JSON.stringify(latestResults, null, 2));
             console.log('💾 Saved latest results to file');
           } catch (saveError) {
             console.error('❌ Failed to save results to file:', saveError);

@@ -19,7 +19,7 @@ Validation tests ensure that the application correctly enforces business rules, 
 
 ### System Validation  
 - `test-session.js` - Session management and validation
-- `debug-test-management.js` - Test management system validation
+- `../test-data/debug/debug-test-management.js` - Test management system validation
 
 ## 🚀 Running Validation Tests
 
@@ -44,7 +44,7 @@ node tests/validation/test-invalid-login.js
 
 # Session and Management
 node tests/validation/test-session.js
-node tests/validation/debug-test-management.js
+node tests/test-data/debug/debug-test-management.js
 ```
 
 ## 🔍 Validation Test Types
