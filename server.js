@@ -1315,6 +1315,59 @@ try {
   console.warn('⚠️ MVP Dashboard routes not available:', error.message);
 }
 
+// Health Check Service and Routes (Week 8)
+try {
+  const HealthCheckService = require('./services/health-check');
+  const healthCheckService = new HealthCheckService();
+  
+  // Health check endpoint
+  app.get('/api/health', async (req, res) => {
+    try {
+      const health = await healthCheckService.performHealthCheck();
+      const statusCode = health.status === 'healthy' ? 200 : 
+                        health.status === 'warning' || health.status === 'degraded' ? 200 : 503;
+      res.status(statusCode).json(health);
+    } catch (error) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Health check failed',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Health history endpoint
+  app.get('/api/health/history', (req, res) => {
+    try {
+      const history = healthCheckService.getHealthHistory();
+      res.json({ history });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to retrieve health history',
+        message: error.message
+      });
+    }
+  });
+
+  // Metrics endpoint for monitoring
+  app.get('/api/metrics', (req, res) => {
+    try {
+      const metrics = healthCheckService.getMetrics();
+      res.json(metrics || { message: 'No metrics available' });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to retrieve metrics',
+        message: error.message
+      });
+    }
+  });
+
+  console.log('✅ Health Check service and routes loaded');
+} catch (error) {
+  console.warn('⚠️ Health Check service not available:', error.message);
+}
+
 // Catch-all route for SPA behavior
 app.get('*', (req, res) => {
   // If the request is for a static file that doesn't exist, send 404
