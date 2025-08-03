@@ -129,7 +129,7 @@ export interface MVPDataState {
 }
 
 // API Base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/mvp-dashboard';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5173/api/mvp-dashboard';
 
 export const useMVPData = () => {
   const [state, setState] = useState<MVPDataState>({

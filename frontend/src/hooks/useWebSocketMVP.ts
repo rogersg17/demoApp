@@ -133,7 +133,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
         }
       };
 
-      ws.onerror = (error) => {
+      ws.onerror = () => {
         setState(prev => ({ 
           ...prev, 
           error: 'WebSocket connection error',

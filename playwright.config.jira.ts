@@ -69,7 +69,7 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: useServer 
-      ? 'http://localhost:3000' 
+      ? 'http://localhost:5173' 
       : 'file://' + path.resolve(__dirname).replace(/\\/g, '/'),
     
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
@@ -113,7 +113,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests (only when using server mode) */
   webServer: useServer ? {
     command: 'npm start',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes timeout for server startup
   } : undefined,

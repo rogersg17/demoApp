@@ -48,6 +48,36 @@ const PORT = process.env.PORT || 5173;
 // Initialize database
 const db = new Database();
 
+// Enhanced helper function to emit test updates with better targeting
+function emitTestUpdate(testId, update) {
+  const payload = {
+    testId,
+    timestamp: new Date().toISOString(),
+    ...update
+  };
+  
+  // Emit to test execution room
+  io.to(`test-${testId}`).emit('testUpdate', payload);
+  
+  // Also emit logs to log subscribers if it's a log update
+  if (update.type === 'log-update') {
+    io.to(`logs-${testId}`).emit('logUpdate', {
+      testId,
+      timestamp: payload.timestamp,
+      source: update.source,
+      content: update.content,
+      level: update.level || 'info',
+      currentTest: update.currentTest
+    });
+  }
+  
+  console.log(`📡 Emitted ${update.type} for test ${testId} to ${io.sockets.adapter.rooms.get(`test-${testId}`)?.size || 0} clients`);
+}
+
+// Initialize test execution orchestration (outside MVP services to ensure availability)
+const TestExecutionQueue = require('./services/test-execution-queue');
+const testQueue = new TestExecutionQueue();
+
 // Initialize MVP services (Week 3, 4 & 5)
 let mvpAdoConfigService = null;
 let mvpPipelineMonitorService = null;
@@ -72,6 +102,9 @@ try {
   const MVPJiraAdoBridge = require('./services/mvp-jira-ado-bridge');
   const AdoTestCorrelation = require('./utils/ado-test-correlation');
   const DuplicateDetector = require('./services/duplicate-detector');
+  
+  // Test execution orchestration services
+  const TestExecutionQueue = require('./services/test-execution-queue');
   
   // Initialize services
   mvpAdoConfigService = new MVPAdoConfigService(db);
@@ -185,11 +218,56 @@ try {
   console.warn('⚠️ MVP services not available:', error.message);
 }
 
+// Set up test execution queue webhook routes and event listeners (outside MVP try block to ensure availability)
+const testWebhookRoutes = require('./routes/test-webhooks')(testQueue, emitTestUpdate);
+app.use('/api/webhooks', testWebhookRoutes);
+
+// Set up event listeners for test queue
+testQueue.on('execution-queued', (execution) => {
+  emitTestUpdate(execution.id, {
+    type: 'execution-queued',
+    status: 'queued',
+    execution: execution
+  });
+});
+
+testQueue.on('execution-running', (execution) => {
+  emitTestUpdate(execution.id, {
+    type: 'execution-running',
+    status: 'running',
+    execution: execution
+  });
+});
+
+testQueue.on('execution-completed', (execution) => {
+  emitTestUpdate(execution.id, {
+    type: 'execution-completed',
+    status: 'completed',
+    execution: execution
+  });
+});
+
+testQueue.on('execution-failed', (execution) => {
+  emitTestUpdate(execution.id, {
+    type: 'execution-failed',
+    status: 'failed',
+    execution: execution
+  });
+});
+
+testQueue.on('execution-cancelled', (execution) => {
+  emitTestUpdate(execution.id, {
+    type: 'execution-cancelled',
+    status: 'cancelled',
+    execution: execution
+  });
+});
+
 // Make database available to routes
 app.locals.db = db;
 
 // Store for active test executions
-const testExecutions = new Map();
+// Global variables for service instances
 
 // Security middleware
 app.use(helmet({
@@ -510,13 +588,15 @@ app.get('/api/tests', requireAuth, async (req, res) => {
     
     // Find the most recent completed test execution
     let latestExecution = null;
-    console.log(`🔍 Checking ${testExecutions.size} executions for latest results...`);
-    for (const [executionId, execution] of testExecutions.entries()) {
-      console.log(`📋 Execution ${executionId}: status=${execution.status}, hasResults=${!!execution.results}`);
+    const executionHistory = testQueue.executionHistory;
+    console.log(`🔍 Checking ${executionHistory.length} executions for latest results...`);
+    
+    for (const execution of executionHistory) {
+      console.log(`📋 Execution ${execution.id}: status=${execution.status}, hasResults=${!!execution.results}`);
       if (execution.status === 'completed' && execution.results) {
-        if (!latestExecution || execution.endTime > latestExecution.endTime) {
+        if (!latestExecution || new Date(execution.completedAt) > new Date(latestExecution.completedAt)) {
           latestExecution = execution;
-          console.log(`✅ Found newer completed execution: ${executionId}`);
+          console.log(`✅ Found newer completed execution: ${execution.id}`);
         }
       }
     }
@@ -525,7 +605,7 @@ app.get('/api/tests', requireAuth, async (req, res) => {
       testResults.passingTests = latestExecution.results.passed;
       testResults.failingTests = latestExecution.results.failed;
       testResults.skippedTests = latestExecution.results.skipped;
-      testResults.lastRun = latestExecution.endTime;
+      testResults.lastRun = latestExecution.completedAt;
       console.log('✅ Found latest execution results:', latestExecution.results);
     } else {
       // Try to load results from file (for persistence across server restarts)
@@ -549,371 +629,217 @@ app.get('/api/tests', requireAuth, async (req, res) => {
   }
 });
 
+// API Routes
+
+// New orchestration-based test execution endpoint
 app.post('/api/tests/run', requireAuth, async (req, res) => {
   try {
-    const { testFiles, suite, grep } = req.body;
+    const { testFiles, suite, grep, priority, targetRunner, environment, branch, commit, tags } = req.body;
     
-    console.log('Test execution request received:', {
+    console.log('Test execution orchestration request received:', {
       testFiles,
       suite,
       grep,
+      priority,
+      targetRunner,
       testFilesCount: testFiles ? testFiles.length : 0
     });
-    
-    const executionId = `exec_${Date.now()}`;
-    
-    // Prepare Playwright command
-    let command = 'npx';
-    let args = ['playwright', 'test', '--config=playwright.config.ts'];
-    
-    // Add specific test files if provided
-    if (testFiles && testFiles.length > 0) {
-      testFiles.forEach(file => {
-        args.push(`tests/${file}`);
+
+    // Validate request
+    if (!testFiles || !Array.isArray(testFiles) || testFiles.length === 0) {
+      return res.status(400).json({ 
+        error: 'testFiles array is required and must not be empty' 
       });
     }
-    
-    // Add grep pattern if provided
-    if (grep) {
-      args.push('--grep', grep);
+
+    // Queue the execution request
+    const execution = testQueue.queueExecution({
+      testFiles,
+      suite: suite || 'default',
+      grep,
+      priority: priority || 'normal',
+      targetRunner: targetRunner || 'auto',
+      environment: environment || 'default',
+      branch: branch || 'main',
+      commit,
+      tags: tags || [],
+      userId: req.session.userId,
+      webhookUrl: `${req.protocol}://${req.get('host')}/api/webhooks/test-results`
+    });
+
+    // Immediately trigger the execution
+    try {
+      const triggerResult = await testQueue.triggerExecution(execution.id);
+      
+      res.json({
+        success: true,
+        executionId: execution.id,
+        status: 'running',
+        message: 'Test execution triggered successfully',
+        estimatedDuration: execution.metadata.estimatedDuration,
+        externalRunId: triggerResult.runId,
+        externalRunUrl: triggerResult.runUrl,
+        provider: triggerResult.provider
+      });
+      
+    } catch (triggerError) {
+      console.error('Failed to trigger execution:', triggerError);
+      
+      // Update execution status to failed
+      testQueue.processFailure(execution.id, triggerError);
+      
+      res.status(500).json({
+        success: false,
+        executionId: execution.id,
+        error: 'Failed to trigger test execution',
+        details: triggerError.message
+      });
     }
-    
-    // Add reporter for JSON output
-    args.push('--reporter=json');
-    
-    console.log(`Starting test execution ${executionId}:`, command, args.join(' '));
-    
-    // Emit test execution started event
-    emitTestUpdate(executionId, {
-      type: 'execution-started',
-      status: 'running',
-      startTime: new Date().toISOString(),
-      command: `${command} ${args.join(' ')}`,
-      testFiles: testFiles || [],
-      estimatedDuration: '30-60 seconds'
-    });
-    
-    // Start the test execution
-    const testProcess = spawn(command, args, {
-      cwd: __dirname,
-      shell: true
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    let currentTest = null;
-    let testStartTime = null;
-    
-    const execution = {
-      id: executionId,
-      status: 'running',
-      startTime: new Date(),
-      process: testProcess,
-      stdout: '',
-      stderr: '',
-      results: null,
-      progress: {
-        completed: 0,
-        total: 0,
-        currentTest: null
-      }
-    };
-    
-    testExecutions.set(executionId, execution);
-    
-    testProcess.stdout.on('data', (data) => {
-      const chunk = data.toString();
-      stdout += chunk;
-      execution.stdout += chunk;
-      
-      // Parse real-time output for test progress
-      const lines = chunk.split('\n');
-      for (const line of lines) {
-        if (line.trim()) {
-          // Detect test start
-          if (line.includes('.spec.ts:')) {
-            const testMatch = line.match(/(\w+\.spec\.ts):(\d+):(\d+)\s+(.+)/);
-            if (testMatch) {
-              const [, file, lineNum, , testName] = testMatch;
-              currentTest = {
-                file,
-                line: lineNum,
-                name: testName,
-                startTime: new Date().toISOString()
-              };
-              testStartTime = Date.now();
-              execution.progress.currentTest = currentTest;
-              
-              emitTestUpdate(executionId, {
-                type: 'test-started',
-                test: currentTest,
-                progress: execution.progress
-              });
-            }
-          }
-          
-          // Detect test completion
-          if (line.includes('✓') || line.includes('✗') || line.includes('○')) {
-            if (currentTest) {
-              const duration = Date.now() - testStartTime;
-              const status = line.includes('✓') ? 'passed' : 
-                           line.includes('✗') ? 'failed' : 'skipped';
-              
-              execution.progress.completed++;
-              
-              emitTestUpdate(executionId, {
-                type: 'test-completed',
-                test: {
-                  ...currentTest,
-                  status,
-                  duration,
-                  endTime: new Date().toISOString()
-                },
-                progress: execution.progress
-              });
-              
-              currentTest = null;
-              testStartTime = null;
-            }
-          }
-          
-          // Extract total test count from summary lines
-          if (line.includes('Running') && line.includes('test')) {
-            const totalMatch = line.match(/Running (\d+) test/);
-            if (totalMatch) {
-              execution.progress.total = parseInt(totalMatch[1]);
-              emitTestUpdate(executionId, {
-                type: 'progress-update',
-                progress: execution.progress
-              });
-            }
-          }
-          
-          // Emit real-time log updates
-          emitTestUpdate(executionId, {
-            type: 'log-update',
-            timestamp: new Date().toISOString(),
-            source: 'stdout',
-            content: line,
-            currentTest: currentTest
-          });
-        }
-      }
-    });
-    
-    testProcess.stderr.on('data', (data) => {
-      const chunk = data.toString();
-      stderr += chunk;
-      execution.stderr += chunk;
-      
-      // Emit error logs in real-time
-      const lines = chunk.split('\n');
-      for (const line of lines) {
-        if (line.trim()) {
-          emitTestUpdate(executionId, {
-            type: 'log-update',
-            timestamp: new Date().toISOString(),
-            source: 'stderr',
-            content: line,
-            level: 'error'
-          });
-        }
-      }
-    });
-    
-    testProcess.on('close', (code) => {
-      execution.status = 'completed';
-      execution.endTime = new Date();
-      execution.exitCode = code;
-      
-      // Emit execution completion event
-      emitTestUpdate(executionId, {
-        type: 'execution-completed',
-        status: 'completed',
-        exitCode: code,
-        endTime: execution.endTime.toISOString(),
-        duration: execution.endTime - execution.startTime
-      });
-      
-      try {
-        // Try to parse JSON output from Playwright
-        console.log('Parsing test results from stdout...');
-        
-        // First try to parse the entire stdout as JSON (Playwright outputs one big JSON object)
-        let results = null;
-        try {
-          results = JSON.parse(stdout);
-          if (results.stats) {
-            console.log('Successfully parsed complete JSON output');
-          }
-        } catch (e) {
-          console.log('Failed to parse complete stdout as JSON, trying line-by-line...');
-          
-          // Fallback: try to find JSON line by line (for other reporters)
-          const jsonOutput = stdout.split('\n').find(line => {
-            try {
-              const parsed = JSON.parse(line);
-              return parsed.stats && parsed.suites;
-            } catch {
-              return false;
-            }
-          });
-          
-          if (jsonOutput) {
-            results = JSON.parse(jsonOutput);
-            console.log('Found JSON output in line-by-line parsing');
-          }
-        }
-        
-        if (results && results.stats) {
-          console.log('Playwright stats:', results.stats);
-          execution.results = {
-            total: (results.stats.expected || 0) + (results.stats.unexpected || 0) + (results.stats.skipped || 0),
-            passed: results.stats.expected || 0,
-            failed: results.stats.unexpected || 0,
-            skipped: results.stats.skipped || 0,
-            duration: `${(results.stats.duration || 0) / 1000}s`,
-            suites: results.suites || []
-          };
-          console.log('Parsed results:', execution.results);
-          
-          // Emit final results
-          emitTestUpdate(executionId, {
-            type: 'results-ready',
-            results: execution.results,
-            summary: {
-              total: execution.results.total,
-              passed: execution.results.passed,
-              failed: execution.results.failed,
-              skipped: execution.results.skipped,
-              duration: execution.results.duration,
-              success: code === 0
-            }
-          });
-          
-          // Save latest results to file for persistence across server restarts
-          try {
-            const latestResults = {
-              timestamp: execution.endTime,
-              results: execution.results,
-              exitCode: code
-            };
-            fs.writeFileSync(path.join(__dirname, 'tests/test-data/results/latest-test-results.json'), JSON.stringify(latestResults, null, 2));
-            console.log('💾 Saved latest results to file');
-          } catch (saveError) {
-            console.error('❌ Failed to save results to file:', saveError);
-          }
-        } else {
-          console.log('No valid JSON with stats found, using fallback');
-          // Fallback result parsing
-          execution.results = {
-            total: code === 0 ? 49 : 0, // Assume all tests passed if exit code is 0
-            passed: code === 0 ? 49 : 0,
-            failed: code !== 0 ? 1 : 0,
-            skipped: 0,
-            duration: `${(execution.endTime - execution.startTime) / 1000}s`,
-            suites: []
-          };
-          
-          // Emit fallback results
-          emitTestUpdate(executionId, {
-            type: 'results-ready',
-            results: execution.results,
-            summary: {
-              total: execution.results.total,
-              passed: execution.results.passed,
-              failed: execution.results.failed,
-              skipped: execution.results.skipped,
-              duration: execution.results.duration,
-              success: code === 0
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error parsing test results:', error);
-        execution.results = {
-          total: 0,
-          passed: 0,
-          failed: 1,
-          skipped: 0,
-          duration: `${(execution.endTime - execution.startTime) / 1000}s`,
-          error: error.message
-        };
-        
-        // Emit error results
-        emitTestUpdate(executionId, {
-          type: 'execution-error',
-          error: error.message,
-          results: execution.results
-        });
-      }
-      
-      console.log(`Test execution ${executionId} completed with exit code ${code}`);
-    });
-    
-    testProcess.on('error', (error) => {
-      execution.status = 'failed';
-      execution.error = error.message;
-      console.error(`Test execution ${executionId} failed:`, error);
-      
-      // Emit execution error event
-      emitTestUpdate(executionId, {
-        type: 'execution-error',
-        error: error.message,
-        status: 'failed'
-      });
-    });
-    
-    res.json({
-      success: true,
-      executionId,
-      message: 'Test execution started',
-      estimatedDuration: '30-60 seconds'
-    });
-    
+
   } catch (error) {
-    console.error('Error running tests:', error);
-    res.status(500).json({ error: 'Failed to run tests' });
+    console.error('Error orchestrating test execution:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to orchestrate test execution',
+      details: error.message
+    });
   }
 });
 
+// Get execution status (updated to work with new queue system)
 app.get('/api/tests/results/:executionId', requireAuth, async (req, res) => {
   try {
     const { executionId } = req.params;
     
-    const execution = testExecutions.get(executionId);
+    const execution = testQueue.getExecutionStatus(executionId);
     
     if (!execution) {
       return res.status(404).json({ error: 'Execution not found' });
     }
-    
+
     res.json({
-      executionId,
+      executionId: execution.id,
       status: execution.status,
-      startTime: execution.startTime,
-      endTime: execution.endTime,
+      createdAt: execution.createdAt,
+      startTime: execution.triggeredAt,
+      endTime: execution.completedAt,
       results: execution.results,
-      stdout: execution.stdout.split('\n').slice(-50).join('\n'), // Last 50 lines
-      stderr: execution.stderr,
-      error: execution.error
+      error: execution.error,
+      externalRunId: execution.externalRunId,
+      externalRunUrl: execution.externalRunUrl,
+      targetRunner: execution.targetRunner,
+      metadata: execution.metadata,
+      actualDuration: execution.actualDuration
     });
     
   } catch (error) {
-    console.error('Error fetching test results:', error);
-    res.status(500).json({ error: 'Failed to fetch test results' });
+    console.error('Error fetching execution status:', error);
+    res.status(500).json({ error: 'Failed to fetch execution status' });
+  }
+});
+
+// Get queue status
+app.get('/api/tests/queue/status', requireAuth, async (req, res) => {
+  try {
+    const queueStatus = testQueue.getQueueStatus();
+    
+    res.json({
+      success: true,
+      queue: queueStatus,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error fetching queue status:', error);
+    res.status(500).json({ error: 'Failed to fetch queue status' });
+  }
+});
+
+// Cancel execution
+app.post('/api/tests/cancel/:executionId', requireAuth, async (req, res) => {
+  try {
+    const { executionId } = req.params;
+    
+    const execution = await testQueue.cancelExecution(executionId);
+    
+    res.json({
+      success: true,
+      executionId,
+      status: execution.status,
+      message: 'Execution cancelled successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error cancelling execution:', error);
+    res.status(500).json({ 
+      error: 'Failed to cancel execution',
+      details: error.message 
+    });
+  }
+});
+
+// Get execution history
+app.get('/api/tests/history', requireAuth, async (req, res) => {
+  try {
+    const { limit = 20, offset = 0 } = req.query;
+    
+    const history = testQueue.executionHistory
+      .slice(offset, offset + limit)
+      .map(execution => ({
+        id: execution.id,
+        status: execution.status,
+        createdAt: execution.createdAt,
+        completedAt: execution.completedAt,
+        testFiles: execution.testFiles,
+        results: execution.results,
+        targetRunner: execution.targetRunner,
+        actualDuration: execution.actualDuration,
+        error: execution.error
+      }));
+    
+    res.json({
+      success: true,
+      history,
+      total: testQueue.executionHistory.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+    
+  } catch (error) {
+    console.error('Error fetching execution history:', error);
+    res.status(500).json({ error: 'Failed to fetch execution history' });
   }
 });
 
 // Get list of all test executions
 app.get('/api/tests/executions', requireAuth, async (req, res) => {
   try {
-    const executions = Array.from(testExecutions.values()).map(exec => ({
-      id: exec.id,
-      status: exec.status,
-      startTime: exec.startTime,
-      endTime: exec.endTime,
-      results: exec.results
-    }));
+    const queueStatus = testQueue.getQueueStatus();
+    const history = testQueue.executionHistory.slice(0, 20); // Last 20 executions
+    
+    const executions = [
+      ...queueStatus.queued.map(exec => ({
+        id: exec.id,
+        status: 'queued',
+        startTime: exec.createdAt,
+        endTime: null,
+        results: null
+      })),
+      ...queueStatus.running.map(exec => ({
+        id: exec.id,
+        status: 'running',
+        startTime: exec.triggeredAt,
+        endTime: null,
+        results: null
+      })),
+      ...history.map(exec => ({
+        id: exec.id,
+        status: exec.status,
+        startTime: exec.createdAt,
+        endTime: exec.completedAt,
+        results: exec.results
+      }))
+    ];
     
     res.json(executions);
   } catch (error) {
@@ -1398,14 +1324,14 @@ io.on('connection', (socket) => {
     console.log(`📊 Client joined test execution room: test-${testId}`);
     
     // Send current execution status if available
-    const execution = testExecutions.get(testId);
+    const execution = testQueue.getExecutionStatus(testId);
     if (execution) {
       socket.emit('testUpdate', {
         testId,
         type: 'execution-status',
         status: execution.status,
-        startTime: execution.startTime,
-        endTime: execution.endTime,
+        startTime: execution.createdAt,
+        endTime: execution.completedAt,
         progress: execution.progress || { completed: 0, total: 0, currentTest: null },
         results: execution.results
       });
@@ -1420,11 +1346,11 @@ io.on('connection', (socket) => {
   
   // Handle request for execution history
   socket.on('getExecutionHistory', () => {
-    const history = Array.from(testExecutions.entries()).map(([id, execution]) => ({
-      id,
+    const history = testQueue.executionHistory.slice(0, 20).map(execution => ({
+      id: execution.id,
       status: execution.status,
-      startTime: execution.startTime,
-      endTime: execution.endTime,
+      startTime: execution.createdAt,
+      endTime: execution.completedAt,
       results: execution.results
     }));
     
@@ -1434,19 +1360,19 @@ io.on('connection', (socket) => {
   // Handle live log subscription
   socket.on('subscribeLogs', (testId) => {
     socket.join(`logs-${testId}`);
-    console.log(`� Client subscribed to logs for: test-${testId}`);
+    console.log(`📜 Client subscribed to logs for: test-${testId}`);
     
     // Send recent logs if execution exists
-    const execution = testExecutions.get(testId);
-    if (execution && execution.stdout) {
-      const recentLogs = execution.stdout.split('\n').slice(-100); // Last 100 lines
+    const execution = testQueue.getExecutionStatus(testId);
+    if (execution && execution.logs && execution.logs.length > 0) {
+      const recentLogs = execution.logs.slice(-100); // Last 100 log entries
       socket.emit('logsHistory', {
         testId,
-        logs: recentLogs.map((line, index) => ({
+        logs: recentLogs.map((log, index) => ({
           id: index,
-          timestamp: new Date().toISOString(),
-          source: 'stdout',
-          content: line
+          timestamp: log.timestamp || new Date().toISOString(),
+          source: log.source || 'stdout',
+          content: log.content || log.message || String(log)
         }))
       });
     }
@@ -1494,35 +1420,6 @@ io.on('connection', (socket) => {
     console.log(`🔌 Client disconnected: ${socket.id}`);
   });
 });
-
-// Enhanced helper function to emit test updates with better targeting
-function emitTestUpdate(testId, update) {
-  const payload = {
-    testId,
-    timestamp: new Date().toISOString(),
-    ...update
-  };
-  
-  // Emit to test execution room
-  io.to(`test-${testId}`).emit('testUpdate', payload);
-  
-  // Also emit logs to log subscribers if it's a log update
-  if (update.type === 'log-update') {
-    io.to(`logs-${testId}`).emit('logUpdate', {
-      testId,
-      timestamp: payload.timestamp,
-      source: update.source,
-      content: update.content,
-      level: update.level || 'info',
-      currentTest: update.currentTest
-    });
-  }
-  
-  console.log(`📡 Emitted ${update.type} for test ${testId} to ${io.sockets.adapter.rooms.get(`test-${testId}`)?.size || 0} clients`);
-}
-
-// Make emitTestUpdate available globally
-global.emitTestUpdate = emitTestUpdate;
 
 // Catch-all handler for React Router (SPA routing)
 app.get('*', (req, res, next) => {
