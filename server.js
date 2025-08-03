@@ -48,37 +48,94 @@ const PORT = process.env.PORT || 5173;
 // Initialize database
 const db = new Database();
 
-// Initialize MVP services
+// Initialize MVP services (Week 3 & 4)
 let mvpAdoConfigService = null;
 let mvpPipelineMonitorService = null;
+let testFailureProcessor = null;
+let enhancedJiraIntegration = null;
+let mvpWebSocketService = null;
 
 try {
+  // Week 3 services
   const MVPAdoConfigService = require('./services/mvp-ado-config');
   const MVPPipelineMonitorService = require('./services/mvp-pipeline-monitor');
   
+  // Week 4 services
+  const TestFailureProcessor = require('./services/test-failure-processor');
+  const EnhancedJiraIntegration = require('./services/enhanced-jira-integration');
+  const MVPWebSocketService = require('./websocket/mvp-updates');
+  
+  // Initialize services
   mvpAdoConfigService = new MVPAdoConfigService(db);
   mvpPipelineMonitorService = new MVPPipelineMonitorService(db, mvpAdoConfigService);
+  testFailureProcessor = new TestFailureProcessor(db);
+  enhancedJiraIntegration = new EnhancedJiraIntegration(db, testFailureProcessor);
+  mvpWebSocketService = new MVPWebSocketService(io);
   
-  // Set up WebSocket integration for pipeline monitoring
+  // Set up service dependencies
+  mvpWebSocketService.setServices({
+    pipelineMonitor: mvpPipelineMonitorService,
+    testFailureProcessor: testFailureProcessor,
+    configService: mvpAdoConfigService
+  });
+  
+  // Set up cross-service communication
+  testFailureProcessor.setJiraIntegration(enhancedJiraIntegration);
+  
+  // Set up WebSocket integration for Week 3 pipeline monitoring
   if (mvpPipelineMonitorService) {
     mvpPipelineMonitorService.on('test_failures_detected', (data) => {
-      io.to('pipeline-monitoring').emit('testFailuresDetected', data);
+      mvpWebSocketService.emitTestFailuresDetected(data);
     });
 
     mvpPipelineMonitorService.on('monitoring_started', (data) => {
-      io.to('pipeline-monitoring').emit('monitoringStarted', data);
+      mvpWebSocketService.emitMonitoringServiceStatusChanged({ status: 'started', ...data });
     });
 
-    mvpPipelineMonitorService.on('monitoring_stopped', () => {
-      io.to('pipeline-monitoring').emit('monitoringStopped');
+    mvpPipelineMonitorService.on('monitoring_stopped', (data) => {
+      mvpWebSocketService.emitMonitoringServiceStatusChanged({ status: 'stopped', ...data });
     });
 
     mvpPipelineMonitorService.on('monitoring_error', (data) => {
-      io.to('pipeline-monitoring').emit('monitoringError', data);
+      mvpWebSocketService.emitMonitoringServiceStatusChanged({ status: 'error', ...data });
+    });
+
+    mvpPipelineMonitorService.on('build_completed', (data) => {
+      mvpWebSocketService.emitBuildCompleted(data);
     });
   }
   
-  console.log('✅ MVP services initialized successfully');
+  // Set up WebSocket integration for Week 4 test processing
+  if (testFailureProcessor) {
+    testFailureProcessor.on('processing_started', (data) => {
+      mvpWebSocketService.emitBuildProcessingStarted(data);
+    });
+
+    testFailureProcessor.on('processing_completed', (data) => {
+      mvpWebSocketService.emitBuildProcessingCompleted(data);
+    });
+
+    testFailureProcessor.on('processing_failed', (data) => {
+      mvpWebSocketService.emitBuildProcessingFailed(data);
+    });
+
+    testFailureProcessor.on('failures_detected', (data) => {
+      mvpWebSocketService.emitTestFailuresDetected(data);
+    });
+  }
+  
+  // Set up WebSocket integration for JIRA events
+  if (enhancedJiraIntegration) {
+    enhancedJiraIntegration.on('issue_created', (data) => {
+      mvpWebSocketService.emitJiraIssueCreated(data);
+    });
+
+    enhancedJiraIntegration.on('issue_updated', (data) => {
+      mvpWebSocketService.emitJiraIssueUpdated(data);
+    });
+  }
+  
+  console.log('✅ MVP services (Week 3 & 4) initialized successfully');
 } catch (error) {
   console.warn('⚠️ MVP services not available:', error.message);
 }
@@ -1149,6 +1206,21 @@ try {
   console.warn('⚠️ MVP ADO configuration routes not available:', error.message);
 }
 
+// MVP Test Result Processing routes (Week 4)
+try {
+  const { router: testResultProcessingRouter, setServices: setProcessingServices } = require('./routes/test-result-processing');
+  
+  // Set the services in the router
+  if (testFailureProcessor && enhancedJiraIntegration && mvpWebSocketService) {
+    setProcessingServices(testFailureProcessor, enhancedJiraIntegration, mvpWebSocketService);
+  }
+  
+  app.use('/api/test-results', testResultProcessingRouter);
+  console.log('✅ MVP Test Result Processing routes loaded');
+} catch (error) {
+  console.warn('⚠️ MVP Test Result Processing routes not available:', error.message);
+}
+
 // ADR-001: Git Integration routes for TMS
 try {
   const gitWebhooksRouter = require('./routes/git-webhooks');
@@ -1181,6 +1253,11 @@ app.get('*', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
+  
+  // Use MVP WebSocket service for handling MVP-specific connections if available
+  if (mvpWebSocketService) {
+    mvpWebSocketService.handleConnection(socket);
+  }
   
   // Handle test execution monitoring
   socket.on('joinTestExecution', (testId) => {
