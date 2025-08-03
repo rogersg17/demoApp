@@ -48,6 +48,41 @@ const PORT = process.env.PORT || 5173;
 // Initialize database
 const db = new Database();
 
+// Initialize MVP services
+let mvpAdoConfigService = null;
+let mvpPipelineMonitorService = null;
+
+try {
+  const MVPAdoConfigService = require('./services/mvp-ado-config');
+  const MVPPipelineMonitorService = require('./services/mvp-pipeline-monitor');
+  
+  mvpAdoConfigService = new MVPAdoConfigService(db);
+  mvpPipelineMonitorService = new MVPPipelineMonitorService(db, mvpAdoConfigService);
+  
+  // Set up WebSocket integration for pipeline monitoring
+  if (mvpPipelineMonitorService) {
+    mvpPipelineMonitorService.on('test_failures_detected', (data) => {
+      io.to('pipeline-monitoring').emit('testFailuresDetected', data);
+    });
+
+    mvpPipelineMonitorService.on('monitoring_started', (data) => {
+      io.to('pipeline-monitoring').emit('monitoringStarted', data);
+    });
+
+    mvpPipelineMonitorService.on('monitoring_stopped', () => {
+      io.to('pipeline-monitoring').emit('monitoringStopped');
+    });
+
+    mvpPipelineMonitorService.on('monitoring_error', (data) => {
+      io.to('pipeline-monitoring').emit('monitoringError', data);
+    });
+  }
+  
+  console.log('✅ MVP services initialized successfully');
+} catch (error) {
+  console.warn('⚠️ MVP services not available:', error.message);
+}
+
 // Make database available to routes
 app.locals.db = db;
 
@@ -1099,6 +1134,21 @@ try {
   console.warn('⚠️ Azure DevOps routes not available:', error.message);
 }
 
+// MVP ADO Configuration routes (Week 3)
+try {
+  const { router: mvpAdoConfigRouter, setServices } = require('./routes/mvp-ado-config');
+  
+  // Set the services in the router
+  if (mvpAdoConfigService && mvpPipelineMonitorService) {
+    setServices(mvpAdoConfigService, mvpPipelineMonitorService);
+  }
+  
+  app.use('/api/mvp', mvpAdoConfigRouter);
+  console.log('✅ MVP ADO configuration routes loaded');
+} catch (error) {
+  console.warn('⚠️ MVP ADO configuration routes not available:', error.message);
+}
+
 // ADR-001: Git Integration routes for TMS
 try {
   const gitWebhooksRouter = require('./routes/git-webhooks');
@@ -1206,6 +1256,28 @@ io.on('connection', (socket) => {
       activity,
       timestamp: new Date().toISOString()
     });
+  });
+
+  // MVP Pipeline monitoring events
+  socket.on('joinPipelineMonitoring', () => {
+    socket.join('pipeline-monitoring');
+    console.log(`🔧 Client joined pipeline monitoring room: ${socket.id}`);
+  });
+
+  socket.on('leavePipelineMonitoring', () => {
+    socket.leave('pipeline-monitoring');
+    console.log(`🔧 Client left pipeline monitoring room: ${socket.id}`);
+  });
+
+  socket.on('getPipelineStatus', async () => {
+    try {
+      if (mvpPipelineMonitorService) {
+        const status = mvpPipelineMonitorService.getMonitoringStatus();
+        socket.emit('pipelineStatus', status);
+      }
+    } catch (error) {
+      console.error('Error getting pipeline status:', error);
+    }
   });
   
   socket.on('disconnect', () => {
