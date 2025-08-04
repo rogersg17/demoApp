@@ -1,0 +1,289 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  email        String    @unique
+  password     String
+  created_at   DateTime  @default(now())
+  last_login   DateTime?
+  is_active    Boolean   @default(true)
+
+  @@map("users")
+}
+
+// Test Management
+model TestExecution {
+  id                String    @id
+  execution_id      String    @unique
+  test_suite        String
+  environment       String
+  status            String    @default("queued") // 'queued', 'assigned', 'running', 'completed', 'failed', 'cancelled'
+  priority          Int       @default(50)
+  created_at        DateTime  @default(now())
+  started_at        DateTime?
+  completed_at      DateTime?
+  assigned_runner_id Int?
+  estimated_duration Int?
+  metadata          String?   // JSON string
+
+  // Relations
+  assigned_runner   TestRunner? @relation(fields: [assigned_runner_id], references: [id])
+  results           TestResult[]
+  queue_items       ExecutionQueueItem[]
+  resource_allocations ResourceAllocation[]
+  execution_metrics ExecutionMetric[]
+  parallel_executions ParallelExecution[]
+
+  @@map("test_executions")
+}
+
+model TestResult {
+  id            Int      @id @default(autoincrement())
+  execution_id  String
+  test_name     String
+  status        String   // 'passed', 'failed', 'skipped'
+  duration      Float
+  error_message String?
+  stack_trace   String?
+  created_at    DateTime @default(now())
+
+  // Relations
+  execution     TestExecution @relation(fields: [execution_id], references: [execution_id])
+
+  @@map("test_results")
+}
+
+// Enhanced Orchestration Models (Week 11)
+model TestRunner {
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  type                String    // 'github-actions', 'azure-devops', 'jenkins', 'gitlab', 'docker', 'custom'
+  status              String    @default("active") // 'active', 'inactive', 'error', 'maintenance'
+  health_status       String    @default("unknown") // 'healthy', 'unhealthy', 'unknown'
+  endpoint_url        String?
+  webhook_url         String?
+  capabilities        String?   // JSON string
+  max_concurrent_jobs Int       @default(1)
+  priority            Int       @default(50)
+  health_check_url    String?
+  metadata            String?   // JSON string
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  last_health_check   DateTime?
+
+  // Relations
+  executions          TestExecution[]
+  queue_assignments   ExecutionQueueItem[]
+  resource_allocations ResourceAllocation[]
+  health_history      RunnerHealthHistory[]
+  parallel_executions ParallelExecution[]
+
+  @@map("test_runners")
+}
+
+model ExecutionQueueItem {
+  id                    Int       @id @default(autoincrement())
+  execution_id          String    @unique
+  test_suite            String
+  environment           String
+  status                String    @default("queued") // 'queued', 'assigned', 'running', 'completed', 'failed', 'cancelled'
+  priority              Int       @default(50)
+  estimated_duration    Int?
+  requested_runner_type String?
+  requested_runner_id   Int?
+  assigned_runner_id    Int?
+  queued_at             DateTime  @default(now())
+  assigned_at           DateTime?
+  started_at            DateTime?
+  completed_at          DateTime?
+  metadata              String?   // JSON string
+
+  // Relations
+  execution             TestExecution @relation(fields: [execution_id], references: [execution_id])
+  assigned_runner       TestRunner?   @relation(fields: [assigned_runner_id], references: [id])
+
+  @@map("execution_queue")
+}
+
+model ResourceAllocation {
+  id                  Int       @id @default(autoincrement())
+  execution_id        String
+  runner_id           Int
+  cpu_allocated       Float     @default(0)
+  memory_allocated    Int       @default(0) // in MB
+  status              String    @default("allocated") // 'allocated', 'released', 'exceeded'
+  allocated_at        DateTime  @default(now())
+  released_at         DateTime?
+  peak_cpu_usage      Float?
+  peak_memory_usage   Int?
+
+  // Relations
+  execution           TestExecution @relation(fields: [execution_id], references: [execution_id])
+  runner              TestRunner    @relation(fields: [runner_id], references: [id])
+
+  @@unique([execution_id, runner_id])
+  @@map("resource_allocations")
+}
+
+model ExecutionMetric {
+  id           Int      @id @default(autoincrement())
+  execution_id String
+  runner_id    Int
+  metric_name  String
+  metric_value Float
+  recorded_at  DateTime @default(now())
+
+  // Relations
+  execution    TestExecution @relation(fields: [execution_id], references: [execution_id])
+
+  @@map("execution_metrics")
+}
+
+model RunnerHealthHistory {
+  id            Int      @id @default(autoincrement())
+  runner_id     Int
+  health_status String   // 'healthy', 'unhealthy', 'unknown'
+  response_time Float?
+  error_message String?
+  checked_at    DateTime @default(now())
+
+  // Relations
+  runner        TestRunner @relation(fields: [runner_id], references: [id])
+
+  @@map("runner_health_history")
+}
+
+model LoadBalancingRule {
+  id                   Int      @id @default(autoincrement())
+  name                 String   @unique
+  rule_type            String   // 'round-robin', 'priority-based', 'resource-based', 'custom'
+  test_suite_pattern   String?
+  environment_pattern  String?
+  runner_type_filter   String?
+  priority             Int      @default(50)
+  active               Boolean  @default(true)
+  rule_config          String?  // JSON string
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("load_balancing_rules")
+}
+
+model ParallelExecution {
+  id                    Int       @id @default(autoincrement())
+  parent_execution_id   String
+  shard_index           Int
+  total_shards          Int
+  execution_id          String    @unique
+  runner_id             Int?
+  status                String    @default("pending") // 'pending', 'running', 'completed', 'failed', 'cancelled'
+  shard_webhook_url     String?
+  created_at            DateTime  @default(now())
+  started_at            DateTime?
+  completed_at          DateTime?
+  results               String?   // JSON string
+
+  // Relations
+  parent_execution      TestExecution @relation(fields: [parent_execution_id], references: [execution_id])
+  runner                TestRunner?   @relation(fields: [runner_id], references: [id])
+
+  @@map("parallel_executions")
+}
+
+// MVP Services Models (Weeks 3-5)
+model AdoConfiguration {
+  id                Int      @id @default(autoincrement())
+  organization_url  String
+  personal_access_token String
+  project_name      String
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("ado_configurations")
+}
+
+model PipelineRun {
+  id              Int      @id @default(autoincrement())
+  pipeline_id     Int
+  run_id          Int      @unique
+  status          String
+  started_at      DateTime
+  completed_at    DateTime?
+  result          String?
+  pipeline_name   String
+  project_name    String
+  created_at      DateTime @default(now())
+
+  @@map("pipeline_runs")
+}
+
+model TestFailure {
+  id               Int      @id @default(autoincrement())
+  test_name        String
+  failure_message  String
+  stack_trace      String?
+  pipeline_run_id  Int
+  occurred_at      DateTime
+  is_flaky         Boolean  @default(false)
+  jira_ticket_id   String?
+  status           String   @default("new") // 'new', 'investigating', 'resolved', 'ignored'
+  created_at       DateTime @default(now())
+
+  @@map("test_failures")
+}
+
+model JiraTicket {
+  id               Int      @id @default(autoincrement())
+  ticket_key       String   @unique
+  summary          String
+  description      String?
+  status           String
+  assignee         String?
+  test_failure_ids String?  // JSON array of test failure IDs
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("jira_tickets")
+}
+
+model FlakyTest {
+  id                    Int      @id @default(autoincrement())
+  test_name             String   @unique
+  failure_count         Int      @default(0)
+  success_count         Int      @default(0)
+  flakiness_percentage  Float    @default(0)
+  last_failure_date     DateTime?
+  last_success_date     DateTime?
+  status                String   @default("monitoring") // 'monitoring', 'confirmed_flaky', 'stable', 'ignored'
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map("flaky_tests")
+}
+
+// Git Integration
+model GitRepository {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  url           String
+  branch        String   @default("main")
+  last_commit   String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("git_repositories")
+}

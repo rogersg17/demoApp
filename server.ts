@@ -35,6 +35,7 @@ import {
 
 // Import services
 const Database = require('./database/database');
+import { prismaDb } from './database/prisma-database';
 
 // Configure environment
 config();
@@ -65,8 +66,9 @@ const io: TypedServer = new Server(server, {
 
 const PORT = process.env.PORT || 5173;
 
-// Initialize database
+// Initialize databases (legacy and new Prisma)
 const db = new Database();
+// Prisma database is initialized as singleton
 
 // Server configuration
 const serverConfig: ServerConfig = {
@@ -311,7 +313,7 @@ io.on('connection', (socket: TypedSocket) => {
 });
 
 // Export the configured server and services for use in routes
-export { app, server, io, db, emitTestUpdate, mvpServices, orchestrationServices, serverConfig };
+export { app, server, io, db, prismaDb, emitTestUpdate, mvpServices, orchestrationServices, serverConfig };
 
 // Start server if this file is run directly
 if (require.main === module) {
@@ -320,9 +322,12 @@ if (require.main === module) {
 
 async function startServer(): Promise<void> {
   try {
-    // Initialize database
+    // Initialize databases
     await db.initialize();
-    console.log('✅ Database initialized');
+    console.log('✅ Legacy database initialized');
+    
+    await prismaDb.initialize();
+    console.log('✅ Prisma database initialized');
     
     // Initialize services
     if (orchestrationServices.orchestration) {
@@ -452,11 +457,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
     
     console.log('✅ Services cleaned up');
     
-    // Close database connection
+    // Close database connections
     if (db.close) {
       await db.close();
-      console.log('✅ Database connection closed');
+      console.log('✅ Legacy database connection closed');
     }
+    
+    await prismaDb.cleanup();
+    console.log('✅ Prisma database connection closed');
     
     console.log('🎉 Graceful shutdown complete');
     process.exit(0);
