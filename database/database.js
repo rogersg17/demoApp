@@ -83,6 +83,7 @@ class Database {
 
     // MVP ADO integration tables for Week 3
     this.initializeMVPTables();
+    this.initializeEnhancedOrchestrationTables();
 
     // Insert sample data after tables are created
     setTimeout(() => {
@@ -1554,6 +1555,185 @@ class Database {
     `, (err) => {
       if (err) console.error('Error creating mvp_recent_failures_with_jira view:', err);
       else console.log('✅ MVP Recent failures with JIRA view ready');
+    });
+  }
+
+  // Initialize Enhanced Orchestration tables for Week 11
+  initializeEnhancedOrchestrationTables() {
+    // Test Runners table - Track registered test runners and their capabilities
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS test_runners (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL, -- 'github-actions', 'azure-devops', 'jenkins', 'gitlab', 'docker', 'custom'
+        endpoint_url TEXT,
+        webhook_url TEXT,
+        status TEXT DEFAULT 'inactive', -- 'active', 'inactive', 'error', 'maintenance'
+        capabilities TEXT, -- JSON string of runner capabilities
+        max_concurrent_jobs INTEGER DEFAULT 1,
+        current_jobs INTEGER DEFAULT 0,
+        priority INTEGER DEFAULT 50, -- Higher number = higher priority
+        health_check_url TEXT,
+        last_health_check DATETIME,
+        health_status TEXT DEFAULT 'unknown', -- 'healthy', 'unhealthy', 'unknown'
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        metadata TEXT -- JSON for additional runner-specific data
+      )
+    `, (err) => {
+      if (err) console.error('Error creating test_runners table:', err);
+      else console.log('✅ Test runners table ready');
+    });
+
+    // Execution Queue table - Manage test execution requests with priority and scheduling
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS execution_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT UNIQUE NOT NULL,
+        test_suite TEXT NOT NULL,
+        environment TEXT NOT NULL,
+        priority INTEGER DEFAULT 50, -- Higher number = higher priority
+        estimated_duration INTEGER, -- Estimated duration in seconds
+        requested_runner_type TEXT,
+        requested_runner_id INTEGER,
+        assigned_runner_id INTEGER,
+        status TEXT DEFAULT 'queued', -- 'queued', 'assigned', 'running', 'completed', 'failed', 'cancelled', 'timeout'
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        assigned_at DATETIME,
+        started_at DATETIME,
+        completed_at DATETIME,
+        timeout_at DATETIME,
+        retry_count INTEGER DEFAULT 0,
+        max_retries INTEGER DEFAULT 3,
+        metadata TEXT, -- JSON for execution parameters
+        FOREIGN KEY (assigned_runner_id) REFERENCES test_runners(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating execution_queue table:', err);
+      else console.log('✅ Execution queue table ready');
+    });
+
+    // Resource Allocations table - Track resource usage and allocation
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS resource_allocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        runner_id INTEGER NOT NULL,
+        execution_id TEXT NOT NULL,
+        allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        released_at DATETIME,
+        cpu_allocation REAL, -- Percentage of CPU allocated
+        memory_allocation INTEGER, -- MB of memory allocated
+        status TEXT DEFAULT 'allocated', -- 'allocated', 'released', 'exceeded'
+        FOREIGN KEY (runner_id) REFERENCES test_runners(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating resource_allocations table:', err);
+      else console.log('✅ Resource allocations table ready');
+    });
+
+    // Execution Metrics table - Performance and monitoring data
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS execution_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        runner_id INTEGER,
+        metric_type TEXT NOT NULL, -- 'queue_time', 'execution_time', 'setup_time', 'teardown_time'
+        metric_value REAL NOT NULL,
+        metric_unit TEXT DEFAULT 'seconds',
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        metadata TEXT, -- JSON for additional metric data
+        FOREIGN KEY (runner_id) REFERENCES test_runners(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating execution_metrics table:', err);
+      else console.log('✅ Execution metrics table ready');
+    });
+
+    // Runner Health History table - Track runner health over time
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS runner_health_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        runner_id INTEGER NOT NULL,
+        health_status TEXT NOT NULL, -- 'healthy', 'unhealthy', 'degraded', 'offline'
+        response_time REAL, -- Health check response time in ms
+        error_message TEXT,
+        cpu_usage REAL,
+        memory_usage REAL,
+        disk_usage REAL,
+        active_jobs INTEGER,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (runner_id) REFERENCES test_runners(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating runner_health_history table:', err);
+      else console.log('✅ Runner health history table ready');
+    });
+
+    // Load Balancing Rules table - Define load balancing strategies
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS load_balancing_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        rule_type TEXT NOT NULL, -- 'round_robin', 'priority_based', 'resource_based', 'custom'
+        test_suite_pattern TEXT, -- Pattern to match test suites
+        environment_pattern TEXT, -- Pattern to match environments
+        runner_type_filter TEXT, -- Filter by runner type
+        priority INTEGER DEFAULT 50,
+        active BOOLEAN DEFAULT 1,
+        rule_config TEXT, -- JSON configuration for the rule
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) console.error('Error creating load_balancing_rules table:', err);
+      else console.log('✅ Load balancing rules table ready');
+    });
+
+    // Parallel Execution Coordination table - Track sharded/parallel executions
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS parallel_executions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_execution_id TEXT NOT NULL,
+        shard_id TEXT NOT NULL,
+        shard_index INTEGER NOT NULL,
+        total_shards INTEGER NOT NULL,
+        runner_id INTEGER,
+        status TEXT DEFAULT 'pending', -- 'pending', 'running', 'completed', 'failed', 'cancelled'
+        started_at DATETIME,
+        completed_at DATETIME,
+        test_results TEXT, -- JSON with test results for this shard
+        artifacts_url TEXT,
+        error_message TEXT,
+        FOREIGN KEY (runner_id) REFERENCES test_runners(id)
+      )
+    `, (err) => {
+      if (err) console.error('Error creating parallel_executions table:', err);
+      else console.log('✅ Parallel executions table ready');
+    });
+
+    // Create indexes for performance
+    this.createOrchestrationIndexes();
+  }
+
+  createOrchestrationIndexes() {
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_execution_queue_status ON execution_queue(status)',
+      'CREATE INDEX IF NOT EXISTS idx_execution_queue_priority ON execution_queue(priority DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_execution_queue_created_at ON execution_queue(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_test_runners_status ON test_runners(status)',
+      'CREATE INDEX IF NOT EXISTS idx_test_runners_type ON test_runners(type)',
+      'CREATE INDEX IF NOT EXISTS idx_resource_allocations_runner ON resource_allocations(runner_id)',
+      'CREATE INDEX IF NOT EXISTS idx_execution_metrics_execution_id ON execution_metrics(execution_id)',
+      'CREATE INDEX IF NOT EXISTS idx_runner_health_timestamp ON runner_health_history(timestamp)',
+      'CREATE INDEX IF NOT EXISTS idx_parallel_executions_parent ON parallel_executions(parent_execution_id)',
+      'CREATE INDEX IF NOT EXISTS idx_parallel_executions_status ON parallel_executions(status)'
+    ];
+
+    indexes.forEach((indexSql, i) => {
+      this.db.run(indexSql, (err) => {
+        if (err) console.error(`Error creating orchestration index ${i + 1}:`, err);
+        else console.log(`✅ Orchestration index ${i + 1} ready`);
+      });
     });
   }
 

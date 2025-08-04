@@ -1245,6 +1245,18 @@ try {
   console.warn('⚠️ MVP Dashboard routes not available:', error.message);
 }
 
+// Enhanced Orchestration System (Week 11)
+try {
+  const enhancedOrchestrationApiRouter = require('./routes/enhanced-orchestration-api');
+  const enhancedOrchestrationDashboardRouter = require('./routes/enhanced-orchestration-dashboard');
+  
+  app.use('/api/enhanced-orchestration', enhancedOrchestrationApiRouter);
+  app.use('/enhanced-orchestration', enhancedOrchestrationDashboardRouter);
+  console.log('✅ Enhanced Orchestration routes loaded');
+} catch (error) {
+  console.warn('⚠️ Enhanced Orchestration routes not available:', error.message);
+}
+
 // Health Check Service and Routes (Week 8)
 try {
   const HealthCheckService = require('./services/health-check');
