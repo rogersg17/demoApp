@@ -356,14 +356,6 @@ app.get('/', (req, res) => {
 });
 
 // Legacy routes for old frontend
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'login/index.html'));
-});
-
-app.get('/login/index.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'login/index.html'));
-});
-
 app.get('/users/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'old-vanilla-pages/users/index.html'));
 });
@@ -1447,8 +1439,7 @@ app.get('*', (req, res, next) => {
 server.listen(PORT, () => {
   console.log(`🚀 Demo App server running at http://localhost:${PORT}`);
   console.log(`⚛️  React Frontend: http://localhost:${PORT}`);
-  console.log(`📱 Legacy Login: http://localhost:${PORT}/login/index.html`);
-  console.log(`👥 Legacy User Management: http://localhost:${PORT}/users/index.html`);
+  console.log(` Legacy User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log(`🧪 Test Management: http://localhost:${PORT}/tests-management/index.html`);
   console.log(`⚙️ Settings: http://localhost:${PORT}/settings/index.html`);

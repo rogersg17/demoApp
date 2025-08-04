@@ -441,7 +441,6 @@ npm run test:performance
 │   │   └── types/           # TypeScript type definitions
 │   ├── package.json         # Frontend dependencies
 │   └── vite.config.ts       # Vite configuration
-├── login/                   # Legacy login page
 ├── users/                   # Legacy user management interface  
 ├── mainPage/                # Legacy main dashboard
 ├── reports/                 # Legacy analytics dashboard

@@ -4,7 +4,8 @@
   "description": "Demo web application with user management and Playwright tests",
   "main": "server.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node server.js",
+    "start:compiled": "node dist/server.js",
     "start:js": "node server.js",
     "start:ts": "ts-node server.ts",
     "start:production": "./deployment/start-production.sh",
