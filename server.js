@@ -344,6 +344,11 @@ app.use(session({
   }
 }));
 
+// Set up authentication routes (after middleware setup)
+const authRoutes = require('./routes/auth');
+authRoutes.setDatabase(db.db); // Pass the actual SQLite instance, not the wrapper
+app.use('/api/auth', authRoutes);
+
 // Serve React frontend static files
 app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
