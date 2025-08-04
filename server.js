@@ -1204,7 +1204,7 @@ try {
   app.set('io', io);
 
   app.use('/api/ado/webhooks', adoWebhooksRouter);
-  app.use('/api/ado/project-config', adoProjectConfigRouter);
+  app.use('/api/ado', adoProjectConfigRouter);
   app.use('/api/ado/dashboard', adoDashboardRouter);
 } catch (error) {
   console.warn('⚠️ Azure DevOps routes not available:', error.message);
