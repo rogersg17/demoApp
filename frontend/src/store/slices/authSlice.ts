@@ -25,7 +25,7 @@ const initialState: AuthState = {
 export const login = createAsyncThunk(
   'auth/login',
   async ({ username, password }: { username: string; password: string }) => {
-    const response = await apiCall('/api/login', {
+    const response = await apiCall('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     })
@@ -54,7 +54,7 @@ export const login = createAsyncThunk(
 )
 
 export const logout = createAsyncThunk('auth/logout', async () => {
-  const response = await apiCall('/api/logout', {
+  const response = await apiCall('/api/auth/logout', {
     method: 'POST',
   })
 
@@ -67,13 +67,13 @@ export const logout = createAsyncThunk('auth/logout', async () => {
 })
 
 export const checkAuth = createAsyncThunk('auth/checkAuth', async () => {
-  const response = await apiCall('/api/settings', {
-    method: 'HEAD',
+  const response = await apiCall('/api/auth/status', {
+    method: 'GET',
   })
 
   if (response.ok) {
-    const loggedInUser = sessionStorage.getItem('loggedInUser')
-    return { username: loggedInUser || 'User' }
+    const data = await response.json()
+    return { username: data.username || 'User' }
   }
 
   throw new Error('Not authenticated')

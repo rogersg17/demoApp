@@ -1,8 +1,29 @@
 # Test Management Platform (TMP)
 
+![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)
+![React](https://img.shields.io/badge/React-19.0+-61DAFB.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Status](https://img.shields.io/badge/Status-MVP%20Development-orange.svg)
+
 A comprehensive test management platform that bridges CI/CD systems with issue tracking platforms. Built on the foundation of **ADR-001: Test Code and Metadata Separation**, TMP provides automated test failure management, real-time monitoring, and intelligent workflow automation.
 
-## 📋 Project Documentation
+## � Table of Contents
+
+- [Project Documentation](#-project-documentation)
+- [Current Status](#-current-status-mvp-development-phase-2)
+- [Architecture Overview](#️-architecture-overview)
+- [Features](#features)
+- [Quick Start](#-quick-start)
+- [Configuration & Setup](#-configuration--setup)
+- [API Reference](#-api-reference)
+- [Development & Contributing](#️-development--contributing)
+- [Monitoring & Analytics](#-monitoring--analytics)
+- [Technical Stack](#️-technical-stack)
+- [Project Roadmap](#-project-roadmap)
+- [Support & Documentation](#-support--documentation)
+
+## �📋 Project Documentation
 
 **➡️ For complete project information, see the [Documentation Hub](docs/README.md)**
 
@@ -20,7 +41,7 @@ A comprehensive test management platform that bridges CI/CD systems with issue t
 - **Database Architecture**: Extended schema with TMS metadata tables
 - **JIRA Integration**: Automated issue creation with rich context ✅ Production Ready
 
-### 🚧 Phase 2 IN PROGRESS: MVP Core Features (Week 3-7)
+### 🚧 Phase 2 IN PROGRESS: MVP Core Features
 - **Azure DevOps Integration**: Enhanced pipeline monitoring and configuration
 - **JIRA-ADO Bridge**: Automated workflow between JIRA and Azure DevOps
 - **Real-time Dashboard**: Pipeline health monitoring and test failure visualization
@@ -50,13 +71,13 @@ A comprehensive test management platform that bridges CI/CD systems with issue t
 - **Real-time Monitoring**: Live test execution and failure detection
 - **React Frontend**: Modern TypeScript-based user interface
 
-### 🎯 **MVP Features** � IN DEVELOPMENT
+### 🎯 **MVP Features** 🚧 IN DEVELOPMENT
 - **Azure DevOps Monitoring**: Real-time pipeline health and test result ingestion  
 - **JIRA-ADO Workflow**: Automated issue creation from ADO test failures
 - **Configuration Dashboard**: Web-based setup for pipelines and workflows
 - **Performance Analytics**: Pipeline health metrics and trend analysis
 
-### � **Planned Features** 📋 ROADMAP
+### 🔮 **Planned Features** 📋 ROADMAP
 - **GitHub Actions Integration**: Complete GitHub workflow monitoring (Phase 3)
 - **Advanced Analytics**: AI-powered failure pattern recognition (Phase 4)  
 - **Enterprise Features**: Multi-tenant architecture and SSO (Phase 5)
@@ -67,15 +88,6 @@ A comprehensive test management platform that bridges CI/CD systems with issue t
 - **Test Correlation**: Advanced algorithms for cross-platform test identification
 - **Validation Suite**: 100% Phase 1 validation success
 - **Compression**: Response compression for better performance
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v16 or higher)
-- npm
-
-### Installation
 
 ## 🚀 Quick Start
 
@@ -173,10 +185,16 @@ npm run test:e2e
 
 # Test JIRA integration
 npm run test:jira
+
+# Run JIRA tests with browser visible
+npm run test:jira:headed
+
+# Interactive JIRA test mode
+npm run test:jira:ui
+
+# Test JIRA integration setup
+npm run test-jira-setup
 ```
-npm run test:jira:headed       # Run JIRA tests with browser visible
-npm run test:jira:ui           # Interactive JIRA test mode
-npm run test-jira-setup        # Test JIRA integration setup
 
 ## 🔧 Configuration & Setup
 
@@ -200,10 +218,10 @@ npm run test:jira-connection
 
 #### Azure DevOps Integration 🚧 In Development
 ```bash
-# Configure ADO connection (Week 3-4)
+# Configure ADO connection
 npm run setup:ado
 
-# Test pipeline monitoring (Week 4-5)  
+# Test pipeline monitoring
 npm run test:ado-integration
 ```
 
@@ -224,7 +242,7 @@ npm run test:webhooks
 - **Test Metadata**: `/api/test-metadata` - Test information and correlation
 - **Platform Integrations**: `/api/integrations` - Integration status and health
 
-### MVP APIs 🚧 In Development (Week 3-7)
+### MVP APIs 🚧 In Development
 - **ADO Configuration**: `/api/mvp/ado/*` - Azure DevOps pipeline configuration
 - **Test Processing**: `/api/mvp/process-build/*` - Test result processing
 - **Workflow Automation**: `/api/mvp/workflow/*` - JIRA-ADO bridge automation
@@ -322,16 +340,16 @@ npm run test:performance
 - **Git Integration**: Multi-provider webhook processing
 - **React Frontend**: Modern TypeScript-based user interface
 
-### Current Sprint 🚧 (Week 3-7)
+### Current Sprint 🚧
 - **Azure DevOps Core**: Pipeline monitoring and configuration
 - **JIRA-ADO Bridge**: Automated workflow integration  
 - **MVP Dashboard**: Real-time pipeline health monitoring
 - **Configuration Management**: Web-based setup interface
 
 ### Next Sprints 📋
-- **GitHub Actions**: Complete GitHub workflow integration (Week 8-11)
-- **Advanced Analytics**: AI-powered failure analysis (Week 12-15) 
-- **Enterprise Features**: Multi-tenant and SSO support (Week 16-19)
+- **GitHub Actions**: Complete GitHub workflow integration
+- **Advanced Analytics**: AI-powered failure analysis
+- **Enterprise Features**: Multi-tenant and SSO support
 
 ## 🎯 Success Metrics
 
@@ -364,26 +382,6 @@ npm run test:performance
 
 **Test Management Platform (TMP)** - Bridging CI/CD systems with intelligent automation  
 *Built on ADR-001: Test Code and Metadata Separation*
-- `POST /api/ado/test-connection` - Test Azure DevOps connection
-- `GET/POST /api/ado/configuration` - Manage ADO settings
-
-**Project Management:**
-- `GET /api/ado/build-definitions` - List available pipelines
-- `POST /api/ado/projects` - Configure pipeline as project
-- `GET /api/ado/projects` - List configured projects
-- `PUT /api/ado/projects/:id` - Update project configuration
-- `DELETE /api/ado/projects/:id` - Remove project monitoring
-
-**Dashboard & Analytics:**
-- `GET /api/ado/dashboard` - Overall pipeline dashboard
-- `GET /api/ado/project/:id` - Specific project details
-- `GET /api/ado/project/:id/trends` - Historical trends
-- `GET /api/ado/project/:id/builds` - Build history
-- `GET /api/ado/project/:id/tests` - Test results
-
-**Webhooks:**
-- `POST /api/ado/webhooks/build-complete` - Receive build completion events
-- `GET /api/ado/webhooks/health` - Webhook service health check
 
 ## Tech Stack
 

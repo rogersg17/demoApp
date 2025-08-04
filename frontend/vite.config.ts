@@ -6,8 +6,6 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      // Enable Fast Refresh
-      fastRefresh: true,
       // Include .tsx files
       include: "**/*.{jsx,tsx}",
     })
