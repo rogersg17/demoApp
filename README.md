@@ -151,9 +151,9 @@ npm run build
 ```
 
 ### Access Points
-- � **Main Dashboard**: http://localhost:3000
-- ⚛️ **React Frontend**: http://localhost:5173 (development) 
-- � **Configuration**: http://localhost:3000/config
+- 🏠 **Main Dashboard**: http://localhost:3000 (backend/legacy interface)
+- ⚛️ **React Frontend**: http://localhost:5173 (development server) 
+- 📝 **Configuration**: http://localhost:3000/config
 - 📊 **Analytics**: http://localhost:3000/analytics
 - 🔗 **Integration Status**: http://localhost:3000/integrations
 

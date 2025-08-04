@@ -17,13 +17,13 @@ export default defineConfig({
     proxy: {
       // Proxy API calls to backend during development
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       // Proxy WebSocket connections
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:3000',
         ws: true,
         changeOrigin: true,
       }

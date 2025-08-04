@@ -1443,12 +1443,12 @@ app.get('*', (req, res, next) => {
 
 server.listen(PORT, () => {
   console.log(`🚀 Demo App server running at http://localhost:${PORT}`);
-  console.log(`⚛️  React Frontend: http://localhost:${PORT}`);
-  console.log(` Legacy User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`📊 Analytics & Reports: http://localhost:${PORT}/reports/index.html`);
   console.log(`🧪 Test Management: http://localhost:${PORT}/tests-management/index.html`);
   console.log(`⚙️ Settings: http://localhost:${PORT}/settings/index.html`);
+  console.log(`👥 User Management: http://localhost:${PORT}/users/index.html`);
   console.log(`🔌 WebSocket server ready for real-time updates`);
-  console.log(`🌐 Server configured for port: ${PORT} (React standard port)`);
+  console.log(`🌐 Backend API server running on port: ${PORT}`);
   console.log('✨ Press Ctrl+C to stop the server');
+  console.log(`📝 Note: For React development, run 'cd frontend && npm run dev' (typically port 5173)`);
 });

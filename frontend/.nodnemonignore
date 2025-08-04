@@ -1,0 +1,3 @@
+# Frontend should not use nodemon - use Vite instead
+# This file exists to prevent parent nodemon config from interfering
+# Frontend development uses: npx vite
