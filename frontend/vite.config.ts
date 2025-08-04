@@ -4,6 +4,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: path.resolve(__dirname),
   plugins: [
     react({
       // Include .tsx files
@@ -34,7 +35,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../public/dist', // Build to backend public directory
+    outDir: 'dist', // Build to standard dist directory
     sourcemap: true,
     target: 'esnext',
     minify: 'esbuild',

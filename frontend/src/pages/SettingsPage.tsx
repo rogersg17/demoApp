@@ -69,8 +69,8 @@ const defaultSettings: Settings = {
   liveLogs: true,
   
   // Environment Configuration
-  baseUrl: 'http://localhost:8080',
-  apiEndpoint: 'http://localhost:8080/api',
+  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+  apiEndpoint: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000') + '/api',
   testEnvironment: 'development',
   
   // JIRA Integration

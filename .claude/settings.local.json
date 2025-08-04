@@ -10,7 +10,9 @@
       "Bash(npm run test:unit:*)",
       "Bash(npx jest:*)",
       "Bash(npm test:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }

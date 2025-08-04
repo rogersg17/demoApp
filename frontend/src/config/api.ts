@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_B
 
 export const apiConfig = {
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 5000, // Shorter timeout to avoid hanging
   withCredentials: true, // Important for session cookies
 }
 
@@ -21,10 +21,25 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     ...options,
   }
 
-  const response = await fetch(url, defaultOptions)
-  
-  // Return response without throwing error - let calling code handle status
-  return response
+  // Add timeout using AbortController
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), apiConfig.timeout)
+
+  try {
+    const response = await fetch(url, {
+      ...defaultOptions,
+      signal: controller.signal,
+    })
+    
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout')
+    }
+    throw error
+  }
 }
 
 export default apiConfig

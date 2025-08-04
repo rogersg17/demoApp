@@ -14,7 +14,7 @@ interface SocketHook {
 }
 
 export function useSocket(options: UseSocketOptions = {}): SocketHook {
-  const { url = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080', autoConnect = true } = options
+  const { url = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', autoConnect = true } = options
   const socketRef = useRef<Socket | null>(null)
   const isConnectedRef = useRef(false)
 

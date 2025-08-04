@@ -67,16 +67,21 @@ export const logout = createAsyncThunk('auth/logout', async () => {
 })
 
 export const checkAuth = createAsyncThunk('auth/checkAuth', async () => {
-  const response = await apiCall('/api/auth/status', {
-    method: 'GET',
-  })
+  try {
+    const response = await apiCall('/api/auth/status', {
+      method: 'GET',
+    })
 
-  if (response.ok) {
-    const data = await response.json()
-    return { username: data.username || 'User' }
+    if (response.ok) {
+      const data = await response.json()
+      return { username: data.user?.username || data.username || 'User' }
+    }
+
+    throw new Error('Not authenticated')
+  } catch (error) {
+    // If backend is not available, treat as not authenticated
+    throw new Error('Backend not available')
   }
-
-  throw new Error('Not authenticated')
 })
 
 const authSlice = createSlice({

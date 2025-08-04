@@ -5,12 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start:compiled": "node dist/server.js",
-    "start:js": "node server.js",
-    "start:ts": "ts-node server.ts",
     "start:production": "./deployment/start-production.sh",
     "dev": "nodemon --exec ts-node server.ts",
-    "dev:js": "nodemon server.js",
+    "dev:full": "./start-dev.sh",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "build:production": "npm run build:frontend && npm run build",
