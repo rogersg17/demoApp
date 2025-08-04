@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-const { LoginPage } = require('../../page-objects/LoginPage.js');
+import { LoginPage } from '../../page-objects/LoginPage';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Login Functional Tests', () => {
-  let loginPage: any;
+  let loginPage: LoginPage;
 
   test.beforeEach(async ({ page }) => {
     loginPage = new LoginPage(page);

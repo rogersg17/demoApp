@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+</head>
+<body>
+    <h1>Vite Debug Test</h1>
+    <p>If you see this page, Vite is serving correctly.</p>
+    <p>Current URL: <span id="url"></span></p>
+    <script>
+        document.getElementById('url').textContent = window.location.href;
+        console.log('Current URL:', window.location.href);
+        console.log('User Agent:', navigator.userAgent);
+    </script>
+</body>
+</html>

@@ -1,11 +1,85 @@
-const { expect } = require('@playwright/test');
+import { expect, Page, Locator } from '@playwright/test';
+
+interface UserData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  department?: string;
+  status?: string;
+}
 
 /**
  * UserManagementPage - Page Object Model for the user management page
  * Follows Playwright best practices for page object implementation
  */
-class UserManagementPage {
-  constructor(page) {
+export class UserManagementPage {
+  readonly page: Page;
+  
+  // Page elements
+  readonly pageHeading: Locator;
+  readonly welcomeMessage: Locator;
+  readonly logoutButton: Locator;
+  
+  // Navigation
+  readonly userManagementIcon: Locator;
+  readonly dashboardIcon: Locator;
+  
+  // Stats cards
+  readonly statCards: Locator;
+  readonly totalUsersCard: Locator;
+  readonly activeUsersCard: Locator;
+  readonly pendingUsersCard: Locator;
+  readonly inactiveUsersCard: Locator;
+  
+  // Users table
+  readonly usersTable: Locator;
+  readonly usersTableBody: Locator;
+  readonly userRows: Locator;
+  
+  // Table headers
+  readonly userHeader: Locator;
+  readonly emailHeader: Locator;
+  readonly roleHeader: Locator;
+  readonly statusHeader: Locator;
+  readonly actionsHeader: Locator;
+  
+  // Action buttons
+  readonly editButtons: Locator;
+  readonly deleteButtons: Locator;
+  
+  // Add user modal
+  readonly addUserButton: Locator;
+  readonly addUserModal: Locator;
+  readonly addUserForm: Locator;
+  readonly closeModalButton: Locator;
+  readonly cancelButton: Locator;
+  
+  // Add user form fields
+  readonly firstNameInput: Locator;
+  readonly lastNameInput: Locator;
+  readonly emailInput: Locator;
+  readonly roleSelect: Locator;
+  readonly departmentInput: Locator;
+  readonly statusSelect: Locator;
+  readonly submitButton: Locator;
+  
+  // Delete user modal
+  readonly deleteUserModal: Locator;
+  readonly deleteUserName: Locator;
+  readonly confirmDeleteButton: Locator;
+  readonly cancelDeleteButton: Locator;
+  readonly closeDeleteModalButton: Locator;
+  readonly deleteWarningText: Locator;
+  
+  // Search and filter
+  readonly searchInput: Locator;
+  readonly statusFilter: Locator;
+  
+  // Notifications
+  readonly notification: Locator;
+
+  constructor(page: Page) {
     this.page = page;
     
     // Page elements
@@ -75,7 +149,7 @@ class UserManagementPage {
   /**
    * Navigate to user management page and reset to default state
    */
-  async navigateToUserManagement() {
+  async navigateToUserManagement(): Promise<void> {
     await this.userManagementIcon.click();
     await expect(this.page).toHaveURL(/.*users\/index\.html/);
     await expect(this.pageHeading).toContainText('User Management');
@@ -86,7 +160,7 @@ class UserManagementPage {
   /**
    * Reset page to default state by reloading
    */
-  async resetToDefaultState() {
+  async resetToDefaultState(): Promise<void> {
     await this.page.reload();
     await this.page.waitForLoadState('networkidle');
     await expect(this.pageHeading).toContainText('User Management');
@@ -96,7 +170,7 @@ class UserManagementPage {
   /**
    * Verify page elements are displayed correctly
    */
-  async verifyPageElements() {
+  async verifyPageElements(): Promise<void> {
     await expect(this.page).toHaveTitle(/User Management/);
     await expect(this.pageHeading).toContainText('User Management');
     
@@ -119,7 +193,7 @@ class UserManagementPage {
   /**
    * Verify default users are displayed (should be 8)
    */
-  async verifyDefaultUsers() {
+  async verifyDefaultUsers(): Promise<void> {
     const userCount = await this.userRows.count();
     expect(userCount).toBe(8);
     
@@ -130,15 +204,11 @@ class UserManagementPage {
 
   /**
    * Fill add user form with provided data
-   * @param {Object} userData - User data object
-   * @param {string} userData.firstName - First name
-   * @param {string} userData.lastName - Last name
-   * @param {string} userData.email - Email address
-   * @param {string} userData.role - User role
-   * @param {string} [userData.department] - Department (optional)
-   * @param {string} [userData.status] - Status (defaults to 'active')
+   * @param userData - User data object
    */
-  async fillAddUserForm({ firstName, lastName, email, role, department = '', status = 'active' }) {
+  async fillAddUserForm(userData: UserData): Promise<void> {
+    const { firstName, lastName, email, role, department = '', status = 'active' } = userData;
+    
     await this.firstNameInput.fill(firstName);
     await this.lastNameInput.fill(lastName);
     await this.emailInput.fill(email);
@@ -151,9 +221,9 @@ class UserManagementPage {
 
   /**
    * Add a new user (complete flow)
-   * @param {Object} userData - User data object
+   * @param userData - User data object
    */
-  async addUser(userData) {
+  async addUser(userData: UserData): Promise<void> {
     await this.addUserButton.click();
     await expect(this.addUserModal).toBeVisible();
     await expect(this.addUserModal.locator('h3')).toContainText('Add New User');
@@ -166,7 +236,7 @@ class UserManagementPage {
   /**
    * Verify form fields are present and labeled correctly
    */
-  async verifyAddUserFormFields() {
+  async verifyAddUserFormFields(): Promise<void> {
     await expect(this.firstNameInput).toBeVisible();
     await expect(this.lastNameInput).toBeVisible();
     await expect(this.emailInput).toBeVisible();
@@ -183,19 +253,19 @@ class UserManagementPage {
 
   /**
    * Get user name from a specific row
-   * @param {number} [userIndex=0] - Index of user row (0-based)
-   * @returns {Promise<string>} User name
+   * @param userIndex - Index of user row (0-based)
+   * @returns User name
    */
-  async getUserName(userIndex = 0) {
+  async getUserName(userIndex: number = 0): Promise<string | null> {
     const userRow = this.userRows.nth(userIndex);
     return await userRow.locator('.user-details h4').textContent();
   }
 
   /**
    * Verify delete modal is displayed with correct user
-   * @param {string} expectedUserName - Expected user name in modal
+   * @param expectedUserName - Expected user name in modal
    */
-  async verifyDeleteModal(expectedUserName) {
+  async verifyDeleteModal(expectedUserName: string): Promise<void> {
     await expect(this.deleteUserModal).toBeVisible();
     await expect(this.page.locator('.delete-header h3')).toContainText('Confirm Deletion');
     await expect(this.deleteUserName).toContainText(expectedUserName);
@@ -210,7 +280,7 @@ class UserManagementPage {
   /**
    * Confirm user deletion with loading state verification
    */
-  async confirmDeleteUser() {
+  async confirmDeleteUser(): Promise<void> {
     await this.confirmDeleteButton.click();
     
     // Verify loading state
@@ -223,11 +293,13 @@ class UserManagementPage {
 
   /**
    * Delete a user (complete flow)
-   * @param {number} [userIndex=0] - Index of user to delete
-   * @returns {Promise<string>} Name of deleted user
+   * @param userIndex - Index of user to delete
+   * @returns Name of deleted user
    */
-  async deleteUser(userIndex = 0) {
+  async deleteUser(userIndex: number = 0): Promise<string> {
     const userName = await this.getUserName(userIndex);
+    if (!userName) throw new Error('Could not get user name');
+    
     const userRow = this.userRows.nth(userIndex);
     await userRow.locator('.action-btn.delete').click();
     await this.verifyDeleteModal(userName);
@@ -237,37 +309,37 @@ class UserManagementPage {
 
   /**
    * Verify success notification
-   * @param {string} expectedMessage - Expected notification message
+   * @param expectedMessage - Expected notification message
    */
-  async verifySuccessNotification(expectedMessage) {
+  async verifySuccessNotification(expectedMessage: string): Promise<void> {
     await expect(this.notification).toBeVisible();
     await expect(this.notification).toContainText(expectedMessage);
   }
 
   /**
    * Verify error notification
-   * @param {string} expectedMessage - Expected error message
+   * @param expectedMessage - Expected error message
    */
-  async verifyErrorNotification(expectedMessage) {
+  async verifyErrorNotification(expectedMessage: string): Promise<void> {
     await expect(this.notification).toBeVisible();
     await expect(this.notification).toContainText(expectedMessage);
   }
 
   /**
    * Wait for stats to update and verify count
-   * @param {number} expectedCount - Expected total user count
+   * @param expectedCount - Expected total user count
    */
-  async waitForStatsUpdate(expectedCount) {
+  async waitForStatsUpdate(expectedCount: number): Promise<void> {
     await this.page.waitForTimeout(1000);
     await expect(this.totalUsersCard).toContainText(expectedCount.toString());
   }
 
   /**
    * Verify user appears in table
-   * @param {Object} userData - User data to verify
+   * @param userData - User data to verify
    */
-  async verifyUserInTable(userData) {
-    const { firstName, lastName, email, department, role, status } = userData;
+  async verifyUserInTable(userData: UserData): Promise<void> {
+    const { firstName, lastName, email, department, role, status = 'active' } = userData;
     const fullName = `${firstName} ${lastName}`;
     
     await expect(this.usersTableBody).toContainText(fullName);
@@ -281,11 +353,9 @@ class UserManagementPage {
 
   /**
    * Verify user is not in table
-   * @param {string} userName - User name to verify is not present
+   * @param userName - User name to verify is not present
    */
-  async verifyUserNotInTable(userName) {
+  async verifyUserNotInTable(userName: string): Promise<void> {
     await expect(this.usersTableBody).not.toContainText(userName);
   }
 }
-
-module.exports = { UserManagementPage };
