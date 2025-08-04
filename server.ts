@@ -404,7 +404,21 @@ function setupRoutes(): void {
       const mvpDashboardRoutes = require('./routes/mvp-dashboard');
       app.use('/mvp', mvpDashboardRoutes);
     } catch (e) { console.warn('MVP dashboard routes not available'); }
-    
+
+    // Azure DevOps routes
+    try {
+      const adoWebhooksRouter = require('./routes/ado-webhooks');
+      const adoProjectConfigRouter = require('./routes/ado-project-config');
+      const adoDashboardRouter = require('./routes/ado-dashboard');
+
+      // Store io instance for webhook access
+      app.set('io', io);
+
+      app.use('/api/ado/webhooks', adoWebhooksRouter);
+      app.use('/api/ado', adoProjectConfigRouter);
+      app.use('/api/ado/dashboard', adoDashboardRouter);
+    } catch (e) { console.warn('Azure DevOps routes not available'); }
+
     // Week 9+ orchestration routes
     try {
       const testWebhookRoutes = require('./routes/test-webhooks');
