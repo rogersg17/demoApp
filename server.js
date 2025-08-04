@@ -349,6 +349,53 @@ const authRoutes = require('./routes/auth');
 authRoutes.setDatabase(db.db); // Pass the actual SQLite instance, not the wrapper
 app.use('/api/auth', authRoutes);
 
+// Azure DevOps test route (temporary)
+app.post('/api/ado/test-connection', async (req, res) => {
+    try {
+        // Check authentication
+        if (!req.session.userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const { organization, project, pat } = req.body;
+        
+        if (!organization || !project || !pat) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields: organization, project, pat' 
+            });
+        }
+
+        console.log(`🧪 Testing ADO connection for user ${req.session.username}...`);
+        
+        // Import AdoClient here to avoid initialization issues
+        const AdoClient = require('./lib/ado-client');
+        
+        const testClient = new AdoClient({
+            orgUrl: organization,
+            projectId: project,
+            pat: pat
+        });
+        
+        const result = await testClient.testConnection();
+        
+        if (result.success) {
+            console.log(`✅ ADO connection test successful for user ${req.session.username}`);
+        } else {
+            console.warn(`❌ ADO connection test failed for user ${req.session.username}: ${result.error}`);
+        }
+        
+        res.json(result);
+    } catch (error) {
+        console.error('❌ ADO connection test error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Connection test failed',
+            message: error.message 
+        });
+    }
+});
+
 // Serve React frontend static files
 app.use(express.static(path.join(__dirname, 'frontend/dist')));
 

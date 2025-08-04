@@ -7,16 +7,13 @@ const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
-// Initialize services
-let adoClient, database, buildDefService, configService;
+// Services will be initialized on-demand
+let database;
 
 try {
-    adoClient = new AdoClient();
     database = new Database();
-    buildDefService = new AdoBuildDefinitionService(adoClient);
-    configService = new AdoProjectConfigurationService(adoClient, database);
 } catch (error) {
-    console.error('⚠️ Azure DevOps configuration services not initialized:', error.message);
+    console.error('⚠️ Database not initialized for ADO config:', error.message);
 }
 
 // Authentication middleware for ADO routes
