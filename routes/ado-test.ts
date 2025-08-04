@@ -1,13 +1,36 @@
-const express = require('express');
+import express, { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
+import { Session } from 'express-session';
+
 const AdoClient = require('../lib/ado-client');
-const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
+// TypeScript interfaces
+interface AuthenticatedRequest extends Request {
+    session: Session & {
+        userId?: string;
+        username?: string;
+    };
+}
+
+interface AdoTestConnectionBody {
+    organization: string;
+    project: string;
+    pat: string;
+}
+
+interface AdoConnectionResult {
+    success: boolean;
+    projects?: Array<{ id: string; name: string }>;
+    error?: string;
+}
+
 // Authentication middleware
-const requireAuth = (req, res, next) => {
+const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.session.userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        res.status(401).json({ error: 'Authentication required' });
+        return;
     }
     next();
 };
@@ -19,20 +42,21 @@ router.post('/test-connection', [
     body('organization').isURL().withMessage('Valid organization URL is required'),
     body('project').notEmpty().withMessage('Project name is required'),
     body('pat').isLength({ min: 10 }).withMessage('Personal Access Token is required')
-], async (req, res) => {
+], async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({ 
+            res.status(400).json({ 
                 success: false,
                 error: 'Validation failed', 
                 details: errors.array() 
             });
+            return;
         }
 
-        const { organization, project, pat } = req.body;
+        const { organization, project, pat }: AdoTestConnectionBody = req.body;
         
-        const username = req.session?.username || 'test-user';
+        const username: string = req.session?.username || 'test-user';
         console.log(`🧪 Testing ADO connection for user ${username}...`);
         console.log(`   Organization: ${organization}`);
         console.log(`   Project: ${project}`);
@@ -46,7 +70,7 @@ router.post('/test-connection', [
                 pat: pat
             });
             
-            const result = await testClient.testConnection();
+            const result: AdoConnectionResult = await testClient.testConnection();
             
             if (result.success) {
                 console.log(`✅ ADO connection test successful for user ${username}`);
@@ -56,7 +80,7 @@ router.post('/test-connection', [
             }
             
             res.json(result);
-        } catch (clientError) {
+        } catch (clientError: any) {
             console.error('❌ ADO client creation failed:', clientError.message);
             res.status(500).json({ 
                 success: false, 
@@ -64,7 +88,7 @@ router.post('/test-connection', [
                 message: clientError.message 
             });
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ ADO connection test error:', error);
         res.status(500).json({ 
             success: false, 
@@ -74,4 +98,4 @@ router.post('/test-connection', [
     }
 });
 
-module.exports = router;
+export default router;

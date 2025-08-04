@@ -367,10 +367,10 @@ function setupRoutes(): void {
     }
 
     // Load route modules
-    const authRoutes = require('./routes/auth');
+    const authRoutes = require('./routes/auth.ts').default;
     const testRoutes = require('./routes/tests');
     const gitRoutes = require('./routes/git');
-    const usersRoutes = require('./routes/users');
+    const usersRoutes = require('./routes/users.ts').default;
     
     // Initialize auth routes with database
     authRoutes.setDatabase(db.db);
@@ -408,14 +408,16 @@ function setupRoutes(): void {
     // Azure DevOps routes
     try {
       const adoWebhooksRouter = require('./routes/ado-webhooks');
-      const adoProjectConfigRouter = require('./routes/ado-project-config');
+      const adoProjectConfigRouter = require('./routes/ado-project-config.ts').default;
       const adoDashboardRouter = require('./routes/ado-dashboard');
+      const adoTestRouter = require('./routes/ado-test.ts').default;
 
       // Store io instance for webhook access
       app.set('io', io);
 
       app.use('/api/ado/webhooks', adoWebhooksRouter);
       app.use('/api/ado', adoProjectConfigRouter);
+      app.use('/api/ado', adoTestRouter);
       app.use('/api/ado/dashboard', adoDashboardRouter);
     } catch (e) { console.warn('Azure DevOps routes not available'); }
 
