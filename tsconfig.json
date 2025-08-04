@@ -4,17 +4,40 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "commonjs",
     "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": false,
-    "noEmit": true,
-    "types": ["node", "@playwright/test"]
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/types/*": ["./types/*"],
+      "@/services/*": ["./services/*"],
+      "@/routes/*": ["./routes/*"],
+      "@/database/*": ["./database/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/websocket/*": ["./websocket/*"]
+    },
+    "typeRoots": ["./node_modules/@types", "./types"],
+    "types": ["node"]
   },
   "include": [
+    "**/*.ts",
+    "**/*.js",
+    "types/**/*",
     "tests/**/*.ts",
     "tests-management/**/*.ts",
     "playwright.config.ts"
@@ -23,6 +46,12 @@
     "node_modules",
     "dist",
     "test-results",
-    "playwright-report"
-  ]
+    "playwright-report",
+    "deployment/node_modules",
+    "frontend/**/*"
+  ],
+  "ts-node": {
+    "esm": false,
+    "experimentalSpecifierResolution": "node"
+  }
 }

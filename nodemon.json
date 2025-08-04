@@ -1,0 +1,30 @@
+{
+  "watch": [
+    "server.ts",
+    "routes/",
+    "services/",
+    "websocket/",
+    "database/",
+    "utils/",
+    "types/"
+  ],
+  "ext": "ts,js,json",
+  "ignore": [
+    "node_modules/",
+    "dist/",
+    "frontend/",
+    "tests/",
+    "test-results/",
+    "playwright-report/",
+    "sessions/",
+    "public/"
+  ],
+  "exec": "ts-node server.ts",
+  "env": {
+    "NODE_ENV": "development",
+    "PORT": "3000"
+  },
+  "delay": 2000,
+  "verbose": true,
+  "legacyWatch": false
+}

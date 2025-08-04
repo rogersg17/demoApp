@@ -5,7 +5,8 @@
       "Bash(powershell Stop-Process:*)",
       "Bash(npm start)",
       "Bash(npm run build:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": []
   }
