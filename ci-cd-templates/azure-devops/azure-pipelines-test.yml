@@ -1,0 +1,405 @@
+trigger: none # Manual trigger only
+
+parameters:
+- name: testSuite
+  displayName: 'Test Suite'
+  type: string
+  default: 'all'
+  values:
+  - all
+  - smoke
+  - regression
+  - api
+  - ui
+- name: executionId
+  displayName: 'TMS Execution ID'
+  type: string
+- name: webhookUrl
+  displayName: 'TMS Webhook URL'
+  type: string
+- name: environment
+  displayName: 'Test Environment'
+  type: string
+  default: 'staging'
+  values:
+  - staging
+  - production
+  - dev
+
+variables:
+  nodeVersion: '18'
+  testSuite: ${{ parameters.testSuite }}
+  executionId: ${{ parameters.executionId }}
+  webhookUrl: ${{ parameters.webhookUrl }}
+  testEnvironment: ${{ parameters.environment }}
+
+stages:
+- stage: NotifyStart
+  displayName: 'Notify Test Start'
+  jobs:
+  - job: NotifyTMSStart
+    displayName: 'Notify TMS - Test Started'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: PowerShell@2
+      displayName: 'Send Start Notification'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $headers = @{
+            'Content-Type' = 'application/json'
+            'Authorization' = 'Bearer $(TMS_WEBHOOK_TOKEN)'
+          }
+          
+          $body = @{
+            executionId = "$(executionId)"
+            status = "running"
+            provider = "azure-devops"
+            runId = "$(Build.BuildId)"
+            runUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+            testSuite = "$(testSuite)"
+            environment = "$(testEnvironment)"
+            startTime = "$(Build.StartTime)"
+            metadata = @{
+              requestedBy = "$(Build.RequestedFor)"
+              sourceBranch = "$(Build.SourceBranch)"
+              sourceVersion = "$(Build.SourceVersion)"
+              buildReason = "$(Build.Reason)"
+              buildDefinitionName = "$(Build.DefinitionName)"
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          try {
+            Invoke-RestMethod -Uri "$(webhookUrl)" -Method Post -Headers $headers -Body $body
+            Write-Host "✅ Successfully notified TMS of test start"
+          } catch {
+            Write-Warning "❌ Failed to notify TMS: $($_.Exception.Message)"
+            # Don't fail the build if webhook fails
+          }
+
+- stage: TestExecution
+  displayName: 'Execute Tests'
+  dependsOn: NotifyStart
+  jobs:
+  - job: RunTests
+    displayName: 'Run Test Suite'
+    strategy:
+      parallel: 4
+    pool:
+      vmImage: 'ubuntu-latest'
+    variables:
+      shardIndex: $(System.JobPositionInPhase)
+      totalShards: $(System.TotalJobsInPhase)
+    steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+        versionSpec: '$(nodeVersion)'
+
+    - task: Cache@2
+      displayName: 'Cache node modules'
+      inputs:
+        key: 'npm | "$(Agent.OS)" | package-lock.json'
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+        path: $(npm_config_cache)
+
+    - script: npm ci
+      displayName: 'Install dependencies'
+
+    - script: npx playwright install --with-deps
+      displayName: 'Install Playwright browsers'
+
+    - task: PowerShell@2
+      displayName: 'Execute Tests'
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Set test environment
+          $env:TEST_ENV = "$(testEnvironment)"
+          
+          # Determine test command based on suite
+          $testCmd = switch ("$(testSuite)") {
+            "smoke" { "npx playwright test --grep @smoke" }
+            "regression" { "npx playwright test --grep @regression" }
+            "api" { "npx playwright test tests/api/" }
+            "ui" { "npx playwright test tests/ui/" }
+            default { "npx playwright test" }
+          }
+          
+          # Add sharding for parallel execution
+          $testCmd += " --shard=$(shardIndex)/$(totalShards)"
+          $testCmd += " --reporter=json"
+          
+          Write-Host "🧪 Running: $testCmd"
+          
+          # Execute tests and capture results
+          $exitCode = 0
+          try {
+            Invoke-Expression "$testCmd > test-results-shard-$(shardIndex).json 2>&1"
+          } catch {
+            $exitCode = $LASTEXITCODE
+            Write-Host "⚠️ Tests completed with exit code: $exitCode"
+          }
+          
+          # Always continue to result processing
+          if (Test-Path "test-results-shard-$(shardIndex).json") {
+            Write-Host "✅ Test results file created successfully"
+            Get-Content "test-results-shard-$(shardIndex).json" | Write-Host
+          } else {
+            Write-Warning "❌ Test results file not found"
+            # Create empty results file
+            @{
+              stats = @{
+                total = 0
+                passed = 0
+                failed = 0
+                skipped = 0
+              }
+              tests = @()
+            } | ConvertTo-Json -Depth 10 | Out-File "test-results-shard-$(shardIndex).json"
+          }
+      continueOnError: true
+
+    - task: PowerShell@2
+      displayName: 'Parse Test Results'
+      inputs:
+        targetType: 'inline'
+        script: |
+          if (Test-Path "test-results-shard-$(shardIndex).json") {
+            $results = Get-Content "test-results-shard-$(shardIndex).json" | ConvertFrom-Json
+            
+            $total = if ($results.stats.total) { $results.stats.total } else { 0 }
+            $passed = if ($results.stats.passed) { $results.stats.passed } else { 0 }
+            $failed = if ($results.stats.failed) { $results.stats.failed } else { 0 }
+            $skipped = if ($results.stats.skipped) { $results.stats.skipped } else { 0 }
+            
+            Write-Host "##vso[task.setvariable variable=testTotal]$total"
+            Write-Host "##vso[task.setvariable variable=testPassed]$passed"
+            Write-Host "##vso[task.setvariable variable=testFailed]$failed"
+            Write-Host "##vso[task.setvariable variable=testSkipped]$skipped"
+            
+            # Extract failed tests
+            $failedTests = $results.tests | Where-Object { $_.status -eq "failed" } | ForEach-Object {
+              @{
+                title = $_.title
+                file = $_.file
+                error = $_.error
+              }
+            }
+            
+            $failedTests | ConvertTo-Json -Depth 10 | Out-File "failed-tests-shard-$(shardIndex).json"
+            
+            Write-Host "📊 Shard $(shardIndex) Results: Total=$total, Passed=$passed, Failed=$failed, Skipped=$skipped"
+          } else {
+            Write-Host "##vso[task.setvariable variable=testTotal]0"
+            Write-Host "##vso[task.setvariable variable=testPassed]0"
+            Write-Host "##vso[task.setvariable variable=testFailed]0"
+            Write-Host "##vso[task.setvariable variable=testSkipped]0"
+          }
+
+    - task: PowerShell@2
+      displayName: 'Send Shard Results to TMS'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          $headers = @{
+            'Content-Type' = 'application/json'
+            'Authorization' = 'Bearer $(TMS_WEBHOOK_TOKEN)'
+          }
+          
+          $body = @{
+            executionId = "$(executionId)"
+            shardId = "$(shardIndex)"
+            status = "shard-complete"
+            provider = "azure-devops"
+            runId = "$(Build.BuildId)"
+            results = @{
+              total = [int]"$(testTotal)"
+              passed = [int]"$(testPassed)"
+              failed = [int]"$(testFailed)"
+              skipped = [int]"$(testSkipped)"
+            }
+            artifacts = @{
+              resultsFile = "test-results-shard-$(shardIndex).json"
+              reportUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+            }
+            timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          } | ConvertTo-Json -Depth 10
+          
+          try {
+            Invoke-RestMethod -Uri "$(webhookUrl)" -Method Post -Headers $headers -Body $body
+            Write-Host "✅ Successfully sent shard $(shardIndex) results to TMS"
+          } catch {
+            Write-Warning "❌ Failed to send shard results: $($_.Exception.Message)"
+          }
+
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results'
+      condition: always()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/test-results.xml'
+        searchFolder: '$(Agent.TempDirectory)'
+        mergeTestResults: false
+        failTaskOnFailedTests: false
+        testRunTitle: 'Playwright Tests - Shard $(shardIndex)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Test Artifacts'
+      condition: always()
+      inputs:
+        pathToPublish: '$(Build.SourcesDirectory)'
+        artifactName: 'test-results-shard-$(shardIndex)'
+        artifactType: 'Container'
+        parallel: true
+        publishLocation: 'Container'
+
+- stage: AggregateResults
+  displayName: 'Aggregate Test Results'
+  dependsOn: TestExecution
+  condition: always()
+  jobs:
+  - job: AggregateAndNotify
+    displayName: 'Aggregate Results and Notify TMS'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadBuildArtifacts@1
+      displayName: 'Download All Shard Results'
+      inputs:
+        buildType: 'current'
+        downloadType: 'specific'
+        downloadPath: '$(Agent.TempDirectory)'
+
+    - task: PowerShell@2
+      displayName: 'Aggregate Test Results'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $totalTests = 0
+          $totalPassed = 0
+          $totalFailed = 0
+          $totalSkipped = 0
+          $allFailedTests = @()
+          
+          # Process results from each shard
+          for ($i = 1; $i -le 4; $i++) {
+            $shardPath = "$(Agent.TempDirectory)/test-results-shard-$i"
+            $resultsFile = "$shardPath/test-results-shard-$i.json"
+            
+            if (Test-Path $resultsFile) {
+              Write-Host "📂 Processing shard $i results..."
+              $shardResults = Get-Content $resultsFile | ConvertFrom-Json
+              
+              $shardTotal = if ($shardResults.stats.total) { $shardResults.stats.total } else { 0 }
+              $shardPassed = if ($shardResults.stats.passed) { $shardResults.stats.passed } else { 0 }
+              $shardFailed = if ($shardResults.stats.failed) { $shardResults.stats.failed } else { 0 }
+              $shardSkipped = if ($shardResults.stats.skipped) { $shardResults.stats.skipped } else { 0 }
+              
+              $totalTests += $shardTotal
+              $totalPassed += $shardPassed
+              $totalFailed += $shardFailed
+              $totalSkipped += $shardSkipped
+              
+              # Collect failed tests
+              $failedTests = $shardResults.tests | Where-Object { $_.status -eq "failed" }
+              $allFailedTests += $failedTests
+              
+              Write-Host "   Shard $i: Total=$shardTotal, Passed=$shardPassed, Failed=$shardFailed, Skipped=$shardSkipped"
+            } else {
+              Write-Warning "⚠️ Results file not found for shard $i"
+            }
+          }
+          
+          # Determine overall status
+          $overallStatus = if ($totalFailed -gt 0) { "failed" } elseif ($totalTests -eq 0) { "error" } else { "passed" }
+          
+          Write-Host "##vso[task.setvariable variable=aggregatedTotal]$totalTests"
+          Write-Host "##vso[task.setvariable variable=aggregatedPassed]$totalPassed"
+          Write-Host "##vso[task.setvariable variable=aggregatedFailed]$totalFailed"
+          Write-Host "##vso[task.setvariable variable=aggregatedSkipped]$totalSkipped"
+          Write-Host "##vso[task.setvariable variable=overallStatus]$overallStatus"
+          
+          # Save failed tests for webhook
+          $allFailedTests | ConvertTo-Json -Depth 10 | Out-File "all-failed-tests.json"
+          
+          Write-Host "📊 Final Results: Total=$totalTests, Passed=$totalPassed, Failed=$totalFailed, Skipped=$totalSkipped, Status=$overallStatus"
+
+    - task: PowerShell@2
+      displayName: 'Send Final Results to TMS'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          $headers = @{
+            'Content-Type' = 'application/json'
+            'Authorization' = 'Bearer $(TMS_WEBHOOK_TOKEN)'
+          }
+          
+          # Read failed tests
+          $failedTests = @()
+          if (Test-Path "all-failed-tests.json") {
+            $failedTests = Get-Content "all-failed-tests.json" | ConvertFrom-Json
+          }
+          
+          $endTime = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          $startTime = "$(Build.StartTime)"
+          
+          $body = @{
+            executionId = "$(executionId)"
+            status = "$(overallStatus)"
+            provider = "azure-devops"
+            runId = "$(Build.BuildId)"
+            runUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+            testSuite = "$(testSuite)"
+            environment = "$(testEnvironment)"
+            results = @{
+              total = [int]"$(aggregatedTotal)"
+              passed = [int]"$(aggregatedPassed)"
+              failed = [int]"$(aggregatedFailed)"
+              skipped = [int]"$(aggregatedSkipped)"
+            }
+            failedTests = $failedTests
+            startTime = $startTime
+            endTime = $endTime
+            artifacts = @{
+              reportUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+              logsUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=logs"
+            }
+            metadata = @{
+              requestedBy = "$(Build.RequestedFor)"
+              sourceBranch = "$(Build.SourceBranch)"
+              sourceVersion = "$(Build.SourceVersion)"
+              buildReason = "$(Build.Reason)"
+              buildDefinitionName = "$(Build.DefinitionName)"
+              shards = 4
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          try {
+            Invoke-RestMethod -Uri "$(webhookUrl)" -Method Post -Headers $headers -Body $body
+            Write-Host "✅ Successfully sent final results to TMS"
+          } catch {
+            Write-Warning "❌ Failed to send final results: $($_.Exception.Message)"
+            Write-Host "Response: $($_.Exception.Response)"
+          }
+
+    - task: PowerShell@2
+      displayName: 'Set Build Result'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          $status = "$(overallStatus)"
+          if ($status -eq "failed") {
+            Write-Host "##vso[task.logissue type=error]Test execution failed with $(aggregatedFailed) failed tests"
+            Write-Host "##vso[task.complete result=Failed]"
+          } elseif ($status -eq "error") {
+            Write-Host "##vso[task.logissue type=error]Test execution encountered errors"
+            Write-Host "##vso[task.complete result=Failed]"
+          } else {
+            Write-Host "##vso[task.complete result=Succeeded]All tests passed successfully"
+          }

@@ -4,7 +4,8 @@
       "Bash(\"taskkill\" \"/PID\" \"18304\" \"/F\")",
       "Bash(powershell Stop-Process:*)",
       "Bash(npm start)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

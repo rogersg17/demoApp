@@ -1,0 +1,223 @@
+version: '3.8'
+
+services:
+  # Main TMS test runner service
+  tms-test-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-test-runner
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - SHARD_INDEX=${SHARD_INDEX:-1}
+      - TOTAL_SHARDS=${TOTAL_SHARDS:-1}
+      - PARALLEL_WORKERS=${PARALLEL_WORKERS:-4}
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+      - ./tests:/app/tests:ro
+      - ./playwright.config.js:/app/playwright.config.js:ro
+    networks:
+      - tms-network
+    command: ["tms-test-runner.sh"]
+    restart: "no"
+
+  # Parallel test runner services for sharded execution
+  tms-test-runner-shard-1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-test-runner-shard-1
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - SHARD_INDEX=1
+      - TOTAL_SHARDS=4
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+      - ./tests:/app/tests:ro
+      - ./playwright.config.js:/app/playwright.config.js:ro
+    networks:
+      - tms-network
+    profiles:
+      - sharded
+    restart: "no"
+
+  tms-test-runner-shard-2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-test-runner-shard-2
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - SHARD_INDEX=2
+      - TOTAL_SHARDS=4
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+      - ./tests:/app/tests:ro
+      - ./playwright.config.js:/app/playwright.config.js:ro
+    networks:
+      - tms-network
+    profiles:
+      - sharded
+    restart: "no"
+
+  tms-test-runner-shard-3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-test-runner-shard-3
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - SHARD_INDEX=3
+      - TOTAL_SHARDS=4
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+      - ./tests:/app/tests:ro
+      - ./playwright.config.js:/app/playwright.config.js:ro
+    networks:
+      - tms-network
+    profiles:
+      - sharded
+    restart: "no"
+
+  tms-test-runner-shard-4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-test-runner-shard-4
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - SHARD_INDEX=4
+      - TOTAL_SHARDS=4
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+      - ./tests:/app/tests:ro
+      - ./playwright.config.js:/app/playwright.config.js:ro
+    networks:
+      - tms-network
+    profiles:
+      - sharded
+    restart: "no"
+
+  # Result aggregator service
+  tms-result-aggregator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: tms-result-aggregator
+    environment:
+      - NODE_ENV=test
+      - TEST_SUITE=${TEST_SUITE:-all}
+      - TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-staging}
+      - EXECUTION_ID=${EXECUTION_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - TMS_WEBHOOK_TOKEN=${TMS_WEBHOOK_TOKEN}
+      - TOTAL_SHARDS=4
+      - AGGREGATOR_MODE=true
+    volumes:
+      - ./test-results:/app/test-results
+      - ./test-reports:/app/test-reports
+      - ./artifacts:/app/artifacts
+    networks:
+      - tms-network
+    profiles:
+      - sharded
+    depends_on:
+      - tms-test-runner-shard-1
+      - tms-test-runner-shard-2
+      - tms-test-runner-shard-3
+      - tms-test-runner-shard-4
+    command: ["tms-result-aggregator.sh"]
+    restart: "no"
+
+  # Optional: Test environment dependencies
+  selenium-hub:
+    image: selenium/hub:4.15.0
+    container_name: selenium-hub
+    ports:
+      - "4444:4444"
+    environment:
+      - GRID_MAX_SESSION=4
+      - GRID_BROWSER_TIMEOUT=300
+      - GRID_TIMEOUT=300
+    networks:
+      - tms-network
+    profiles:
+      - selenium
+
+  chrome-node:
+    image: selenium/node-chrome:4.15.0
+    container_name: chrome-node
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - NODE_MAX_INSTANCES=2
+      - NODE_MAX_SESSION=2
+    depends_on:
+      - selenium-hub
+    networks:
+      - tms-network
+    profiles:
+      - selenium
+
+  firefox-node:
+    image: selenium/node-firefox:4.15.0
+    container_name: firefox-node
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - NODE_MAX_INSTANCES=2
+      - NODE_MAX_SESSION=2
+    depends_on:
+      - selenium-hub
+    networks:
+      - tms-network
+    profiles:
+      - selenium
+
+networks:
+  tms-network:
+    driver: bridge
+    name: tms-test-network
+
+volumes:
+  test-results:
+    driver: local
+  test-reports:
+    driver: local
+  artifacts:
+    driver: local

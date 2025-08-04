@@ -1,0 +1,576 @@
+variables:
+  NODE_VERSION: "18"
+  PLAYWRIGHT_BROWSERS_PATH: $CI_PROJECT_DIR/playwright-cache
+  
+stages:
+  - notify-start
+  - test
+  - aggregate
+  - notify-complete
+
+# Template job for manual trigger with parameters
+.manual_test_execution:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "api"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+
+# Template job for webhook/API triggers
+.api_test_execution:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+    - if: $CI_PIPELINE_SOURCE == "api"
+
+# Common setup for all test jobs
+.test_setup:
+  image: mcr.microsoft.com/playwright:v1.40.0-focal
+  before_script:
+    - node --version
+    - npm --version
+    - npm ci
+    - npx playwright install --with-deps
+  cache:
+    key: 
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+      - playwright-cache/
+
+notify_test_start:
+  stage: notify-start
+  extends: .manual_test_execution
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      # Set default values if not provided
+      TEST_SUITE=${TEST_SUITE:-"all"}
+      TEST_ENVIRONMENT=${TEST_ENVIRONMENT:-"staging"}
+      EXECUTION_ID=${EXECUTION_ID:-"gitlab-${CI_PIPELINE_ID}"}
+      
+      # Prepare webhook payload
+      START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      
+      PAYLOAD=$(jq -n \
+        --arg executionId "$EXECUTION_ID" \
+        --arg status "running" \
+        --arg provider "gitlab" \
+        --arg runId "$CI_PIPELINE_ID" \
+        --arg runUrl "$CI_PIPELINE_URL" \
+        --arg testSuite "$TEST_SUITE" \
+        --arg environment "$TEST_ENVIRONMENT" \
+        --arg startTime "$START_TIME" \
+        --arg jobName "$CI_JOB_NAME" \
+        --arg pipelineId "$CI_PIPELINE_ID" \
+        --arg projectPath "$CI_PROJECT_PATH" \
+        --arg commitSha "$CI_COMMIT_SHA" \
+        --arg commitRef "$CI_COMMIT_REF_NAME" \
+        --arg triggeredBy "$GITLAB_USER_NAME" \
+        '{
+          executionId: $executionId,
+          status: $status,
+          provider: $provider,
+          runId: $runId,
+          runUrl: $runUrl,
+          testSuite: $testSuite,
+          environment: $environment,
+          startTime: $startTime,
+          metadata: {
+            jobName: $jobName,
+            pipelineId: $pipelineId,
+            projectPath: $projectPath,
+            commitSha: $commitSha,
+            commitRef: $commitRef,
+            triggeredBy: $triggeredBy
+          }
+        }')
+      
+      echo "🚀 Notifying TMS of test start..."
+      echo "Payload: $PAYLOAD"
+      
+      if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+        curl -X POST "$WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" \
+          -d "$PAYLOAD" \
+          --fail-with-body || echo "❌ Failed to notify TMS (continuing anyway)"
+        echo "✅ Successfully notified TMS of test start"
+      else
+        echo "⚠️ WEBHOOK_URL or TMS_WEBHOOK_TOKEN not set, skipping notification"
+      fi
+  variables:
+    # These can be overridden via API triggers or manual runs
+    TEST_SUITE: "all"
+    TEST_ENVIRONMENT: "staging"
+    EXECUTION_ID: ""
+    WEBHOOK_URL: ""
+
+# Parallel test execution jobs
+test_shard_1:
+  stage: test
+  extends: 
+    - .manual_test_execution
+    - .test_setup
+  script:
+    - export TEST_ENV=${TEST_ENVIRONMENT:-"staging"}
+    - export SHARD_INDEX=1
+    - export TOTAL_SHARDS=4
+    - |
+      # Determine test command based on suite
+      case "${TEST_SUITE:-all}" in
+        "smoke")
+          TEST_CMD="npx playwright test --grep @smoke"
+          ;;
+        "regression")
+          TEST_CMD="npx playwright test --grep @regression"
+          ;;
+        "api")
+          TEST_CMD="npx playwright test tests/api/"
+          ;;
+        "ui")
+          TEST_CMD="npx playwright test tests/ui/"
+          ;;
+        *)
+          TEST_CMD="npx playwright test"
+          ;;
+      esac
+      
+      # Add sharding and JSON output
+      TEST_CMD="$TEST_CMD --shard=$SHARD_INDEX/$TOTAL_SHARDS --reporter=json"
+      
+      echo "🧪 Running: $TEST_CMD"
+      
+      # Execute tests and capture results
+      $TEST_CMD > test-results-shard-$SHARD_INDEX.json 2>&1 || TEST_EXIT_CODE=$?
+      
+      echo "📊 Test execution completed with exit code: ${TEST_EXIT_CODE:-0}"
+      
+      # Parse results
+      if [ -f "test-results-shard-$SHARD_INDEX.json" ]; then
+        echo "✅ Test results file created"
+        
+        # Extract metrics using jq
+        TOTAL=$(jq '.stats.total // 0' test-results-shard-$SHARD_INDEX.json)
+        PASSED=$(jq '.stats.passed // 0' test-results-shard-$SHARD_INDEX.json)
+        FAILED=$(jq '.stats.failed // 0' test-results-shard-$SHARD_INDEX.json)
+        SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-$SHARD_INDEX.json)
+        
+        echo "TEST_TOTAL_$SHARD_INDEX=$TOTAL" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=$PASSED" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=$FAILED" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=$SKIPPED" >> shard_results.env
+        
+        echo "📊 Shard $SHARD_INDEX Results: Total=$TOTAL, Passed=$PASSED, Failed=$FAILED, Skipped=$SKIPPED"
+        
+        # Extract failed tests
+        jq -r '.tests[] | select(.status == "failed") | {title: .title, file: .file, error: .error}' test-results-shard-$SHARD_INDEX.json > failed-tests-shard-$SHARD_INDEX.json || echo "[]" > failed-tests-shard-$SHARD_INDEX.json
+        
+        # Send shard results to TMS
+        if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+          SHARD_PAYLOAD=$(jq -n \
+            --arg executionId "${EXECUTION_ID:-gitlab-${CI_PIPELINE_ID}}" \
+            --arg shardId "$SHARD_INDEX" \
+            --arg status "shard-complete" \
+            --arg provider "gitlab" \
+            --arg runId "$CI_PIPELINE_ID" \
+            --argjson total "$TOTAL" \
+            --argjson passed "$PASSED" \
+            --argjson failed "$FAILED" \
+            --argjson skipped "$SKIPPED" \
+            --arg resultsFile "test-results-shard-$SHARD_INDEX.json" \
+            --arg reportUrl "$CI_PIPELINE_URL" \
+            --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            '{
+              executionId: $executionId,
+              shardId: $shardId,
+              status: $status,
+              provider: $provider,
+              runId: $runId,
+              results: {
+                total: $total,
+                passed: $passed,
+                failed: $failed,
+                skipped: $skipped
+              },
+              artifacts: {
+                resultsFile: $resultsFile,
+                reportUrl: $reportUrl
+              },
+              timestamp: $timestamp
+            }')
+          
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" \
+            -d "$SHARD_PAYLOAD" \
+            --fail-with-body || echo "❌ Failed to send shard results (continuing anyway)"
+          
+          echo "✅ Successfully sent shard $SHARD_INDEX results to TMS"
+        fi
+      else
+        echo "❌ Test results file not found"
+        echo "TEST_TOTAL_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=0" >> shard_results.env
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - test-results-shard-*.json
+      - failed-tests-shard-*.json
+      - playwright-report/
+      - test-results/
+      - shard_results.env
+    reports:
+      junit: test-results/junit.xml
+
+test_shard_2:
+  stage: test
+  extends: 
+    - .manual_test_execution
+    - .test_setup
+  script:
+    - export TEST_ENV=${TEST_ENVIRONMENT:-"staging"}
+    - export SHARD_INDEX=2
+    - export TOTAL_SHARDS=4
+    # Same script as shard 1 but with SHARD_INDEX=2
+    - |
+      case "${TEST_SUITE:-all}" in
+        "smoke") TEST_CMD="npx playwright test --grep @smoke" ;;
+        "regression") TEST_CMD="npx playwright test --grep @regression" ;;
+        "api") TEST_CMD="npx playwright test tests/api/" ;;
+        "ui") TEST_CMD="npx playwright test tests/ui/" ;;
+        *) TEST_CMD="npx playwright test" ;;
+      esac
+      TEST_CMD="$TEST_CMD --shard=$SHARD_INDEX/$TOTAL_SHARDS --reporter=json"
+      echo "🧪 Running: $TEST_CMD"
+      $TEST_CMD > test-results-shard-$SHARD_INDEX.json 2>&1 || TEST_EXIT_CODE=$?
+      echo "📊 Test execution completed with exit code: ${TEST_EXIT_CODE:-0}"
+      if [ -f "test-results-shard-$SHARD_INDEX.json" ]; then
+        TOTAL=$(jq '.stats.total // 0' test-results-shard-$SHARD_INDEX.json)
+        PASSED=$(jq '.stats.passed // 0' test-results-shard-$SHARD_INDEX.json)
+        FAILED=$(jq '.stats.failed // 0' test-results-shard-$SHARD_INDEX.json)
+        SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-$SHARD_INDEX.json)
+        echo "TEST_TOTAL_$SHARD_INDEX=$TOTAL" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=$PASSED" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=$FAILED" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=$SKIPPED" >> shard_results.env
+        echo "📊 Shard $SHARD_INDEX Results: Total=$TOTAL, Passed=$PASSED, Failed=$FAILED, Skipped=$SKIPPED"
+        jq -r '.tests[] | select(.status == "failed") | {title: .title, file: .file, error: .error}' test-results-shard-$SHARD_INDEX.json > failed-tests-shard-$SHARD_INDEX.json || echo "[]" > failed-tests-shard-$SHARD_INDEX.json
+        if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+          SHARD_PAYLOAD=$(jq -n --arg executionId "${EXECUTION_ID:-gitlab-${CI_PIPELINE_ID}}" --arg shardId "$SHARD_INDEX" --arg status "shard-complete" --arg provider "gitlab" --arg runId "$CI_PIPELINE_ID" --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson failed "$FAILED" --argjson skipped "$SKIPPED" --arg resultsFile "test-results-shard-$SHARD_INDEX.json" --arg reportUrl "$CI_PIPELINE_URL" --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '{ executionId: $executionId, shardId: $shardId, status: $status, provider: $provider, runId: $runId, results: { total: $total, passed: $passed, failed: $failed, skipped: $skipped }, artifacts: { resultsFile: $resultsFile, reportUrl: $reportUrl }, timestamp: $timestamp }')
+          curl -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" -d "$SHARD_PAYLOAD" --fail-with-body || echo "❌ Failed to send shard results (continuing anyway)"
+          echo "✅ Successfully sent shard $SHARD_INDEX results to TMS"
+        fi
+      else
+        echo "TEST_TOTAL_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=0" >> shard_results.env
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - test-results-shard-*.json
+      - failed-tests-shard-*.json
+      - playwright-report/
+      - test-results/
+      - shard_results.env
+
+test_shard_3:
+  stage: test
+  extends: 
+    - .manual_test_execution
+    - .test_setup
+  script:
+    - export TEST_ENV=${TEST_ENVIRONMENT:-"staging"}
+    - export SHARD_INDEX=3
+    - export TOTAL_SHARDS=4
+    # Same script pattern as other shards
+    - |
+      case "${TEST_SUITE:-all}" in
+        "smoke") TEST_CMD="npx playwright test --grep @smoke" ;;
+        "regression") TEST_CMD="npx playwright test --grep @regression" ;;
+        "api") TEST_CMD="npx playwright test tests/api/" ;;
+        "ui") TEST_CMD="npx playwright test tests/ui/" ;;
+        *) TEST_CMD="npx playwright test" ;;
+      esac
+      TEST_CMD="$TEST_CMD --shard=$SHARD_INDEX/$TOTAL_SHARDS --reporter=json"
+      echo "🧪 Running: $TEST_CMD"
+      $TEST_CMD > test-results-shard-$SHARD_INDEX.json 2>&1 || TEST_EXIT_CODE=$?
+      if [ -f "test-results-shard-$SHARD_INDEX.json" ]; then
+        TOTAL=$(jq '.stats.total // 0' test-results-shard-$SHARD_INDEX.json)
+        PASSED=$(jq '.stats.passed // 0' test-results-shard-$SHARD_INDEX.json)
+        FAILED=$(jq '.stats.failed // 0' test-results-shard-$SHARD_INDEX.json)
+        SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-$SHARD_INDEX.json)
+        echo "TEST_TOTAL_$SHARD_INDEX=$TOTAL" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=$PASSED" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=$FAILED" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=$SKIPPED" >> shard_results.env
+        jq -r '.tests[] | select(.status == "failed") | {title: .title, file: .file, error: .error}' test-results-shard-$SHARD_INDEX.json > failed-tests-shard-$SHARD_INDEX.json || echo "[]" > failed-tests-shard-$SHARD_INDEX.json
+        if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+          SHARD_PAYLOAD=$(jq -n --arg executionId "${EXECUTION_ID:-gitlab-${CI_PIPELINE_ID}}" --arg shardId "$SHARD_INDEX" --arg status "shard-complete" --arg provider "gitlab" --arg runId "$CI_PIPELINE_ID" --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson failed "$FAILED" --argjson skipped "$SKIPPED" --arg resultsFile "test-results-shard-$SHARD_INDEX.json" --arg reportUrl "$CI_PIPELINE_URL" --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '{ executionId: $executionId, shardId: $shardId, status: $status, provider: $provider, runId: $runId, results: { total: $total, passed: $passed, failed: $failed, skipped: $skipped }, artifacts: { resultsFile: $resultsFile, reportUrl: $reportUrl }, timestamp: $timestamp }')
+          curl -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" -d "$SHARD_PAYLOAD" --fail-with-body || echo "❌ Failed to send shard results"
+        fi
+      else
+        echo "TEST_TOTAL_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=0" >> shard_results.env
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - test-results-shard-*.json
+      - failed-tests-shard-*.json
+      - shard_results.env
+
+test_shard_4:
+  stage: test
+  extends: 
+    - .manual_test_execution
+    - .test_setup
+  script:
+    - export TEST_ENV=${TEST_ENVIRONMENT:-"staging"}
+    - export SHARD_INDEX=4
+    - export TOTAL_SHARDS=4
+    - |
+      case "${TEST_SUITE:-all}" in
+        "smoke") TEST_CMD="npx playwright test --grep @smoke" ;;
+        "regression") TEST_CMD="npx playwright test --grep @regression" ;;
+        "api") TEST_CMD="npx playwright test tests/api/" ;;
+        "ui") TEST_CMD="npx playwright test tests/ui/" ;;
+        *) TEST_CMD="npx playwright test" ;;
+      esac
+      TEST_CMD="$TEST_CMD --shard=$SHARD_INDEX/$TOTAL_SHARDS --reporter=json"
+      echo "🧪 Running: $TEST_CMD"
+      $TEST_CMD > test-results-shard-$SHARD_INDEX.json 2>&1 || TEST_EXIT_CODE=$?
+      if [ -f "test-results-shard-$SHARD_INDEX.json" ]; then
+        TOTAL=$(jq '.stats.total // 0' test-results-shard-$SHARD_INDEX.json)
+        PASSED=$(jq '.stats.passed // 0' test-results-shard-$SHARD_INDEX.json)
+        FAILED=$(jq '.stats.failed // 0' test-results-shard-$SHARD_INDEX.json)
+        SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-$SHARD_INDEX.json)
+        echo "TEST_TOTAL_$SHARD_INDEX=$TOTAL" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=$PASSED" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=$FAILED" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=$SKIPPED" >> shard_results.env
+        jq -r '.tests[] | select(.status == "failed") | {title: .title, file: .file, error: .error}' test-results-shard-$SHARD_INDEX.json > failed-tests-shard-$SHARD_INDEX.json || echo "[]" > failed-tests-shard-$SHARD_INDEX.json
+        if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+          SHARD_PAYLOAD=$(jq -n --arg executionId "${EXECUTION_ID:-gitlab-${CI_PIPELINE_ID}}" --arg shardId "$SHARD_INDEX" --arg status "shard-complete" --arg provider "gitlab" --arg runId "$CI_PIPELINE_ID" --argjson total "$TOTAL" --argjson passed "$PASSED" --argjson failed "$FAILED" --argjson skipped "$SKIPPED" --arg resultsFile "test-results-shard-$SHARD_INDEX.json" --arg reportUrl "$CI_PIPELINE_URL" --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '{ executionId: $executionId, shardId: $shardId, status: $status, provider: $provider, runId: $runId, results: { total: $total, passed: $passed, failed: $failed, skipped: $skipped }, artifacts: { resultsFile: $resultsFile, reportUrl: $reportUrl }, timestamp: $timestamp }')
+          curl -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" -d "$SHARD_PAYLOAD" --fail-with-body || echo "❌ Failed to send shard results"
+        fi
+      else
+        echo "TEST_TOTAL_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_PASSED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_FAILED_$SHARD_INDEX=0" >> shard_results.env
+        echo "TEST_SKIPPED_$SHARD_INDEX=0" >> shard_results.env
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - test-results-shard-*.json
+      - failed-tests-shard-*.json
+      - shard_results.env
+
+aggregate_results:
+  stage: aggregate
+  extends: .manual_test_execution
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      echo "📊 Aggregating test results from all shards..."
+      
+      # Initialize totals
+      TOTAL_TESTS=0
+      TOTAL_PASSED=0
+      TOTAL_FAILED=0
+      TOTAL_SKIPPED=0
+      
+      # Process each shard's environment file
+      for SHARD in 1 2 3 4; do
+        if [ -f "shard_results.env" ]; then
+          source shard_results.env
+          
+          # Get values for this shard
+          SHARD_TOTAL_VAR="TEST_TOTAL_$SHARD"
+          SHARD_PASSED_VAR="TEST_PASSED_$SHARD"
+          SHARD_FAILED_VAR="TEST_FAILED_$SHARD"
+          SHARD_SKIPPED_VAR="TEST_SKIPPED_$SHARD"
+          
+          SHARD_TOTAL=$(eval echo \$$SHARD_TOTAL_VAR)
+          SHARD_PASSED=$(eval echo \$$SHARD_PASSED_VAR)
+          SHARD_FAILED=$(eval echo \$$SHARD_FAILED_VAR)
+          SHARD_SKIPPED=$(eval echo \$$SHARD_SKIPPED_VAR)
+          
+          # Add to totals
+          TOTAL_TESTS=$((TOTAL_TESTS + ${SHARD_TOTAL:-0}))
+          TOTAL_PASSED=$((TOTAL_PASSED + ${SHARD_PASSED:-0}))
+          TOTAL_FAILED=$((TOTAL_FAILED + ${SHARD_FAILED:-0}))
+          TOTAL_SKIPPED=$((TOTAL_SKIPPED + ${SHARD_SKIPPED:-0}))
+          
+          echo "   Shard $SHARD: Total=${SHARD_TOTAL:-0}, Passed=${SHARD_PASSED:-0}, Failed=${SHARD_FAILED:-0}, Skipped=${SHARD_SKIPPED:-0}"
+        else
+          echo "⚠️ No results found for shard $SHARD"
+        fi
+      done
+      
+      # Determine overall status
+      if [ $TOTAL_FAILED -gt 0 ]; then
+        OVERALL_STATUS="failed"
+      elif [ $TOTAL_TESTS -eq 0 ]; then
+        OVERALL_STATUS="error"
+      else
+        OVERALL_STATUS="passed"
+      fi
+      
+      echo "📊 Final Results: Total=$TOTAL_TESTS, Passed=$TOTAL_PASSED, Failed=$TOTAL_FAILED, Skipped=$TOTAL_SKIPPED, Status=$OVERALL_STATUS"
+      
+      # Combine failed tests from all shards
+      echo "[]" > all-failed-tests.json
+      for SHARD in 1 2 3 4; do
+        if [ -f "failed-tests-shard-$SHARD.json" ]; then
+          jq -s 'flatten' all-failed-tests.json failed-tests-shard-$SHARD.json > temp-failed.json
+          mv temp-failed.json all-failed-tests.json
+        fi
+      done
+      
+      # Store final results
+      echo "AGGREGATED_TOTAL=$TOTAL_TESTS" >> final_results.env
+      echo "AGGREGATED_PASSED=$TOTAL_PASSED" >> final_results.env
+      echo "AGGREGATED_FAILED=$TOTAL_FAILED" >> final_results.env
+      echo "AGGREGATED_SKIPPED=$TOTAL_SKIPPED" >> final_results.env
+      echo "OVERALL_STATUS=$OVERALL_STATUS" >> final_results.env
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - all-failed-tests.json
+      - final_results.env
+    reports:
+      junit: test-results/junit.xml
+
+notify_complete:
+  stage: notify-complete
+  extends: .manual_test_execution
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      # Load final results
+      if [ -f "final_results.env" ]; then
+        source final_results.env
+      else
+        echo "⚠️ No final results found, using defaults"
+        AGGREGATED_TOTAL=0
+        AGGREGATED_PASSED=0
+        AGGREGATED_FAILED=0
+        AGGREGATED_SKIPPED=0
+        OVERALL_STATUS="error"
+      fi
+      
+      # Load failed tests
+      FAILED_TESTS="[]"
+      if [ -f "all-failed-tests.json" ]; then
+        FAILED_TESTS=$(cat all-failed-tests.json)
+      fi
+      
+      # Calculate duration
+      END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      
+      # Prepare final webhook payload
+      FINAL_PAYLOAD=$(jq -n \
+        --arg executionId "${EXECUTION_ID:-gitlab-${CI_PIPELINE_ID}}" \
+        --arg status "$OVERALL_STATUS" \
+        --arg provider "gitlab" \
+        --arg runId "$CI_PIPELINE_ID" \
+        --arg runUrl "$CI_PIPELINE_URL" \
+        --arg testSuite "${TEST_SUITE:-all}" \
+        --arg environment "${TEST_ENVIRONMENT:-staging}" \
+        --argjson total "$AGGREGATED_TOTAL" \
+        --argjson passed "$AGGREGATED_PASSED" \
+        --argjson failed "$AGGREGATED_FAILED" \
+        --argjson skipped "$AGGREGATED_SKIPPED" \
+        --argjson failedTests "$FAILED_TESTS" \
+        --arg endTime "$END_TIME" \
+        --arg reportUrl "$CI_PIPELINE_URL" \
+        --arg logsUrl "$CI_PIPELINE_URL" \
+        --arg artifactsUrl "$CI_PIPELINE_URL/-/jobs/artifacts/$CI_COMMIT_REF_NAME/browse" \
+        --arg jobName "$CI_JOB_NAME" \
+        --arg pipelineId "$CI_PIPELINE_ID" \
+        --arg projectPath "$CI_PROJECT_PATH" \
+        --arg commitSha "$CI_COMMIT_SHA" \
+        --arg commitRef "$CI_COMMIT_REF_NAME" \
+        --arg triggeredBy "$GITLAB_USER_NAME" \
+        '{
+          executionId: $executionId,
+          status: $status,
+          provider: $provider,
+          runId: $runId,
+          runUrl: $runUrl,
+          testSuite: $testSuite,
+          environment: $environment,
+          results: {
+            total: $total,
+            passed: $passed,
+            failed: $failed,
+            skipped: $skipped
+          },
+          failedTests: $failedTests,
+          endTime: $endTime,
+          artifacts: {
+            reportUrl: $reportUrl,
+            logsUrl: $logsUrl,
+            artifactsUrl: $artifactsUrl
+          },
+          metadata: {
+            jobName: $jobName,
+            pipelineId: $pipelineId,
+            projectPath: $projectPath,
+            commitSha: $commitSha,
+            commitRef: $commitRef,
+            triggeredBy: $triggeredBy,
+            shards: 4
+          }
+        }')
+      
+      echo "🏁 Sending final results to TMS..."
+      echo "Final Status: $OVERALL_STATUS"
+      echo "Total Tests: $AGGREGATED_TOTAL"
+      echo "Passed: $AGGREGATED_PASSED"
+      echo "Failed: $AGGREGATED_FAILED"
+      echo "Skipped: $AGGREGATED_SKIPPED"
+      
+      if [ -n "$WEBHOOK_URL" ] && [ -n "$TMS_WEBHOOK_TOKEN" ]; then
+        curl -X POST "$WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TMS_WEBHOOK_TOKEN" \
+          -d "$FINAL_PAYLOAD" \
+          --fail-with-body || echo "❌ Failed to send final results"
+        
+        echo "✅ Successfully sent final results to TMS"
+      else
+        echo "⚠️ WEBHOOK_URL or TMS_WEBHOOK_TOKEN not set, skipping final notification"
+      fi
+      
+      # Set pipeline result based on test status
+      if [ "$OVERALL_STATUS" = "failed" ]; then
+        echo "❌ Pipeline failed due to test failures"
+        exit 1
+      elif [ "$OVERALL_STATUS" = "error" ]; then
+        echo "⚠️ Pipeline completed with errors"
+        exit 1
+      else
+        echo "✅ Pipeline completed successfully"
+      fi
+  dependencies:
+    - aggregate_results

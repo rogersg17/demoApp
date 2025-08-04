@@ -1,0 +1,390 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(
+            name: 'TEST_SUITE',
+            choices: ['all', 'smoke', 'regression', 'api', 'ui'],
+            description: 'Test suite to run'
+        )
+        string(
+            name: 'EXECUTION_ID',
+            description: 'TMS Execution ID',
+            defaultValue: ''
+        )
+        string(
+            name: 'WEBHOOK_URL',
+            description: 'TMS Webhook URL',
+            defaultValue: ''
+        )
+        choice(
+            name: 'TEST_ENVIRONMENT',
+            choices: ['staging', 'production', 'dev'],
+            description: 'Test environment'
+        )
+    }
+    
+    environment {
+        NODE_VERSION = '18'
+        TMS_WEBHOOK_TOKEN = credentials('tms-webhook-token')
+        PLAYWRIGHT_BROWSERS_PATH = '/opt/playwright-cache'
+    }
+    
+    stages {
+        stage('Notify Test Start') {
+            steps {
+                script {
+                    def startTime = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                    def payload = [
+                        executionId: params.EXECUTION_ID,
+                        status: 'running',
+                        provider: 'jenkins',
+                        runId: env.BUILD_ID,
+                        runUrl: env.BUILD_URL,
+                        testSuite: params.TEST_SUITE,
+                        environment: params.TEST_ENVIRONMENT,
+                        startTime: startTime,
+                        metadata: [
+                            jobName: env.JOB_NAME,
+                            buildNumber: env.BUILD_NUMBER,
+                            buildUser: env.BUILD_USER ?: 'system',
+                            nodeName: env.NODE_NAME,
+                            workspace: env.WORKSPACE
+                        ]
+                    ]
+                    
+                    try {
+                        def response = httpRequest(
+                            httpMode: 'POST',
+                            url: params.WEBHOOK_URL,
+                            contentType: 'APPLICATION_JSON',
+                            customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                            requestBody: groovy.json.JsonOutput.toJson(payload)
+                        )
+                        echo "✅ Successfully notified TMS of test start"
+                    } catch (Exception e) {
+                        echo "❌ Failed to notify TMS: ${e.getMessage()}"
+                        // Don't fail the build if webhook fails
+                    }
+                }
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                script {
+                    // Install Node.js using NodeJS plugin or system package
+                    if (isUnix()) {
+                        sh '''
+                            # Check if Node.js is installed
+                            if ! command -v node &> /dev/null; then
+                                echo "❌ Node.js not found. Please install Node.js ${NODE_VERSION}"
+                                exit 1
+                            fi
+                            
+                            # Check Node version
+                            NODE_CURRENT=$(node --version | sed 's/v//')
+                            echo "📦 Node.js version: $NODE_CURRENT"
+                            
+                            # Install dependencies
+                            npm ci
+                            
+                            # Install Playwright browsers
+                            npx playwright install --with-deps
+                        '''
+                    } else {
+                        bat '''
+                            @echo off
+                            where node >nul 2>nul
+                            if %errorlevel% neq 0 (
+                                echo ❌ Node.js not found. Please install Node.js %NODE_VERSION%
+                                exit /b 1
+                            )
+                            
+                            for /f "tokens=*" %%i in ('node --version') do set NODE_CURRENT=%%i
+                            echo 📦 Node.js version: %NODE_CURRENT%
+                            
+                            npm ci
+                            npx playwright install --with-deps
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Execute Tests') {
+            parallel {
+                stage('Test Shard 1') {
+                    steps {
+                        runTestShard(1, 4)
+                    }
+                }
+                stage('Test Shard 2') {
+                    steps {
+                        runTestShard(2, 4)
+                    }
+                }
+                stage('Test Shard 3') {
+                    steps {
+                        runTestShard(3, 4)
+                    }
+                }
+                stage('Test Shard 4') {
+                    steps {
+                        runTestShard(4, 4)
+                    }
+                }
+            }
+        }
+        
+        stage('Aggregate Results') {
+            steps {
+                script {
+                    def totalTests = 0
+                    def totalPassed = 0
+                    def totalFailed = 0
+                    def totalSkipped = 0
+                    def allFailedTests = []
+                    
+                    // Process results from each shard
+                    for (int i = 1; i <= 4; i++) {
+                        def resultsFile = "test-results-shard-${i}.json"
+                        if (fileExists(resultsFile)) {
+                            def results = readJSON file: resultsFile
+                            
+                            def shardTotal = results.stats?.total ?: 0
+                            def shardPassed = results.stats?.passed ?: 0
+                            def shardFailed = results.stats?.failed ?: 0
+                            def shardSkipped = results.stats?.skipped ?: 0
+                            
+                            totalTests += shardTotal
+                            totalPassed += shardPassed
+                            totalFailed += shardFailed
+                            totalSkipped += shardSkipped
+                            
+                            // Collect failed tests
+                            def failedTests = results.tests?.findAll { it.status == 'failed' } ?: []
+                            allFailedTests.addAll(failedTests.collect { test ->
+                                [
+                                    title: test.title,
+                                    file: test.file,
+                                    error: test.error
+                                ]
+                            })
+                            
+                            echo "📊 Shard ${i}: Total=${shardTotal}, Passed=${shardPassed}, Failed=${shardFailed}, Skipped=${shardSkipped}"
+                        } else {
+                            echo "⚠️ Results file not found for shard ${i}"
+                        }
+                    }
+                    
+                    // Determine overall status
+                    def overallStatus = totalFailed > 0 ? 'failed' : (totalTests == 0 ? 'error' : 'passed')
+                    
+                    echo "📊 Final Results: Total=${totalTests}, Passed=${totalPassed}, Failed=${totalFailed}, Skipped=${totalSkipped}, Status=${overallStatus}"
+                    
+                    // Store results for final webhook
+                    env.AGGREGATED_TOTAL = totalTests.toString()
+                    env.AGGREGATED_PASSED = totalPassed.toString()
+                    env.AGGREGATED_FAILED = totalFailed.toString()
+                    env.AGGREGATED_SKIPPED = totalSkipped.toString()
+                    env.OVERALL_STATUS = overallStatus
+                    
+                    // Save failed tests for webhook
+                    writeJSON file: 'all-failed-tests.json', json: allFailedTests
+                }
+            }
+        }
+        
+        stage('Send Final Results') {
+            steps {
+                script {
+                    def endTime = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                    def startTime = currentBuild.startTimeInMillis
+                    def duration = currentBuild.duration ?: (System.currentTimeMillis() - startTime)
+                    
+                    def failedTests = []
+                    if (fileExists('all-failed-tests.json')) {
+                        failedTests = readJSON file: 'all-failed-tests.json'
+                    }
+                    
+                    def payload = [
+                        executionId: params.EXECUTION_ID,
+                        status: env.OVERALL_STATUS,
+                        provider: 'jenkins',
+                        runId: env.BUILD_ID,
+                        runUrl: env.BUILD_URL,
+                        testSuite: params.TEST_SUITE,
+                        environment: params.TEST_ENVIRONMENT,
+                        results: [
+                            total: Integer.parseInt(env.AGGREGATED_TOTAL),
+                            passed: Integer.parseInt(env.AGGREGATED_PASSED),
+                            failed: Integer.parseInt(env.AGGREGATED_FAILED),
+                            skipped: Integer.parseInt(env.AGGREGATED_SKIPPED)
+                        ],
+                        failedTests: failedTests,
+                        duration: "${duration}ms",
+                        endTime: endTime,
+                        artifacts: [
+                            reportUrl: env.BUILD_URL,
+                            logsUrl: "${env.BUILD_URL}console",
+                            artifactsUrl: "${env.BUILD_URL}artifact/"
+                        ],
+                        metadata: [
+                            jobName: env.JOB_NAME,
+                            buildNumber: env.BUILD_NUMBER,
+                            buildUser: env.BUILD_USER ?: 'system',
+                            nodeName: env.NODE_NAME,
+                            workspace: env.WORKSPACE,
+                            shards: 4
+                        ]
+                    ]
+                    
+                    try {
+                        def response = httpRequest(
+                            httpMode: 'POST',
+                            url: params.WEBHOOK_URL,
+                            contentType: 'APPLICATION_JSON',
+                            customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                            requestBody: groovy.json.JsonOutput.toJson(payload)
+                        )
+                        echo "✅ Successfully sent final results to TMS"
+                    } catch (Exception e) {
+                        echo "❌ Failed to send final results: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Archive test results and reports
+            archiveArtifacts artifacts: '**/test-results-shard-*.json, **/failed-tests-shard-*.json, playwright-report/**/*', allowEmptyArchive: true
+            
+            // Publish test results if available
+            script {
+                if (fileExists('**/test-results.xml')) {
+                    publishTestResults testResultsPattern: '**/test-results.xml'
+                }
+            }
+            
+            // Clean up workspace if needed
+            script {
+                if (env.OVERALL_STATUS == 'failed') {
+                    currentBuild.result = 'FAILURE'
+                } else if (env.OVERALL_STATUS == 'error') {
+                    currentBuild.result = 'UNSTABLE'
+                } else {
+                    currentBuild.result = 'SUCCESS'
+                }
+            }
+        }
+        
+        success {
+            echo "🎉 Test execution completed successfully"
+        }
+        
+        failure {
+            echo "❌ Test execution failed"
+        }
+        
+        unstable {
+            echo "⚠️ Test execution completed with issues"
+        }
+    }
+}
+
+def runTestShard(shardIndex, totalShards) {
+    script {
+        def testCommand = getTestCommand(params.TEST_SUITE)
+        testCommand += " --shard=${shardIndex}/${totalShards}"
+        testCommand += " --reporter=json"
+        
+        try {
+            if (isUnix()) {
+                sh """
+                    export TEST_ENV=${params.TEST_ENVIRONMENT}
+                    echo "🧪 Running: ${testCommand}"
+                    ${testCommand} > test-results-shard-${shardIndex}.json 2>&1 || true
+                """
+            } else {
+                bat """
+                    set TEST_ENV=${params.TEST_ENVIRONMENT}
+                    echo 🧪 Running: ${testCommand}
+                    ${testCommand} > test-results-shard-${shardIndex}.json 2>&1 || echo "Tests completed"
+                """
+            }
+            
+            echo "✅ Shard ${shardIndex} execution completed"
+            
+            // Parse and send shard results
+            if (fileExists("test-results-shard-${shardIndex}.json")) {
+                def results = readJSON file: "test-results-shard-${shardIndex}.json"
+                def total = results.stats?.total ?: 0
+                def passed = results.stats?.passed ?: 0
+                def failed = results.stats?.failed ?: 0
+                def skipped = results.stats?.skipped ?: 0
+                
+                echo "📊 Shard ${shardIndex} Results: Total=${total}, Passed=${passed}, Failed=${failed}, Skipped=${skipped}"
+                
+                // Send shard results to TMS
+                def shardPayload = [
+                    executionId: params.EXECUTION_ID,
+                    shardId: shardIndex.toString(),
+                    status: 'shard-complete',
+                    provider: 'jenkins',
+                    runId: env.BUILD_ID,
+                    results: [
+                        total: total,
+                        passed: passed,
+                        failed: failed,
+                        skipped: skipped
+                    ],
+                    artifacts: [
+                        resultsFile: "test-results-shard-${shardIndex}.json",
+                        reportUrl: env.BUILD_URL
+                    ],
+                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                ]
+                
+                try {
+                    httpRequest(
+                        httpMode: 'POST',
+                        url: params.WEBHOOK_URL,
+                        contentType: 'APPLICATION_JSON',
+                        customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                        requestBody: groovy.json.JsonOutput.toJson(shardPayload)
+                    )
+                    echo "✅ Successfully sent shard ${shardIndex} results to TMS"
+                } catch (Exception e) {
+                    echo "❌ Failed to send shard results: ${e.getMessage()}"
+                }
+            } else {
+                echo "⚠️ No results file found for shard ${shardIndex}"
+            }
+        } catch (Exception e) {
+            echo "❌ Error executing shard ${shardIndex}: ${e.getMessage()}"
+            // Create empty results file for aggregation
+            writeJSON file: "test-results-shard-${shardIndex}.json", json: [
+                stats: [total: 0, passed: 0, failed: 0, skipped: 0],
+                tests: []
+            ]
+        }
+    }
+}
+
+def getTestCommand(testSuite) {
+    switch (testSuite) {
+        case 'smoke':
+            return 'npx playwright test --grep @smoke'
+        case 'regression':
+            return 'npx playwright test --grep @regression'
+        case 'api':
+            return 'npx playwright test tests/api/'
+        case 'ui':
+            return 'npx playwright test tests/ui/'
+        default:
+            return 'npx playwright test'
+    }
+}

@@ -1,0 +1,314 @@
+name: Test Execution for TMS
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - smoke
+        - regression
+        - api
+        - ui
+      execution_id:
+        description: 'TMS Execution ID'
+        required: true
+        type: string
+      webhook_url:
+        description: 'TMS Webhook URL'
+        required: true
+        type: string
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+        - dev
+
+  repository_dispatch:
+    types: [run-tests]
+
+env:
+  NODE_VERSION: '18'
+  TMS_WEBHOOK_URL: ${{ github.event.inputs.webhook_url || github.event.client_payload.webhook_url }}
+  TMS_EXECUTION_ID: ${{ github.event.inputs.execution_id || github.event.client_payload.execution_id }}
+  TEST_SUITE: ${{ github.event.inputs.test_suite || github.event.client_payload.test_suite || 'all' }}
+  TEST_ENVIRONMENT: ${{ github.event.inputs.environment || github.event.client_payload.environment || 'staging' }}
+
+jobs:
+  notify-start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify TMS - Test Started
+        run: |
+          curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+            -d '{
+              "executionId": "${{ env.TMS_EXECUTION_ID }}",
+              "status": "running",
+              "provider": "github-actions",
+              "runId": "${{ github.run_id }}",
+              "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "testSuite": "${{ env.TEST_SUITE }}",
+              "environment": "${{ env.TEST_ENVIRONMENT }}",
+              "startTime": "${{ github.event.created_at }}",
+              "metadata": {
+                "actor": "${{ github.actor }}",
+                "ref": "${{ github.ref }}",
+                "sha": "${{ github.sha }}",
+                "workflow": "${{ github.workflow }}"
+              }
+            }'
+
+  test-execution:
+    runs-on: ubuntu-latest
+    needs: notify-start
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run tests
+        id: test-execution
+        run: |
+          case "${{ env.TEST_SUITE }}" in
+            "smoke")
+              TEST_CMD="npx playwright test --grep @smoke"
+              ;;
+            "regression")
+              TEST_CMD="npx playwright test --grep @regression"
+              ;;
+            "api")
+              TEST_CMD="npx playwright test tests/api/"
+              ;;
+            "ui")
+              TEST_CMD="npx playwright test tests/ui/"
+              ;;
+            *)
+              TEST_CMD="npx playwright test"
+              ;;
+          esac
+          
+          # Add sharding for parallel execution
+          TEST_CMD="$TEST_CMD --shard=${{ matrix.shard }}/4"
+          
+          # Set environment
+          export TEST_ENV=${{ env.TEST_ENVIRONMENT }}
+          
+          # Run tests and capture results
+          echo "Running: $TEST_CMD"
+          $TEST_CMD --reporter=json > test-results-shard-${{ matrix.shard }}.json || true
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-shard-${{ matrix.shard }}
+          path: |
+            test-results-shard-${{ matrix.shard }}.json
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+      - name: Parse test results
+        id: parse-results
+        if: always()
+        run: |
+          if [ -f "test-results-shard-${{ matrix.shard }}.json" ]; then
+            # Parse JSON results using jq
+            TOTAL=$(jq '.stats.total // 0' test-results-shard-${{ matrix.shard }}.json)
+            PASSED=$(jq '.stats.passed // 0' test-results-shard-${{ matrix.shard }}.json)
+            FAILED=$(jq '.stats.failed // 0' test-results-shard-${{ matrix.shard }}.json)
+            SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-${{ matrix.shard }}.json)
+            
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+            
+            # Extract failed tests
+            jq -r '.tests[] | select(.status == "failed") | {title: .title, file: .file, error: .error}' test-results-shard-${{ matrix.shard }}.json > failed-tests-shard-${{ matrix.shard }}.json
+          else
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+            echo "skipped=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send shard results to TMS
+        if: always()
+        run: |
+          curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+            -d '{
+              "executionId": "${{ env.TMS_EXECUTION_ID }}",
+              "shardId": "${{ matrix.shard }}",
+              "status": "shard-complete",
+              "provider": "github-actions",
+              "runId": "${{ github.run_id }}",
+              "results": {
+                "total": ${{ steps.parse-results.outputs.total }},
+                "passed": ${{ steps.parse-results.outputs.passed }},
+                "failed": ${{ steps.parse-results.outputs.failed }},
+                "skipped": ${{ steps.parse-results.outputs.skipped }}
+              },
+              "artifacts": {
+                "resultsFile": "test-results-shard-${{ matrix.shard }}.json",
+                "reportUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              },
+              "timestamp": "${{ github.event.created_at }}"
+            }'
+
+  aggregate-results:
+    runs-on: ubuntu-latest
+    needs: test-execution
+    if: always()
+    
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-shard-*
+          merge-multiple: true
+
+      - name: Aggregate test results
+        id: aggregate
+        run: |
+          # Combine all shard results
+          TOTAL=0
+          PASSED=0
+          FAILED=0
+          SKIPPED=0
+          
+          for i in {1..4}; do
+            if [ -f "test-results-shard-$i.json" ]; then
+              SHARD_TOTAL=$(jq '.stats.total // 0' test-results-shard-$i.json)
+              SHARD_PASSED=$(jq '.stats.passed // 0' test-results-shard-$i.json)
+              SHARD_FAILED=$(jq '.stats.failed // 0' test-results-shard-$i.json)
+              SHARD_SKIPPED=$(jq '.stats.skipped // 0' test-results-shard-$i.json)
+              
+              TOTAL=$((TOTAL + SHARD_TOTAL))
+              PASSED=$((PASSED + SHARD_PASSED))
+              FAILED=$((FAILED + SHARD_FAILED))
+              SKIPPED=$((SKIPPED + SHARD_SKIPPED))
+            fi
+          done
+          
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+          
+          # Determine overall status
+          if [ $FAILED -gt 0 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+          elif [ $TOTAL -eq 0 ]; then
+            echo "status=error" >> $GITHUB_OUTPUT
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+          fi
+          
+          # Combine failed tests from all shards
+          cat failed-tests-shard-*.json 2>/dev/null | jq -s 'flatten' > all-failed-tests.json || echo "[]" > all-failed-tests.json
+
+      - name: Send final results to TMS
+        if: always()
+        run: |
+          # Read failed tests
+          FAILED_TESTS=$(cat all-failed-tests.json)
+          
+          curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+            -d "{
+              \"executionId\": \"${{ env.TMS_EXECUTION_ID }}\",
+              \"status\": \"${{ steps.aggregate.outputs.status }}\",
+              \"provider\": \"github-actions\",
+              \"runId\": \"${{ github.run_id }}\",
+              \"runUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+              \"testSuite\": \"${{ env.TEST_SUITE }}\",
+              \"environment\": \"${{ env.TEST_ENVIRONMENT }}\",
+              \"results\": {
+                \"total\": ${{ steps.aggregate.outputs.total }},
+                \"passed\": ${{ steps.aggregate.outputs.passed }},
+                \"failed\": ${{ steps.aggregate.outputs.failed }},
+                \"skipped\": ${{ steps.aggregate.outputs.skipped }}
+              },
+              \"failedTests\": $FAILED_TESTS,
+              \"duration\": \"${{ github.event.created_at }}\",
+              \"endTime\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"artifacts\": {
+                \"reportUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+                \"logsUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              },
+              \"metadata\": {
+                \"actor\": \"${{ github.actor }}\",
+                \"ref\": \"${{ github.ref }}\",
+                \"sha\": \"${{ github.sha }}\",
+                \"workflow\": \"${{ github.workflow }}\",
+                \"shards\": 4
+              }
+            }"
+
+      - name: Comment on PR (if triggered from PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              total: ${{ steps.aggregate.outputs.total }},
+              passed: ${{ steps.aggregate.outputs.passed }},
+              failed: ${{ steps.aggregate.outputs.failed }},
+              skipped: ${{ steps.aggregate.outputs.skipped }}
+            };
+            
+            const status = '${{ steps.aggregate.outputs.status }}';
+            const emoji = status === 'passed' ? '✅' : status === 'failed' ? '❌' : '⚠️';
+            
+            const body = `## ${emoji} Test Results
+            
+            **Test Suite:** ${{ env.TEST_SUITE }}
+            **Environment:** ${{ env.TEST_ENVIRONMENT }}
+            **Status:** ${status.toUpperCase()}
+            
+            | Metric | Count |
+            |--------|-------|
+            | Total | ${results.total} |
+            | Passed | ${results.passed} |
+            | Failed | ${results.failed} |
+            | Skipped | ${results.skipped} |
+            
+            [View detailed results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
