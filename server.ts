@@ -370,9 +370,13 @@ function setupRoutes(): void {
     const authRoutes = require('./routes/auth');
     const testRoutes = require('./routes/tests');
     const gitRoutes = require('./routes/git');
+    const usersRoutes = require('./routes/users');
     
     // Initialize auth routes with database
-    authRoutes.setDatabase(db);
+    authRoutes.setDatabase(db.db);
+    
+    // Initialize users routes with database
+    usersRoutes.setDatabase(db.db);
     
     // Initialize test routes with database
     testRoutes.setDatabase(db);
@@ -420,6 +424,7 @@ function setupRoutes(): void {
     app.use('/api/auth', authRoutes);
     app.use('/api/tests', testRoutes);
     app.use('/api/git', gitRoutes);
+    app.use('/api/users', usersRoutes.router);
     
     // Health check endpoint
     app.get('/api/health', (req: Request, res: Response) => {

@@ -264,6 +264,29 @@ const UserManagementPage: React.FC = () => {
     })
   }
 
+  const handleDeleteUser = async (userId: number, userName: string) => {
+    if (!window.confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        // Reload users list to reflect the deletion
+        await loadUsers()
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to delete user: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      alert('Failed to delete user. Please try again.')
+    }
+  }
+
   const stats = getStats()
 
   if (loading) {
@@ -390,7 +413,12 @@ const UserManagementPage: React.FC = () => {
                   <td>
                     <div className="action-buttons">
                       <button className="btn-edit">Edit</button>
-                      <button className="btn-delete">Delete</button>
+                      <button 
+                        className="btn-delete"
+                        onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
