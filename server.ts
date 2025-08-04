@@ -367,16 +367,18 @@ function setupRoutes(): void {
     }
 
     // Load route modules
-    const authRoutes = require('./routes/auth.ts').default;
+    const authModule = require('./routes/auth.ts');
+    const authRoutes = authModule.default;
     const testRoutes = require('./routes/tests');
     const gitRoutes = require('./routes/git');
-    const usersRoutes = require('./routes/users.ts').default;
+    const usersModule = require('./routes/users.ts');
+    const usersRoutes = usersModule.default;
     
     // Initialize auth routes with database
-    authRoutes.setDatabase(db.db);
+    authModule.setDatabase(db.db);
     
     // Initialize users routes with database
-    usersRoutes.setDatabase(db.db);
+    usersModule.setDatabase(db.db);
     
     // Initialize test routes with database
     testRoutes.setDatabase(db);
@@ -440,7 +442,7 @@ function setupRoutes(): void {
     app.use('/api/auth', authRoutes);
     app.use('/api/tests', testRoutes);
     app.use('/api/git', gitRoutes);
-    app.use('/api/users', usersRoutes.router);
+    app.use('/api/users', usersRoutes);
     
     // Health check endpoint
     app.get('/api/health', (req: Request, res: Response) => {
