@@ -64,7 +64,7 @@ const io: TypedServer = new Server(server, {
   cors: corsOptions
 });
 
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 3000;
 
 // Initialize databases (legacy and new Prisma)
 const db = new Database();
@@ -72,7 +72,7 @@ const db = new Database();
 
 // Server configuration
 const serverConfig: ServerConfig = {
-  port: parseInt(process.env.PORT || '5173'),
+  port: parseInt(process.env.PORT || '3000'),
   sessionSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(','),
   rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 minutes
@@ -323,7 +323,7 @@ if (require.main === module) {
 async function startServer(): Promise<void> {
   try {
     // Initialize databases
-    await db.initialize();
+    // Legacy database initializes itself in constructor
     console.log('✅ Legacy database initialized');
     
     await prismaDb.initialize();
@@ -358,10 +358,27 @@ async function startServer(): Promise<void> {
 
 function setupRoutes(): void {
   try {
+    // Setup API documentation with Swagger
+    try {
+      const { setupSwagger } = require('./lib/swagger');
+      setupSwagger(app);
+    } catch (e) { 
+      console.warn('⚠️ Swagger documentation not available:', e instanceof Error ? e.message : String(e)); 
+    }
+
     // Load route modules
     const authRoutes = require('./routes/auth');
     const testRoutes = require('./routes/tests');
     const gitRoutes = require('./routes/git');
+    
+    // Initialize auth routes with database
+    authRoutes.setDatabase(db);
+    
+    // Initialize test routes with database
+    testRoutes.setDatabase(db);
+    
+    // Initialize git routes with database
+    gitRoutes.setDatabase(db);
     
     // Week 3+ routes
     try {

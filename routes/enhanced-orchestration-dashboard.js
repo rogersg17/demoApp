@@ -1,122 +1,188 @@
+/**
+ * Enhanced Orchestration Dashboard Route
+ * Week 11-12: Database & ORM Evolution - Updated to use Prisma ORM
+ * 
+ * Provides a comprehensive dashboard for monitoring the enhanced orchestration system
+ */
+
 const express = require('express');
 const router = express.Router();
-const Database = require('../database/database');
 
-// Initialize database connection
-const db = new Database();
+// Import the new Prisma-based orchestration service
+const { orchestrationService } = require('../services/enhanced-orchestration-service');
 
 // ==================== MAIN DASHBOARD ROUTES ====================
 
 // Main orchestration dashboard page
 router.get('/', async (req, res) => {
   try {
-    const [queueSummary, runnerSummary, recentExecutions, systemMetrics] = await Promise.all([
-      getQueueSummary(),
-      getRunnerSummary(),
-      getRecentExecutions(20),
-      getSystemMetrics()
+    console.log('🎛️ Loading Enhanced Orchestration Dashboard...');
+    
+    // Use the new Prisma-based orchestration service
+    const [queueStatus, executionHistory, runnerMetrics] = await Promise.all([
+      orchestrationService.getQueueStatus(),
+      orchestrationService.getExecutionHistory({ limit: 20, offset: 0 }),
+      orchestrationService.getRunnerMetrics()
     ]);
 
+    console.log('✅ Dashboard data loaded successfully');
+
     res.render('enhanced-orchestration-dashboard', {
-      title: 'Enhanced Orchestration Dashboard',
-      queueSummary,
-      runnerSummary,
-      recentExecutions,
-      systemMetrics,
-      refreshInterval: 5000 // 5 seconds
+      title: 'Enhanced Orchestration Dashboard - Prisma Edition',
+      queueStatus,
+      executionHistory,
+      runnerMetrics,
+      refreshInterval: 5000, // 5 seconds
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error loading orchestration dashboard:', error);
-    res.status(500).json({ error: 'Failed to load dashboard' });
+    console.error('❌ Error loading orchestration dashboard:', error);
+    res.status(500).json({ 
+      error: 'Failed to load dashboard',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 // ==================== API ENDPOINTS FOR REAL-TIME DATA ====================
 
-// Get current queue status
+// Get current queue status with Prisma
 router.get('/api/queue-status', async (req, res) => {
   try {
-    const queueSummary = await getQueueSummary();
-    const queueDetails = await getQueueDetails();
+    const queueStatus = await orchestrationService.getQueueStatus();
     
     res.json({
-      summary: queueSummary,
-      details: queueDetails
+      success: true,
+      data: queueStatus,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching queue status:', error);
-    res.status(500).json({ error: 'Failed to fetch queue status' });
+    console.error('❌ Error fetching queue status:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch queue status',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Get runner status and health
+// Get runner status and health with Prisma
 router.get('/api/runner-status', async (req, res) => {
   try {
-    const runnerSummary = await getRunnerSummary();
-    const runnerDetails = await getRunnerDetails();
-    const runnerHealth = await getRunnerHealthStatus();
+    const runnerMetrics = await orchestrationService.getRunnerMetrics();
     
     res.json({
-      summary: runnerSummary,
-      details: runnerDetails,
-      health: runnerHealth
+      success: true,
+      data: runnerMetrics,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching runner status:', error);
-    res.status(500).json({ error: 'Failed to fetch runner status' });
+    console.error('❌ Error fetching runner status:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch runner status',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Get active executions
+// Get active executions with Prisma
 router.get('/api/active-executions', async (req, res) => {
   try {
-    const activeExecutions = await getActiveExecutions();
-    const parallelExecutions = await getActiveParallelExecutions();
+    const executionHistory = await orchestrationService.getExecutionHistory({
+      limit: 50,
+      offset: 0,
+      status: 'running'
+    });
     
     res.json({
-      regular: activeExecutions,
-      parallel: parallelExecutions
+      success: true,
+      data: executionHistory.executions,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching active executions:', error);
-    res.status(500).json({ error: 'Failed to fetch active executions' });
+    console.error('❌ Error fetching active executions:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch active executions',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Get execution metrics
+// Get execution metrics with Prisma
 router.get('/api/execution-metrics', async (req, res) => {
   try {
     const hours = parseInt(req.query.hours) || 24;
-    const metrics = await getExecutionMetrics(hours);
+    const executionHistory = await orchestrationService.getExecutionHistory({
+      limit: 100,
+      offset: 0
+    });
     
-    res.json(metrics);
+    res.json({
+      success: true,
+      data: executionHistory,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching execution metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch execution metrics' });
+    console.error('❌ Error fetching execution metrics:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch execution metrics',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Get system performance metrics
+// Get system performance metrics (simplified for Prisma)
 router.get('/api/system-metrics', async (req, res) => {
   try {
-    const systemMetrics = await getSystemMetrics();
+    const queueStatus = await orchestrationService.getQueueStatus();
     
-    res.json(systemMetrics);
+    res.json({
+      success: true,
+      data: {
+        queue: queueStatus.queue,
+        runners: queueStatus.runners,
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+      },
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching system metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch system metrics' });
+    console.error('❌ Error fetching system metrics:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch system metrics',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Get resource utilization
+// Get resource utilization with Prisma
 router.get('/api/resource-utilization', async (req, res) => {
   try {
-    const resourceUtilization = await getResourceUtilization();
+    const runnerMetrics = await orchestrationService.getRunnerMetrics();
     
-    res.json(resourceUtilization);
+    res.json({
+      success: true,
+      data: runnerMetrics,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching resource utilization:', error);
-    res.status(500).json({ error: 'Failed to fetch resource utilization' });
+    console.error('❌ Error fetching resource utilization:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch resource utilization',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

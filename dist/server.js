@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.serverConfig = exports.orchestrationServices = exports.mvpServices = exports.db = exports.io = exports.server = exports.app = void 0;
+exports.serverConfig = exports.orchestrationServices = exports.mvpServices = exports.prismaDb = exports.db = exports.io = exports.server = exports.app = void 0;
 exports.emitTestUpdate = emitTestUpdate;
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
@@ -21,6 +21,8 @@ const crypto_1 = __importDefault(require("crypto"));
 const dotenv_1 = require("dotenv");
 // Import services
 const Database = require('./database/database');
+const prisma_database_1 = require("./database/prisma-database");
+Object.defineProperty(exports, "prismaDb", { enumerable: true, get: function () { return prisma_database_1.prismaDb; } });
 // Configure environment
 (0, dotenv_1.config)();
 // Create Express app and HTTP server
@@ -48,13 +50,14 @@ const io = new socket_io_1.Server(server, {
     cors: corsOptions
 });
 exports.io = io;
-const PORT = process.env.PORT || 5173;
-// Initialize database
+const PORT = process.env.PORT || 3000;
+// Initialize databases (legacy and new Prisma)
 const db = new Database();
 exports.db = db;
+// Prisma database is initialized as singleton
 // Server configuration
 const serverConfig = {
-    port: parseInt(process.env.PORT || '5173'),
+    port: parseInt(process.env.PORT || '3000'),
     sessionSecret: process.env.SESSION_SECRET || crypto_1.default.randomBytes(32).toString('hex'),
     corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(','),
     rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 minutes
@@ -272,9 +275,11 @@ if (require.main === module) {
 }
 async function startServer() {
     try {
-        // Initialize database
-        await db.initialize();
-        console.log('✅ Database initialized');
+        // Initialize databases
+        // Legacy database initializes itself in constructor
+        console.log('✅ Legacy database initialized');
+        await prisma_database_1.prismaDb.initialize();
+        console.log('✅ Prisma database initialized');
         // Initialize services
         if (orchestrationServices.orchestration) {
             await orchestrationServices.orchestration.initialize?.();
@@ -301,10 +306,24 @@ async function startServer() {
 }
 function setupRoutes() {
     try {
+        // Setup API documentation with Swagger
+        try {
+            const { setupSwagger } = require('./lib/swagger');
+            setupSwagger(app);
+        }
+        catch (e) {
+            console.warn('⚠️ Swagger documentation not available:', e instanceof Error ? e.message : String(e));
+        }
         // Load route modules
         const authRoutes = require('./routes/auth');
         const testRoutes = require('./routes/tests');
         const gitRoutes = require('./routes/git');
+        // Initialize auth routes with database
+        authRoutes.setDatabase(db);
+        // Initialize test routes with database
+        testRoutes.setDatabase(db);
+        // Initialize git routes with database
+        gitRoutes.setDatabase(db);
         // Week 3+ routes
         try {
             const mvpAdoConfigRoutes = require('./routes/mvp-ado-config');
@@ -400,11 +419,13 @@ async function gracefulShutdown(signal) {
             await orchestrationServices.parallelExecution.cleanup();
         }
         console.log('✅ Services cleaned up');
-        // Close database connection
+        // Close database connections
         if (db.close) {
             await db.close();
-            console.log('✅ Database connection closed');
+            console.log('✅ Legacy database connection closed');
         }
+        await prisma_database_1.prismaDb.cleanup();
+        console.log('✅ Prisma database connection closed');
         console.log('🎉 Graceful shutdown complete');
         process.exit(0);
     }

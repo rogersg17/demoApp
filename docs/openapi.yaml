@@ -1,0 +1,1064 @@
+openapi: 3.0.0
+info:
+  title: Test Management Platform API
+  description: |
+    Comprehensive API for the Test Management Platform with Observer/Orchestrator architecture.
+    
+    This API provides endpoints for:
+    - Authentication and user management
+    - Test execution orchestration
+    - Git repository management
+    - Webhook integrations for CI/CD systems
+    
+    ## Authentication
+    The API uses session-based authentication. Users must login to receive a session cookie
+    that will be used for subsequent authenticated requests.
+    
+    ## Architecture
+    The platform follows an Observer/Orchestrator pattern where the API coordinates
+    external CI/CD systems rather than executing tests directly.
+  version: 1.0.0
+  contact:
+    name: Test Management Platform
+    url: http://localhost:3000
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://your-domain.com/api
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Test Orchestration
+    description: Test execution orchestration and monitoring
+  - name: Git Repositories
+    description: Git repository management and integration
+  - name: Webhooks
+    description: CI/CD webhook endpoints for external systems
+  - name: Health
+    description: Health check and monitoring endpoints
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and create session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  example: admin123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successful
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Destroy user session
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Logout successful
+
+  /auth/status:
+    get:
+      tags:
+        - Authentication
+      summary: Check authentication status
+      description: Get current user authentication status
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /auth/profile:
+    get:
+      tags:
+        - Authentication
+      summary: Get user profile
+      description: Get current user profile information
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change user password
+      description: Change current user password
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Password changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Test Orchestration Endpoints
+  /tests/executions:
+    get:
+      tags:
+        - Test Orchestration
+      summary: List test executions
+      description: Get paginated list of test executions
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+      responses:
+        '200':
+          description: List of test executions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TestExecution'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /tests/run:
+    post:
+      tags:
+        - Test Orchestration
+      summary: Orchestrate test execution
+      description: Trigger test execution via external CI/CD system
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - repositoryId
+                - branch
+              properties:
+                repositoryId:
+                  type: integer
+                  example: 1
+                branch:
+                  type: string
+                  example: main
+                testSuite:
+                  type: string
+                  example: e2e
+                environment:
+                  type: string
+                  example: staging
+                priority:
+                  type: string
+                  enum: [low, normal, high, urgent]
+                  default: normal
+      responses:
+        '201':
+          description: Test execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  executionId:
+                    type: string
+                    example: exec_123456
+                  message:
+                    type: string
+                    example: Test execution orchestrated successfully
+
+  /tests/results/{executionId}:
+    get:
+      tags:
+        - Test Orchestration
+      summary: Get test execution results
+      description: Get results for a specific test execution
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Test execution results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestExecution'
+
+  /tests/logs/{executionId}:
+    get:
+      tags:
+        - Test Orchestration
+      summary: Get test execution logs
+      description: Get logs for a specific test execution
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Test execution logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        level:
+                          type: string
+                          enum: [debug, info, warn, error]
+                        message:
+                          type: string
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /tests/cancel/{executionId}:
+    post:
+      tags:
+        - Test Orchestration
+      summary: Cancel test execution
+      description: Cancel a running test execution
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Test execution cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Test execution cancelled successfully
+
+  /tests/queue/status:
+    get:
+      tags:
+        - Test Orchestration
+      summary: Get queue status
+      description: Get current test execution queue status
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Queue status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalJobs:
+                    type: integer
+                  pendingJobs:
+                    type: integer
+                  runningJobs:
+                    type: integer
+                  completedJobs:
+                    type: integer
+                  failedJobs:
+                    type: integer
+
+  /tests/health:
+    get:
+      tags:
+        - Health
+      summary: Test service health check
+      description: Check health of test orchestration service
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+
+  # Git Repository Endpoints
+  /git/repositories:
+    get:
+      tags:
+        - Git Repositories
+      summary: List git repositories
+      description: Get paginated list of git repositories
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of git repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repositories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GitRepository'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags:
+        - Git Repositories
+      summary: Create git repository
+      description: Add a new git repository to the system
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - url
+              properties:
+                name:
+                  type: string
+                  example: my-test-repo
+                url:
+                  type: string
+                  format: uri
+                  example: https://github.com/user/repo.git
+                branch:
+                  type: string
+                  default: main
+                  example: main
+                description:
+                  type: string
+                  example: Repository for automated testing
+                provider:
+                  type: string
+                  enum: [github, gitlab, bitbucket, azure]
+                  default: github
+                access_token:
+                  type: string
+                  description: Access token for private repositories
+                webhook_secret:
+                  type: string
+                  description: Secret for webhook validation
+      responses:
+        '201':
+          description: Repository created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Git repository created successfully
+                  repository:
+                    $ref: '#/components/schemas/GitRepository'
+
+  /git/repositories/{id}:
+    get:
+      tags:
+        - Git Repositories
+      summary: Get git repository
+      description: Get details of a specific git repository
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Git repository details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repository:
+                    $ref: '#/components/schemas/GitRepository'
+
+    put:
+      tags:
+        - Git Repositories
+      summary: Update git repository
+      description: Update git repository configuration
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+                branch:
+                  type: string
+                description:
+                  type: string
+                provider:
+                  type: string
+                  enum: [github, gitlab, bitbucket, azure]
+                access_token:
+                  type: string
+                webhook_secret:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, inactive, error]
+      responses:
+        '200':
+          description: Repository updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Git repository updated successfully
+
+    delete:
+      tags:
+        - Git Repositories
+      summary: Delete git repository
+      description: Remove git repository from the system
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Repository deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Git repository deleted successfully
+
+  /git/repositories/{id}/test-connection:
+    post:
+      tags:
+        - Git Repositories
+      summary: Test repository connection
+      description: Test connection to git repository
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  repository:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      url:
+                        type: string
+                      branch:
+                        type: string
+                      status:
+                        type: string
+
+  /git/health:
+    get:
+      tags:
+        - Health
+      summary: Git service health check
+      description: Check health of git service
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+
+  # Webhook Endpoints
+  /webhooks/test-results:
+    post:
+      tags:
+        - Webhooks
+      summary: Generic test results webhook
+      description: Receive test results from external CI/CD systems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - executionId
+                - status
+              properties:
+                executionId:
+                  type: string
+                status:
+                  type: string
+                  enum: [success, failure, error]
+                results:
+                  type: object
+                  properties:
+                    total:
+                      type: integer
+                    passed:
+                      type: integer
+                    failed:
+                      type: integer
+                    skipped:
+                      type: integer
+                duration:
+                  type: number
+                  description: Execution duration in seconds
+                artifacts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      url:
+                        type: string
+                      type:
+                        type: string
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Test results processed successfully
+
+  /webhooks/github-actions:
+    post:
+      tags:
+        - Webhooks
+      summary: GitHub Actions webhook
+      description: Receive webhook from GitHub Actions workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: GitHub Actions webhook payload
+      responses:
+        '200':
+          description: GitHub Actions webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /webhooks/azure-devops:
+    post:
+      tags:
+        - Webhooks
+      summary: Azure DevOps webhook
+      description: Receive webhook from Azure DevOps pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Azure DevOps webhook payload
+      responses:
+        '200':
+          description: Azure DevOps webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /webhooks/jenkins:
+    post:
+      tags:
+        - Webhooks
+      summary: Jenkins webhook
+      description: Receive webhook from Jenkins pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Jenkins webhook payload
+      responses:
+        '200':
+          description: Jenkins webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /webhooks/health:
+    get:
+      tags:
+        - Health
+      summary: Webhook service health check
+      description: Check health of webhook service
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+      description: Session-based authentication using HTTP cookies
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+        role:
+          type: string
+          example: admin
+        created_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+
+    TestExecution:
+      type: object
+      properties:
+        id:
+          type: string
+          example: exec_123456
+        repositoryId:
+          type: integer
+          example: 1
+        branch:
+          type: string
+          example: main
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        testSuite:
+          type: string
+          example: e2e
+        environment:
+          type: string
+          example: staging
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        duration:
+          type: number
+          description: Duration in seconds
+        results:
+          type: object
+          properties:
+            total:
+              type: integer
+            passed:
+              type: integer
+            failed:
+              type: integer
+            skipped:
+              type: integer
+        artifacts:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              url:
+                type: string
+              type:
+                type: string
+
+    GitRepository:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: my-test-repo
+        url:
+          type: string
+          format: uri
+          example: https://github.com/user/repo.git
+        branch:
+          type: string
+          example: main
+        description:
+          type: string
+        provider:
+          type: string
+          enum: [github, gitlab, bitbucket, azure]
+        status:
+          type: string
+          enum: [active, inactive, error]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+        created_by_username:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        totalPages:
+          type: integer
+          example: 5
+
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        service:
+          type: string
+          example: test-api
+        timestamp:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid credentials
+        code:
+          type: string
+          example: AUTH_FAILED
+        details:
+          type: object
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Authentication required
+              code:
+                type: string
+                example: AUTH_REQUIRED
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Resource not found
+              code:
+                type: string
+                example: NOT_FOUND
+
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Invalid request data
+              code:
+                type: string
+                example: INVALID_REQUEST
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Internal server error
+              code:
+                type: string
+                example: SERVER_ERROR

@@ -43,7 +43,7 @@ const io = new Server(server, {
   cors: corsOptions
 });
 
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 3000;
 
 // Initialize database
 const db = new Database();

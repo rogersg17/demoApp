@@ -36,7 +36,7 @@ socket.on('connect_error', (error) => {
   console.error('❌ Connection Failed:', error.message)
   console.log('')
   console.log('🔧 Troubleshooting steps:')
-  console.log('   • Ensure server is running on port 5173')
+  console.log('   • Ensure server is running on port 3000')
   console.log('   • Check that Socket.IO is properly installed')
   console.log('   • Verify WebSocket support is enabled')
   process.exit(1)

@@ -81,7 +81,7 @@ export class PrismaDatabase {
   }
 
   // Transaction wrapper
-  public async transaction<T>(fn: (prisma: PrismaClient) => Promise<T>): Promise<T> {
+  public async transaction<T>(fn: (prisma: any) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(fn);
   }
 
