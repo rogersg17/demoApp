@@ -1,0 +1,63 @@
+# Node.js Test Runner Container for TMS
+# Lightweight container for unit tests, API tests, and Jest-based testing
+
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    jq \
+    git \
+    openssh-client \
+    ca-certificates \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ttf-freefont
+
+# Create non-root user
+RUN addgroup -g 1001 -S tmsuser && \
+    adduser -S tmsuser -u 1001 -G tmsuser
+
+# Set environment variables
+ENV NODE_ENV=test
+ENV CI=true
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV CHROME_BIN=/usr/bin/chromium-browser
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Change ownership to non-root user
+RUN chown -R tmsuser:tmsuser /app
+
+# Switch to non-root user
+USER tmsuser
+
+# Create directories for test results
+RUN mkdir -p /app/test-results /app/coverage /app/logs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node --version || exit 1
+
+# Default command
+CMD ["npm", "test"]
+
+# Labels
+LABEL maintainer="TMS Team"
+LABEL description="Node.js test runner container for TMS unit and API testing"
+LABEL version="1.0.0"

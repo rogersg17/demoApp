@@ -6,7 +6,11 @@
       "Bash(npm start)",
       "Bash(npm run build:*)",
       "Bash(mkdir:*)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(npm run test:unit:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm test:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }

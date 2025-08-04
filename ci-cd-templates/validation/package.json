@@ -1,0 +1,28 @@
+{
+  "name": "tms-template-validation",
+  "version": "1.0.0",
+  "description": "Validation tools for TMS CI/CD templates",
+  "main": "validate-templates.js",
+  "scripts": {
+    "validate": "node validate-templates.js",
+    "test": "./test-templates.sh",
+    "test:syntax": "node validate-templates.js",
+    "test:integration": "./test-templates.sh",
+    "install-deps": "npm install js-yaml"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  },
+  "keywords": [
+    "tms",
+    "ci-cd",
+    "templates",
+    "validation",
+    "testing"
+  ],
+  "author": "TMS Team",
+  "license": "MIT"
+}

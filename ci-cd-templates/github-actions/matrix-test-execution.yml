@@ -1,0 +1,387 @@
+name: Matrix Test Execution for TMS
+
+on:
+  workflow_dispatch:
+    inputs:
+      execution_id:
+        description: 'TMS Execution ID'
+        required: true
+        type: string
+      webhook_url:
+        description: 'TMS Webhook URL'
+        required: true
+        type: string
+      test_config:
+        description: 'Test Configuration JSON'
+        required: false
+        default: '{"browsers": ["chromium", "firefox"], "environments": ["staging"], "test_types": ["smoke"]}'
+        type: string
+
+  repository_dispatch:
+    types: [run-matrix-tests]
+
+env:
+  NODE_VERSION: '18'
+  TMS_WEBHOOK_URL: ${{ github.event.inputs.webhook_url || github.event.client_payload.webhook_url }}
+  TMS_EXECUTION_ID: ${{ github.event.inputs.execution_id || github.event.client_payload.execution_id }}
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set up test matrix
+        id: set-matrix
+        run: |
+          # Parse test configuration
+          CONFIG='${{ github.event.inputs.test_config || github.event.client_payload.test_config }}'
+          
+          # Default configuration if not provided
+          if [ -z "$CONFIG" ] || [ "$CONFIG" = "null" ]; then
+            CONFIG='{"browsers": ["chromium", "firefox"], "environments": ["staging"], "test_types": ["smoke"]}'
+          fi
+          
+          echo "Test Configuration: $CONFIG"
+          
+          # Generate matrix combinations
+          python3 << 'EOF'
+          import json
+          import sys
+          
+          config = json.loads('''$CONFIG''')
+          browsers = config.get('browsers', ['chromium'])
+          environments = config.get('environments', ['staging'])
+          test_types = config.get('test_types', ['smoke'])
+          
+          matrix = []
+          for browser in browsers:
+              for env in environments:
+                  for test_type in test_types:
+                      matrix.append({
+                          'browser': browser,
+                          'environment': env,
+                          'test_type': test_type,
+                          'id': f"{browser}-{env}-{test_type}"
+                      })
+          
+          print(json.dumps({'include': matrix}))
+          EOF
+          
+          MATRIX=$(python3 << 'EOF'
+          import json
+          config = json.loads('''$CONFIG''')
+          browsers = config.get('browsers', ['chromium'])
+          environments = config.get('environments', ['staging'])
+          test_types = config.get('test_types', ['smoke'])
+          
+          matrix = []
+          for browser in browsers:
+              for env in environments:
+                  for test_type in test_types:
+                      matrix.append({
+                          'browser': browser,
+                          'environment': env,
+                          'test_type': test_type,
+                          'id': f"{browser}-{env}-{test_type}"
+                      })
+          
+          print(json.dumps({'include': matrix}))
+          EOF
+          )
+          
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $MATRIX"
+
+  notify-start:
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    steps:
+      - name: Notify TMS - Matrix Test Started
+        run: |
+          curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+            -d '{
+              "executionId": "${{ env.TMS_EXECUTION_ID }}",
+              "status": "running",
+              "provider": "github-actions-matrix",
+              "runId": "${{ github.run_id }}",
+              "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "testType": "matrix",
+              "matrix": ${{ needs.prepare-matrix.outputs.matrix }},
+              "startTime": "${{ github.event.created_at }}",
+              "metadata": {
+                "actor": "${{ github.actor }}",
+                "ref": "${{ github.ref }}",
+                "sha": "${{ github.sha }}",
+                "workflow": "${{ github.workflow }}"
+              }
+            }'
+
+  matrix-test-execution:
+    runs-on: ubuntu-latest
+    needs: [prepare-matrix, notify-start]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run matrix tests
+        id: test-execution
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
+          TEST_ENVIRONMENT: ${{ matrix.environment }}
+          TEST_TYPE: ${{ matrix.test_type }}
+        run: |
+          # Set up test command based on test type
+          case "${{ matrix.test_type }}" in
+            "smoke")
+              GREP_PATTERN="@smoke"
+              ;;
+            "regression")
+              GREP_PATTERN="@regression"
+              ;;
+            "api")
+              TEST_DIR="tests/api/"
+              ;;
+            "ui")
+              TEST_DIR="tests/ui/"
+              ;;
+            "integration")
+              GREP_PATTERN="@integration"
+              ;;
+            *)
+              GREP_PATTERN=".*"
+              ;;
+          esac
+          
+          # Build test command
+          if [ -n "$TEST_DIR" ]; then
+            TEST_CMD="npx playwright test $TEST_DIR --project=${{ matrix.browser }}"
+          else
+            TEST_CMD="npx playwright test --grep=\"$GREP_PATTERN\" --project=${{ matrix.browser }}"
+          fi
+          
+          # Set environment variables
+          export TEST_ENV=${{ matrix.environment }}
+          export BROWSER=${{ matrix.browser }}
+          
+          echo "Running: $TEST_CMD"
+          echo "Environment: $TEST_ENVIRONMENT"
+          echo "Browser: $TEST_BROWSER"
+          
+          # Run tests and capture results
+          $TEST_CMD --reporter=json > test-results-${{ matrix.id }}.json || true
+          
+          # Check if tests ran successfully
+          if [ -f "test-results-${{ matrix.id }}.json" ]; then
+            echo "Tests completed for ${{ matrix.id }}"
+          else
+            echo "No test results generated for ${{ matrix.id }}"
+            echo '{"stats": {"total": 0, "passed": 0, "failed": 0, "skipped": 0}, "tests": []}' > test-results-${{ matrix.id }}.json
+          fi
+        continue-on-error: true
+
+      - name: Upload test results and artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.id }}
+          path: |
+            test-results-${{ matrix.id }}.json
+            playwright-report/
+            test-results/
+            screenshots/
+            videos/
+          retention-days: 30
+
+      - name: Parse and send matrix results
+        id: parse-results
+        if: always()
+        run: |
+          if [ -f "test-results-${{ matrix.id }}.json" ]; then
+            TOTAL=$(jq '.stats.total // 0' test-results-${{ matrix.id }}.json)
+            PASSED=$(jq '.stats.passed // 0' test-results-${{ matrix.id }}.json)
+            FAILED=$(jq '.stats.failed // 0' test-results-${{ matrix.id }}.json)
+            SKIPPED=$(jq '.stats.skipped // 0' test-results-${{ matrix.id }}.json)
+            
+            # Determine status
+            if [ $FAILED -gt 0 ]; then
+              STATUS="failed"
+            elif [ $TOTAL -eq 0 ]; then
+              STATUS="no-tests"
+            else
+              STATUS="passed"
+            fi
+            
+            echo "Matrix job ${{ matrix.id }}: $TOTAL total, $PASSED passed, $FAILED failed, $SKIPPED skipped"
+            
+            # Send matrix job results to TMS
+            curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+              -d "{
+                \"executionId\": \"${{ env.TMS_EXECUTION_ID }}\",
+                \"matrixId\": \"${{ matrix.id }}\",
+                \"status\": \"matrix-job-complete\",
+                \"jobStatus\": \"$STATUS\",
+                \"provider\": \"github-actions-matrix\",
+                \"runId\": \"${{ github.run_id }}\",
+                \"matrix\": {
+                  \"browser\": \"${{ matrix.browser }}\",
+                  \"environment\": \"${{ matrix.environment }}\",
+                  \"testType\": \"${{ matrix.test_type }}\"
+                },
+                \"results\": {
+                  \"total\": $TOTAL,
+                  \"passed\": $PASSED,
+                  \"failed\": $FAILED,
+                  \"skipped\": $SKIPPED
+                },
+                \"artifacts\": {
+                  \"resultsFile\": \"test-results-${{ matrix.id }}.json\",
+                  \"reportUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                },
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }"
+          fi
+
+  aggregate-matrix-results:
+    runs-on: ubuntu-latest
+    needs: matrix-test-execution
+    if: always()
+    
+    steps:
+      - name: Download all matrix results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          merge-multiple: true
+
+      - name: Aggregate all matrix results
+        id: aggregate
+        run: |
+          TOTAL=0
+          PASSED=0
+          FAILED=0
+          SKIPPED=0
+          MATRIX_JOBS=0
+          MATRIX_PASSED=0
+          MATRIX_FAILED=0
+          
+          # Process all result files
+          for result_file in test-results-*.json; do
+            if [ -f "$result_file" ]; then
+              echo "Processing $result_file"
+              
+              JOB_TOTAL=$(jq '.stats.total // 0' "$result_file")
+              JOB_PASSED=$(jq '.stats.passed // 0' "$result_file")
+              JOB_FAILED=$(jq '.stats.failed // 0' "$result_file")
+              JOB_SKIPPED=$(jq '.stats.skipped // 0' "$result_file")
+              
+              TOTAL=$((TOTAL + JOB_TOTAL))
+              PASSED=$((PASSED + JOB_PASSED))
+              FAILED=$((FAILED + JOB_FAILED))
+              SKIPPED=$((SKIPPED + JOB_SKIPPED))
+              
+              MATRIX_JOBS=$((MATRIX_JOBS + 1))
+              
+              if [ $JOB_FAILED -gt 0 ]; then
+                MATRIX_FAILED=$((MATRIX_FAILED + 1))
+              elif [ $JOB_TOTAL -gt 0 ]; then
+                MATRIX_PASSED=$((MATRIX_PASSED + 1))
+              fi
+            fi
+          done
+          
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+          echo "matrix_jobs=$MATRIX_JOBS" >> $GITHUB_OUTPUT
+          echo "matrix_passed=$MATRIX_PASSED" >> $GITHUB_OUTPUT
+          echo "matrix_failed=$MATRIX_FAILED" >> $GITHUB_OUTPUT
+          
+          # Overall status
+          if [ $FAILED -gt 0 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+          elif [ $TOTAL -eq 0 ]; then
+            echo "status=no-tests" >> $GITHUB_OUTPUT
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Matrix Summary: $MATRIX_JOBS jobs, $MATRIX_PASSED passed, $MATRIX_FAILED failed"
+          echo "Test Summary: $TOTAL total tests, $PASSED passed, $FAILED failed, $SKIPPED skipped"
+
+      - name: Send final matrix results to TMS
+        if: always()
+        run: |
+          curl -X POST "${{ env.TMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TMS_WEBHOOK_TOKEN }}" \
+            -d "{
+              \"executionId\": \"${{ env.TMS_EXECUTION_ID }}\",
+              \"status\": \"${{ steps.aggregate.outputs.status }}\",
+              \"provider\": \"github-actions-matrix\",
+              \"runId\": \"${{ github.run_id }}\",
+              \"runUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+              \"testType\": \"matrix\",
+              \"results\": {
+                \"total\": ${{ steps.aggregate.outputs.total }},
+                \"passed\": ${{ steps.aggregate.outputs.passed }},
+                \"failed\": ${{ steps.aggregate.outputs.failed }},
+                \"skipped\": ${{ steps.aggregate.outputs.skipped }}
+              },
+              \"matrixResults\": {
+                \"totalJobs\": ${{ steps.aggregate.outputs.matrix_jobs }},
+                \"passedJobs\": ${{ steps.aggregate.outputs.matrix_passed }},
+                \"failedJobs\": ${{ steps.aggregate.outputs.matrix_failed }}
+              },
+              \"endTime\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"artifacts\": {
+                \"reportUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
+                \"logsUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              },
+              \"metadata\": {
+                \"actor\": \"${{ github.actor }}\",
+                \"ref\": \"${{ github.ref }}\",
+                \"sha\": \"${{ github.sha }}\",
+                \"workflow\": \"${{ github.workflow }}\",
+                \"matrixJobs\": ${{ steps.aggregate.outputs.matrix_jobs }}
+              }
+            }"
+
+      - name: Generate matrix summary
+        if: always()
+        run: |
+          echo "# 🧪 Matrix Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status:** ${{ steps.aggregate.outputs.status == 'passed' && '✅ PASSED' || steps.aggregate.outputs.status == 'failed' && '❌ FAILED' || '⚠️ NO TESTS' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Matrix Jobs | ${{ steps.aggregate.outputs.matrix_jobs }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Passed Jobs | ${{ steps.aggregate.outputs.matrix_passed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failed Jobs | ${{ steps.aggregate.outputs.matrix_failed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Tests | ${{ steps.aggregate.outputs.total }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Passed Tests | ${{ steps.aggregate.outputs.passed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failed Tests | ${{ steps.aggregate.outputs.failed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skipped Tests | ${{ steps.aggregate.outputs.skipped }} |" >> $GITHUB_STEP_SUMMARY

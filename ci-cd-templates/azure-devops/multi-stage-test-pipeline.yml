@@ -1,0 +1,535 @@
+trigger: none # Manual trigger only
+
+parameters:
+- name: executionId
+  displayName: 'TMS Execution ID'
+  type: string
+- name: webhookUrl
+  displayName: 'TMS Webhook URL'
+  type: string
+- name: testStrategy
+  displayName: 'Test Strategy'
+  type: string
+  default: 'comprehensive'
+  values:
+  - comprehensive
+  - smoke-only
+  - regression-only
+  - custom
+- name: environments
+  displayName: 'Target Environments'
+  type: object
+  default:
+  - staging
+- name: browsers
+  displayName: 'Target Browsers'
+  type: object
+  default:
+  - chromium
+  - firefox
+- name: customTests
+  displayName: 'Custom Test Configuration (JSON)'
+  type: string
+  default: '{}'
+
+variables:
+  nodeVersion: '18'
+  executionId: ${{ parameters.executionId }}
+  webhookUrl: ${{ parameters.webhookUrl }}
+  testStrategy: ${{ parameters.testStrategy }}
+
+stages:
+# Stage 1: Initialize and Validate
+- stage: Initialize
+  displayName: 'Initialize Test Execution'
+  jobs:
+  - job: ValidateAndNotify
+    displayName: 'Validate Parameters & Notify TMS'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: PowerShell@2
+      displayName: 'Validate Test Configuration'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "🔍 Validating test configuration..."
+          
+          # Validate required parameters
+          if (-not "$(executionId)") {
+            Write-Error "❌ executionId parameter is required"
+            exit 1
+          }
+          
+          if (-not "$(webhookUrl)") {
+            Write-Error "❌ webhookUrl parameter is required"
+            exit 1
+          }
+          
+          # Parse and validate environments and browsers
+          $environments = @(${{ convertToJson(parameters.environments) }})
+          $browsers = @(${{ convertToJson(parameters.browsers) }})
+          
+          Write-Host "✅ Configuration valid:"
+          Write-Host "   Execution ID: $(executionId)"
+          Write-Host "   Test Strategy: $(testStrategy)"
+          Write-Host "   Environments: $($environments -join ', ')"
+          Write-Host "   Browsers: $($browsers -join ', ')"
+          
+          # Set variables for later stages
+          $environmentsJson = $environments | ConvertTo-Json -Compress
+          $browsersJson = $browsers | ConvertTo-Json -Compress
+          
+          Write-Host "##vso[task.setvariable variable=environmentsJson;isOutput=true]$environmentsJson"
+          Write-Host "##vso[task.setvariable variable=browsersJson;isOutput=true]$browsersJson"
+      name: validation
+
+    - task: PowerShell@2
+      displayName: 'Notify TMS - Multi-Stage Test Started'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $headers = @{
+            'Content-Type' = 'application/json'
+            'Authorization' = 'Bearer $(TMS_WEBHOOK_TOKEN)'
+          }
+          
+          $environments = ${{ convertToJson(parameters.environments) }}
+          $browsers = ${{ convertToJson(parameters.browsers) }}
+          
+          $body = @{
+            executionId = "$(executionId)"
+            status = "running"
+            provider = "azure-devops-multistage"
+            runId = "$(Build.BuildId)"
+            runUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+            testStrategy = "$(testStrategy)"
+            testType = "multi-stage"
+            startTime = "$(Build.StartTime)"
+            configuration = @{
+              environments = $environments
+              browsers = $browsers
+              strategy = "$(testStrategy)"
+            }
+            metadata = @{
+              requestedBy = "$(Build.RequestedFor)"
+              sourceBranch = "$(Build.SourceBranch)"
+              sourceVersion = "$(Build.SourceVersion)"
+              buildReason = "$(Build.Reason)"
+              buildDefinitionName = "$(Build.DefinitionName)"
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          try {
+            Invoke-RestMethod -Uri "$(webhookUrl)" -Method Post -Headers $headers -Body $body
+            Write-Host "✅ Successfully notified TMS of multi-stage test start"
+          } catch {
+            Write-Warning "❌ Failed to notify TMS: $($_.Exception.Message)"
+          }
+
+# Stage 2: Unit and API Tests (Fast Feedback)
+- stage: UnitAndAPITests
+  displayName: 'Unit & API Tests'
+  dependsOn: Initialize
+  jobs:
+  - job: UnitTests
+    displayName: 'Run Unit Tests'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+        versionSpec: '$(nodeVersion)'
+    
+    - script: npm ci
+      displayName: 'Install dependencies'
+    
+    - script: npm run test:unit
+      displayName: 'Run unit tests'
+      continueOnError: true
+    
+    - task: PublishTestResults@2
+      displayName: 'Publish Unit Test Results'
+      condition: always()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/unit-test-results.xml'
+        testRunTitle: 'Unit Tests'
+
+  - job: APITests
+    displayName: 'Run API Tests'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+        versionSpec: '$(nodeVersion)'
+    
+    - script: npm ci
+      displayName: 'Install dependencies'
+    
+    - script: npm run test:api
+      displayName: 'Run API tests'
+      continueOnError: true
+    
+    - task: PublishTestResults@2
+      displayName: 'Publish API Test Results'
+      condition: always()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/api-test-results.xml'
+        testRunTitle: 'API Tests'
+
+# Stage 3: Smoke Tests (Quick Validation)
+- stage: SmokeTests
+  displayName: 'Smoke Tests'
+  dependsOn: UnitAndAPITests
+  condition: and(succeeded(), or(eq(variables.testStrategy, 'comprehensive'), eq(variables.testStrategy, 'smoke-only')))
+  jobs:
+  - deployment: SmokeTestExecution
+    displayName: 'Execute Smoke Tests'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'smoke-testing'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: NodeTool@0
+            displayName: 'Setup Node.js'
+            inputs:
+              versionSpec: '$(nodeVersion)'
+          
+          - script: npm ci
+            displayName: 'Install dependencies'
+          
+          - script: npx playwright install --with-deps
+            displayName: 'Install Playwright browsers'
+          
+          - task: PowerShell@2
+            displayName: 'Run Smoke Tests - Multi-Environment'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $environments = ${{ convertToJson(parameters.environments) }}
+                $browsers = ${{ convertToJson(parameters.browsers) }}
+                
+                $totalResults = @{
+                  total = 0
+                  passed = 0
+                  failed = 0
+                  skipped = 0
+                }
+                
+                foreach ($env in $environments) {
+                  foreach ($browser in $browsers) {
+                    Write-Host "🧪 Running smoke tests - Environment: $env, Browser: $browser"
+                    
+                    $env:TEST_ENV = $env
+                    $testCmd = "npx playwright test --grep @smoke --project=$browser --reporter=json"
+                    
+                    try {
+                      $output = Invoke-Expression "$testCmd" 2>&1
+                      $results = $output | ConvertFrom-Json
+                      
+                      $totalResults.total += $results.stats.total
+                      $totalResults.passed += $results.stats.passed
+                      $totalResults.failed += $results.stats.failed
+                      $totalResults.skipped += $results.stats.skipped
+                      
+                      Write-Host "   Results: $($results.stats.passed)/$($results.stats.total) passed"
+                    } catch {
+                      Write-Warning "   ⚠️ Smoke tests failed for $env/$browser"
+                      $totalResults.failed += 1
+                    }
+                  }
+                }
+                
+                # Save results
+                $totalResults | ConvertTo-Json | Out-File "smoke-test-results.json"
+                
+                Write-Host "##vso[task.setvariable variable=smokeTotal]$($totalResults.total)"
+                Write-Host "##vso[task.setvariable variable=smokePassed]$($totalResults.passed)"
+                Write-Host "##vso[task.setvariable variable=smokeFailed]$($totalResults.failed)"
+                Write-Host "##vso[task.setvariable variable=smokeSkipped]$($totalResults.skipped)"
+            continueOnError: true
+
+# Stage 4: Integration Tests (Comprehensive)
+- stage: IntegrationTests
+  displayName: 'Integration Tests'
+  dependsOn: SmokeTests
+  condition: and(in(dependencies.SmokeTests.result, 'Succeeded', 'SucceededWithIssues'), or(eq(variables.testStrategy, 'comprehensive'), eq(variables.testStrategy, 'regression-only')))
+  jobs:
+  - job: IntegrationTestMatrix
+    displayName: 'Integration Test Matrix'
+    strategy:
+      matrix:
+        ${{ each env in parameters.environments }}:
+          ${{ each browser in parameters.browsers }}:
+            ${{ env }}_${{ browser }}:
+              testEnvironment: ${{ env }}
+              testBrowser: ${{ browser }}
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+        versionSpec: '$(nodeVersion)'
+    
+    - script: npm ci
+      displayName: 'Install dependencies'
+    
+    - script: npx playwright install --with-deps $(testBrowser)
+      displayName: 'Install Playwright browser'
+    
+    - task: PowerShell@2
+      displayName: 'Run Integration Tests'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $env:TEST_ENV = "$(testEnvironment)"
+          
+          $testCmd = switch ("$(testStrategy)") {
+            "regression-only" { "npx playwright test --grep @regression --project=$(testBrowser)" }
+            default { "npx playwright test --grep @integration --project=$(testBrowser)" }
+          }
+          
+          $testCmd += " --reporter=json"
+          
+          Write-Host "🧪 Running: $testCmd"
+          Write-Host "   Environment: $(testEnvironment)"
+          Write-Host "   Browser: $(testBrowser)"
+          
+          try {
+            Invoke-Expression "$testCmd > integration-results-$(testEnvironment)-$(testBrowser).json"
+            Write-Host "✅ Integration tests completed"
+          } catch {
+            Write-Warning "⚠️ Integration tests encountered issues"
+          }
+      continueOnError: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Integration Test Results'
+      condition: always()
+      inputs:
+        pathToPublish: '$(Build.SourcesDirectory)'
+        artifactName: 'integration-results-$(testEnvironment)-$(testBrowser)'
+
+# Stage 5: Performance Tests (Optional)
+- stage: PerformanceTests
+  displayName: 'Performance Tests'
+  dependsOn: IntegrationTests
+  condition: and(succeeded(), eq(variables.testStrategy, 'comprehensive'))
+  jobs:
+  - job: PerformanceValidation
+    displayName: 'Performance Validation'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+        versionSpec: '$(nodeVersion)'
+    
+    - script: npm ci
+      displayName: 'Install dependencies'
+    
+    - script: npx playwright install --with-deps chromium
+      displayName: 'Install Playwright browser'
+    
+    - script: |
+        npx playwright test --grep @performance --project=chromium --reporter=json > performance-results.json
+      displayName: 'Run performance tests'
+      continueOnError: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Performance Results'
+      condition: always()
+      inputs:
+        pathToPublish: '$(Build.SourcesDirectory)/performance-results.json'
+        artifactName: 'performance-results'
+
+# Stage 6: Aggregate and Report
+- stage: AggregateResults
+  displayName: 'Aggregate & Report Results'
+  dependsOn: 
+  - UnitAndAPITests
+  - SmokeTests
+  - IntegrationTests
+  - PerformanceTests
+  condition: always()
+  jobs:
+  - job: FinalAggregation
+    displayName: 'Aggregate All Results & Notify TMS'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadBuildArtifacts@1
+      displayName: 'Download All Test Results'
+      inputs:
+        buildType: 'current'
+        downloadType: 'specific'
+        downloadPath: '$(Agent.TempDirectory)'
+
+    - task: PowerShell@2
+      displayName: 'Aggregate Multi-Stage Results'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "📊 Aggregating multi-stage test results..."
+          
+          $aggregatedResults = @{
+            unitTests = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+            apiTests = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+            smokeTests = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+            integrationTests = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+            performanceTests = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+            overall = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+          }
+          
+          # Aggregate smoke test results
+          if ("$(smokeFailed)" -ne "") {
+            $aggregatedResults.smokeTests = @{
+              total = [int]"$(smokeTotal)"
+              passed = [int]"$(smokePassed)"
+              failed = [int]"$(smokeFailed)"
+              skipped = [int]"$(smokeSkipped)"
+            }
+          }
+          
+          # Process integration test results
+          $integrationArtifacts = Get-ChildItem "$(Agent.TempDirectory)" -Filter "integration-results-*" -Directory
+          foreach ($artifact in $integrationArtifacts) {
+            $resultFile = Get-ChildItem $artifact.FullName -Filter "integration-results-*.json" | Select-Object -First 1
+            if ($resultFile -and (Test-Path $resultFile.FullName)) {
+              $results = Get-Content $resultFile.FullName | ConvertFrom-Json
+              $aggregatedResults.integrationTests.total += $results.stats.total
+              $aggregatedResults.integrationTests.passed += $results.stats.passed
+              $aggregatedResults.integrationTests.failed += $results.stats.failed
+              $aggregatedResults.integrationTests.skipped += $results.stats.skipped
+            }
+          }
+          
+          # Calculate overall totals
+          foreach ($testType in $aggregatedResults.Keys) {
+            if ($testType -ne "overall") {
+              $aggregatedResults.overall.total += $aggregatedResults[$testType].total
+              $aggregatedResults.overall.passed += $aggregatedResults[$testType].passed
+              $aggregatedResults.overall.failed += $aggregatedResults[$testType].failed
+              $aggregatedResults.overall.skipped += $aggregatedResults[$testType].skipped
+            }
+          }
+          
+          # Determine overall status
+          $overallStatus = if ($aggregatedResults.overall.failed -gt 0) { "failed" } 
+                          elseif ($aggregatedResults.overall.total -eq 0) { "no-tests" } 
+                          else { "passed" }
+          
+          Write-Host "##vso[task.setvariable variable=finalStatus]$overallStatus"
+          Write-Host "##vso[task.setvariable variable=finalTotal]$($aggregatedResults.overall.total)"
+          Write-Host "##vso[task.setvariable variable=finalPassed]$($aggregatedResults.overall.passed)"
+          Write-Host "##vso[task.setvariable variable=finalFailed]$($aggregatedResults.overall.failed)"
+          Write-Host "##vso[task.setvariable variable=finalSkipped]$($aggregatedResults.overall.skipped)"
+          
+          # Save detailed results for webhook
+          $aggregatedResults | ConvertTo-Json -Depth 10 | Out-File "final-aggregated-results.json"
+          
+          Write-Host "📋 Multi-Stage Test Summary:"
+          Write-Host "   Overall Status: $overallStatus"
+          Write-Host "   Total Tests: $($aggregatedResults.overall.total)"
+          Write-Host "   Passed: $($aggregatedResults.overall.passed)"
+          Write-Host "   Failed: $($aggregatedResults.overall.failed)"
+          Write-Host "   Skipped: $($aggregatedResults.overall.skipped)"
+
+    - task: PowerShell@2
+      displayName: 'Send Final Multi-Stage Results to TMS'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          $headers = @{
+            'Content-Type' = 'application/json'
+            'Authorization' = 'Bearer $(TMS_WEBHOOK_TOKEN)'
+          }
+          
+          # Read detailed results
+          $detailedResults = @{}
+          if (Test-Path "final-aggregated-results.json") {
+            $detailedResults = Get-Content "final-aggregated-results.json" | ConvertFrom-Json
+          }
+          
+          $environments = ${{ convertToJson(parameters.environments) }}
+          $browsers = ${{ convertToJson(parameters.browsers) }}
+          
+          $body = @{
+            executionId = "$(executionId)"
+            status = "$(finalStatus)"
+            provider = "azure-devops-multistage"
+            runId = "$(Build.BuildId)"
+            runUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+            testStrategy = "$(testStrategy)"
+            testType = "multi-stage"
+            configuration = @{
+              environments = $environments
+              browsers = $browsers
+              strategy = "$(testStrategy)"
+            }
+            results = @{
+              total = [int]"$(finalTotal)"
+              passed = [int]"$(finalPassed)"
+              failed = [int]"$(finalFailed)"
+              skipped = [int]"$(finalSkipped)"
+            }
+            detailedResults = $detailedResults
+            endTime = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+            artifacts = @{
+              reportUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+              logsUrl = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=logs"
+            }
+            metadata = @{
+              requestedBy = "$(Build.RequestedFor)"
+              sourceBranch = "$(Build.SourceBranch)"
+              sourceVersion = "$(Build.SourceVersion)"
+              buildReason = "$(Build.Reason)"
+              buildDefinitionName = "$(Build.DefinitionName)"
+              stages = @("UnitAndAPITests", "SmokeTests", "IntegrationTests", "PerformanceTests")
+            }
+          } | ConvertTo-Json -Depth 10
+          
+          try {
+            Invoke-RestMethod -Uri "$(webhookUrl)" -Method Post -Headers $headers -Body $body
+            Write-Host "✅ Successfully sent final multi-stage results to TMS"
+          } catch {
+            Write-Warning "❌ Failed to send final results: $($_.Exception.Message)"
+          }
+
+    - task: PowerShell@2
+      displayName: 'Generate Multi-Stage Summary'
+      condition: always()
+      inputs:
+        targetType: 'inline'
+        script: |
+          $status = "$(finalStatus)"
+          $emoji = if ($status -eq "passed") { "✅" } elseif ($status -eq "failed") { "❌" } else { "⚠️" }
+          
+          Write-Host "##[section]$emoji Multi-Stage Test Execution Complete"
+          Write-Host "##[group]Final Results Summary"
+          Write-Host "Strategy: $(testStrategy)"
+          Write-Host "Status: $status"
+          Write-Host "Total Tests: $(finalTotal)"
+          Write-Host "Passed: $(finalPassed)"
+          Write-Host "Failed: $(finalFailed)"
+          Write-Host "Skipped: $(finalSkipped)"
+          Write-Host "##[endgroup]"
+          
+          if ($status -eq "failed") {
+            Write-Host "##vso[task.logissue type=error]Multi-stage test execution failed"
+            Write-Host "##vso[task.complete result=Failed]"
+          } else {
+            Write-Host "##vso[task.complete result=Succeeded]"
+          }

@@ -1,0 +1,63 @@
+# Playwright Test Runner Container for TMS
+# Optimized for CI/CD pipeline execution with comprehensive browser support
+
+FROM mcr.microsoft.com/playwright:v1.40.0-focal
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for better test reliability
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    git \
+    openssh-client \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 18 LTS (if not already present)
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs
+
+# Create non-root user for security
+RUN groupadd -r tmsuser && useradd -r -g tmsuser -u 1001 tmsuser \
+    && mkdir -p /home/tmsuser \
+    && chown -R tmsuser:tmsuser /home/tmsuser /app
+
+# Set environment variables
+ENV NODE_ENV=test
+ENV CI=true
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies as root, then switch to non-root user
+RUN npm ci --only=production --ignore-scripts \
+    && npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Change ownership to non-root user
+RUN chown -R tmsuser:tmsuser /app
+
+# Switch to non-root user
+USER tmsuser
+
+# Create directories for test results
+RUN mkdir -p /app/test-results /app/playwright-report /app/logs
+
+# Health check to ensure browsers are properly installed
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD npx playwright --version || exit 1
+
+# Default command - can be overridden in CI/CD
+CMD ["npm", "test"]
+
+# Labels for container metadata
+LABEL maintainer="TMS Team"
+LABEL description="Playwright test runner container for TMS CI/CD integration"
+LABEL version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/your-org/tms"

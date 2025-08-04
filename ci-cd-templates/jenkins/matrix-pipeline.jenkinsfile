@@ -1,0 +1,450 @@
+pipeline {
+    agent none
+    
+    parameters {
+        string(
+            name: 'EXECUTION_ID',
+            description: 'TMS Execution ID',
+            defaultValue: ''
+        )
+        string(
+            name: 'WEBHOOK_URL',
+            description: 'TMS Webhook URL',
+            defaultValue: ''
+        )
+        text(
+            name: 'TEST_MATRIX_CONFIG',
+            description: 'Test Matrix Configuration (JSON)',
+            defaultValue: '''
+{
+    "browsers": ["chromium", "firefox"],
+    "environments": ["staging"],
+    "test_types": ["smoke", "regression"]
+}
+            '''
+        )
+    }
+    
+    environment {
+        NODE_VERSION = '18'
+        TMS_WEBHOOK_TOKEN = credentials('tms-webhook-token')
+    }
+    
+    stages {
+        stage('Parse Matrix Configuration') {
+            agent any
+            steps {
+                script {
+                    def config = readJSON text: params.TEST_MATRIX_CONFIG
+                    def browsers = config.browsers ?: ['chromium']
+                    def environments = config.environments ?: ['staging']
+                    def testTypes = config.test_types ?: ['smoke']
+                    
+                    def matrixJobs = []
+                    browsers.each { browser ->
+                        environments.each { environment ->
+                            testTypes.each { testType ->
+                                matrixJobs.add([
+                                    browser: browser,
+                                    environment: environment,
+                                    testType: testType,
+                                    jobId: "${browser}-${environment}-${testType}"
+                                ])
+                            }
+                        }
+                    }
+                    
+                    env.MATRIX_JOBS = groovy.json.JsonOutput.toJson(matrixJobs)
+                    env.TOTAL_MATRIX_JOBS = matrixJobs.size().toString()
+                    
+                    echo "📋 Generated ${matrixJobs.size()} matrix jobs"
+                    matrixJobs.each { job ->
+                        echo "   - ${job.jobId}"
+                    }
+                }
+            }
+        }
+        
+        stage('Notify Matrix Test Start') {
+            agent any
+            steps {
+                script {
+                    def startTime = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                    def matrixJobs = readJSON text: env.MATRIX_JOBS
+                    
+                    def payload = [
+                        executionId: params.EXECUTION_ID,
+                        status: 'running',
+                        provider: 'jenkins-matrix',
+                        runId: env.BUILD_ID,
+                        runUrl: env.BUILD_URL,
+                        testType: 'matrix',
+                        matrix: matrixJobs,
+                        startTime: startTime,
+                        metadata: [
+                            jobName: env.JOB_NAME,
+                            buildNumber: env.BUILD_NUMBER,
+                            buildUser: env.BUILD_USER ?: 'system',
+                            nodeName: env.NODE_NAME,
+                            totalJobs: Integer.parseInt(env.TOTAL_MATRIX_JOBS)
+                        ]
+                    ]
+                    
+                    try {
+                        httpRequest(
+                            httpMode: 'POST',
+                            url: params.WEBHOOK_URL,
+                            contentType: 'APPLICATION_JSON',
+                            customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                            requestBody: groovy.json.JsonOutput.toJson(payload)
+                        )
+                        echo "✅ Successfully notified TMS of matrix test start"
+                    } catch (Exception e) {
+                        echo "❌ Failed to notify TMS: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+        
+        stage('Execute Matrix Tests') {
+            steps {
+                script {
+                    def matrixJobs = readJSON text: env.MATRIX_JOBS
+                    def parallelStages = [:]
+                    
+                    matrixJobs.each { job ->
+                        parallelStages["Matrix-${job.jobId}"] = {
+                            node {
+                                stage("Setup-${job.jobId}") {
+                                    // Checkout code
+                                    checkout scm
+                                    
+                                    // Setup Node.js environment
+                                    if (isUnix()) {
+                                        sh '''
+                                            if ! command -v node &> /dev/null; then
+                                                echo "❌ Node.js not found"
+                                                exit 1
+                                            fi
+                                            npm ci
+                                            npx playwright install --with-deps ''' + job.browser + '''
+                                        '''
+                                    } else {
+                                        bat '''
+                                            where node >nul 2>nul || (echo ❌ Node.js not found & exit /b 1)
+                                            npm ci
+                                            npx playwright install --with-deps ''' + job.browser + '''
+                                        '''
+                                    }
+                                }
+                                
+                                stage("Test-${job.jobId}") {
+                                    script {
+                                        def testCommand = getMatrixTestCommand(job.testType, job.browser)
+                                        def resultsFile = "matrix-results-${job.jobId}.json"
+                                        
+                                        try {
+                                            if (isUnix()) {
+                                                sh """
+                                                    export TEST_ENV=${job.environment}
+                                                    export BROWSER=${job.browser}
+                                                    echo "🧪 Matrix Job: ${job.jobId}"
+                                                    echo "   Command: ${testCommand}"
+                                                    echo "   Environment: ${job.environment}"
+                                                    echo "   Browser: ${job.browser}"
+                                                    
+                                                    ${testCommand} --reporter=json > ${resultsFile} 2>&1 || true
+                                                """
+                                            } else {
+                                                bat """
+                                                    set TEST_ENV=${job.environment}
+                                                    set BROWSER=${job.browser}
+                                                    echo 🧪 Matrix Job: ${job.jobId}
+                                                    echo    Command: ${testCommand}
+                                                    echo    Environment: ${job.environment}
+                                                    echo    Browser: ${job.browser}
+                                                    
+                                                    ${testCommand} --reporter=json > ${resultsFile} 2>&1 || echo "Tests completed"
+                                                """
+                                            }
+                                            
+                                            // Parse and send matrix job results
+                                            if (fileExists(resultsFile)) {
+                                                def results = readJSON file: resultsFile
+                                                def total = results.stats?.total ?: 0
+                                                def passed = results.stats?.passed ?: 0
+                                                def failed = results.stats?.failed ?: 0
+                                                def skipped = results.stats?.skipped ?: 0
+                                                
+                                                def jobStatus = failed > 0 ? 'failed' : (total == 0 ? 'no-tests' : 'passed')
+                                                
+                                                echo "📊 Matrix Job ${job.jobId}: Total=${total}, Passed=${passed}, Failed=${failed}, Skipped=${skipped}, Status=${jobStatus}"
+                                                
+                                                // Send matrix job results to TMS
+                                                def jobPayload = [
+                                                    executionId: params.EXECUTION_ID,
+                                                    matrixId: job.jobId,
+                                                    status: 'matrix-job-complete',
+                                                    jobStatus: jobStatus,
+                                                    provider: 'jenkins-matrix',
+                                                    runId: env.BUILD_ID,
+                                                    matrix: [
+                                                        browser: job.browser,
+                                                        environment: job.environment,
+                                                        testType: job.testType
+                                                    ],
+                                                    results: [
+                                                        total: total,
+                                                        passed: passed,
+                                                        failed: failed,
+                                                        skipped: skipped
+                                                    ],
+                                                    artifacts: [
+                                                        resultsFile: resultsFile,
+                                                        reportUrl: env.BUILD_URL
+                                                    ],
+                                                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                                                ]
+                                                
+                                                try {
+                                                    httpRequest(
+                                                        httpMode: 'POST',
+                                                        url: params.WEBHOOK_URL,
+                                                        contentType: 'APPLICATION_JSON',
+                                                        customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                                                        requestBody: groovy.json.JsonOutput.toJson(jobPayload)
+                                                    )
+                                                    echo "✅ Successfully sent matrix job ${job.jobId} results to TMS"
+                                                } catch (Exception e) {
+                                                    echo "❌ Failed to send matrix job results: ${e.getMessage()}"
+                                                }
+                                                
+                                                // Archive results for aggregation
+                                                archiveArtifacts artifacts: resultsFile, allowEmptyArchive: true
+                                            } else {
+                                                echo "⚠️ No results file found for matrix job ${job.jobId}"
+                                                // Create empty results for aggregation
+                                                writeJSON file: resultsFile, json: [
+                                                    stats: [total: 0, passed: 0, failed: 0, skipped: 0],
+                                                    tests: []
+                                                ]
+                                                archiveArtifacts artifacts: resultsFile, allowEmptyArchive: true
+                                            }
+                                        } catch (Exception e) {
+                                            echo "❌ Error in matrix job ${job.jobId}: ${e.getMessage()}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Execute all matrix jobs in parallel
+                    parallel parallelStages
+                }
+            }
+        }
+        
+        stage('Aggregate Matrix Results') {
+            agent any
+            steps {
+                script {
+                    // Copy artifacts from parallel stages
+                    copyArtifacts(
+                        projectName: env.JOB_NAME,
+                        selector: specific(env.BUILD_NUMBER),
+                        filter: 'matrix-results-*.json',
+                        optional: true
+                    )
+                    
+                    def totalTests = 0
+                    def totalPassed = 0
+                    def totalFailed = 0
+                    def totalSkipped = 0
+                    def matrixJobs = 0
+                    def matrixPassed = 0
+                    def matrixFailed = 0
+                    
+                    def matrixJobList = readJSON text: env.MATRIX_JOBS
+                    
+                    // Process results from each matrix job
+                    matrixJobList.each { job ->
+                        def resultsFile = "matrix-results-${job.jobId}.json"
+                        if (fileExists(resultsFile)) {
+                            def results = readJSON file: resultsFile
+                            
+                            def jobTotal = results.stats?.total ?: 0
+                            def jobPassed = results.stats?.passed ?: 0
+                            def jobFailed = results.stats?.failed ?: 0
+                            def jobSkipped = results.stats?.skipped ?: 0
+                            
+                            totalTests += jobTotal
+                            totalPassed += jobPassed
+                            totalFailed += jobFailed
+                            totalSkipped += jobSkipped
+                            
+                            matrixJobs++
+                            if (jobFailed > 0) {
+                                matrixFailed++
+                            } else if (jobTotal > 0) {
+                                matrixPassed++
+                            }
+                            
+                            echo "📊 Matrix Job ${job.jobId}: Total=${jobTotal}, Passed=${jobPassed}, Failed=${jobFailed}, Skipped=${jobSkipped}"
+                        } else {
+                            echo "⚠️ Results file not found for matrix job ${job.jobId}"
+                        }
+                    }
+                    
+                    // Determine overall status
+                    def overallStatus = totalFailed > 0 ? 'failed' : (totalTests == 0 ? 'no-tests' : 'passed')
+                    
+                    echo "📊 Matrix Summary:"
+                    echo "   Matrix Jobs: ${matrixJobs} total, ${matrixPassed} passed, ${matrixFailed} failed"
+                    echo "   Test Results: ${totalTests} total, ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped"
+                    echo "   Overall Status: ${overallStatus}"
+                    
+                    // Store results for final webhook
+                    env.FINAL_STATUS = overallStatus
+                    env.FINAL_TOTAL = totalTests.toString()
+                    env.FINAL_PASSED = totalPassed.toString()
+                    env.FINAL_FAILED = totalFailed.toString()
+                    env.FINAL_SKIPPED = totalSkipped.toString()
+                    env.MATRIX_TOTAL_JOBS = matrixJobs.toString()
+                    env.MATRIX_PASSED_JOBS = matrixPassed.toString()
+                    env.MATRIX_FAILED_JOBS = matrixFailed.toString()
+                }
+            }
+        }
+        
+        stage('Send Final Matrix Results') {
+            agent any
+            steps {
+                script {
+                    def endTime = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+                    def matrixJobList = readJSON text: env.MATRIX_JOBS
+                    
+                    def payload = [
+                        executionId: params.EXECUTION_ID,
+                        status: env.FINAL_STATUS,
+                        provider: 'jenkins-matrix',
+                        runId: env.BUILD_ID,
+                        runUrl: env.BUILD_URL,
+                        testType: 'matrix',
+                        results: [
+                            total: Integer.parseInt(env.FINAL_TOTAL),
+                            passed: Integer.parseInt(env.FINAL_PASSED),
+                            failed: Integer.parseInt(env.FINAL_FAILED),
+                            skipped: Integer.parseInt(env.FINAL_SKIPPED)
+                        ],
+                        matrixResults: [
+                            totalJobs: Integer.parseInt(env.MATRIX_TOTAL_JOBS),
+                            passedJobs: Integer.parseInt(env.MATRIX_PASSED_JOBS),
+                            failedJobs: Integer.parseInt(env.MATRIX_FAILED_JOBS)
+                        ],
+                        endTime: endTime,
+                        artifacts: [
+                            reportUrl: env.BUILD_URL,
+                            logsUrl: "${env.BUILD_URL}console",
+                            artifactsUrl: "${env.BUILD_URL}artifact/"
+                        ],
+                        metadata: [
+                            jobName: env.JOB_NAME,
+                            buildNumber: env.BUILD_NUMBER,
+                            buildUser: env.BUILD_USER ?: 'system',
+                            nodeName: env.NODE_NAME,
+                            matrixJobs: Integer.parseInt(env.MATRIX_TOTAL_JOBS)
+                        ]
+                    ]
+                    
+                    try {
+                        httpRequest(
+                            httpMode: 'POST',
+                            url: params.WEBHOOK_URL,
+                            contentType: 'APPLICATION_JSON',
+                            customHeaders: [[name: 'Authorization', value: "Bearer ${env.TMS_WEBHOOK_TOKEN}"]],
+                            requestBody: groovy.json.JsonOutput.toJson(payload)
+                        )
+                        echo "✅ Successfully sent final matrix results to TMS"
+                    } catch (Exception e) {
+                        echo "❌ Failed to send final results: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            node {
+                // Archive all matrix results
+                archiveArtifacts artifacts: 'matrix-results-*.json', allowEmptyArchive: true
+                
+                // Set build result based on overall status
+                script {
+                    if (env.FINAL_STATUS == 'failed') {
+                        currentBuild.result = 'FAILURE'
+                        echo "❌ Matrix test execution failed"
+                    } else if (env.FINAL_STATUS == 'no-tests') {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "⚠️ Matrix test execution completed with no tests"
+                    } else {
+                        currentBuild.result = 'SUCCESS'
+                        echo "🎉 Matrix test execution completed successfully"
+                    }
+                }
+                
+                // Generate matrix summary
+                script {
+                    def summary = """
+## 🧪 Matrix Test Results Summary
+
+**Overall Status:** ${env.FINAL_STATUS?.toUpperCase()}
+
+### Matrix Jobs
+| Metric | Count |
+|--------|-------|
+| Total Jobs | ${env.MATRIX_TOTAL_JOBS} |
+| Passed Jobs | ${env.MATRIX_PASSED_JOBS} |
+| Failed Jobs | ${env.MATRIX_FAILED_JOBS} |
+
+### Test Results
+| Metric | Count |
+|--------|-------|
+| Total Tests | ${env.FINAL_TOTAL} |
+| Passed Tests | ${env.FINAL_PASSED} |
+| Failed Tests | ${env.FINAL_FAILED} |
+| Skipped Tests | ${env.FINAL_SKIPPED} |
+
+**Build:** [${env.BUILD_NUMBER}](${env.BUILD_URL})
+**Execution ID:** ${params.EXECUTION_ID}
+                    """
+                    
+                    writeFile file: 'matrix-test-summary.md', text: summary
+                    archiveArtifacts artifacts: 'matrix-test-summary.md', allowEmptyArchive: true
+                    
+                    echo summary
+                }
+            }
+        }
+    }
+}
+
+def getMatrixTestCommand(testType, browser) {
+    def baseCommand = "npx playwright test --project=${browser}"
+    
+    switch (testType) {
+        case 'smoke':
+            return "${baseCommand} --grep @smoke"
+        case 'regression':
+            return "${baseCommand} --grep @regression"
+        case 'api':
+            return "${baseCommand} tests/api/"
+        case 'ui':
+            return "${baseCommand} tests/ui/"
+        case 'integration':
+            return "${baseCommand} --grep @integration"
+        default:
+            return baseCommand
+    }
+}
