@@ -75,7 +75,7 @@ const TestManagementPage: React.FC = () => {
       setError(null)
     } catch (err) {
       console.error('❌ Error loading tests:', err)
-      setError('Failed to load tests. Please refresh the page.')
+      setError('Unable to connect to test API. Displaying sample test data for demonstration purposes.')
       // Load mock data as fallback
       console.log('🔄 Loading mock data as fallback...')
       loadMockTests()
@@ -83,7 +83,7 @@ const TestManagementPage: React.FC = () => {
       setLoading(false)
       console.log('✅ Finished loading tests')
     }
-  }, [])
+  }, [navigate])
 
   const loadMockTests = () => {
     console.log('📝 Loading mock test data...')
