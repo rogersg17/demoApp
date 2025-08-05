@@ -9,7 +9,11 @@ interface FlakyTest {
   confidence: number;
   last_analyzed: string;
   pattern_type?: string;
-  analysis_data?: any;
+  analysis_data?: {
+    failure_patterns?: string[];
+    common_errors?: string[];
+    environmental_factors?: string[];
+  };
 }
 
 interface FlakyTestStatistics {
@@ -46,7 +50,18 @@ const FlakyTestsPage: React.FC = () => {
   const [statistics, setStatistics] = useState<FlakyTestStatistics | null>(null);
   const [analysisRuns, setAnalysisRuns] = useState<AnalysisRun[]>([]);
   const [selectedTest, setSelectedTest] = useState<FlakyTest | null>(null);
-  const [testAnalysis, setTestAnalysis] = useState<any>(null);
+  const [testAnalysis, setTestAnalysis] = useState<{ 
+    patterns: string[]; 
+    recommendations: string[];
+    flakiness?: {
+      analysis?: {
+        passRate: number;
+        consistencyScore: number;
+        recentExecutions: number;
+        totalExecutions: number;
+      };
+    };
+  } | null>(null);
   const [recommendations, setRecommendations] = useState<TestRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzingAll, setAnalyzingAll] = useState(false);
@@ -154,7 +169,7 @@ const FlakyTestsPage: React.FC = () => {
       if (response.ok) {
         await loadDashboardData();
         if (selectedTest?.test_name === testName) {
-          setSelectedTest(prev => prev ? { ...prev, classification: newClassification as any } : null);
+          setSelectedTest(prev => prev ? { ...prev, classification: newClassification as FlakyTest['classification'] } : null);
         }
       }
     } catch (error) {

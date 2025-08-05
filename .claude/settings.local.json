@@ -13,7 +13,15 @@
       "Bash(touch:*)",
       "Bash(curl:*)",
       "Bash(npm run dev:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(find:*)",
+      "Bash(npm outdated)",
+      "Bash(ls:*)",
+      "Bash(npx eslint:*)",
+      "Bash(sed:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm run test:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

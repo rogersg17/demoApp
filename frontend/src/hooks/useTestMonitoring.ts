@@ -8,7 +8,12 @@ export interface TestExecutionState {
     completed: number
     total: number
     percentage: number
-    currentTest?: any
+    currentTest?: {
+      name: string
+      file: string
+      line?: number
+      startTime?: string
+    }
   }
   results?: {
     total: number
@@ -124,7 +129,7 @@ export function useTestMonitoring(testId: string | null, options: UseTestMonitor
             duration: update.duration,
             progress: {
               ...newProgress,
-              currentTest: null
+              currentTest: undefined
             }
           }
 

@@ -141,11 +141,13 @@ const TestExecutionMonitor: React.FC<TestExecutionMonitorProps> = ({
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="font-medium text-blue-900">{state.progress.currentTest.name}</p>
               <p className="text-sm text-blue-700">
-                {state.progress.currentTest.file}:{state.progress.currentTest.line}
+                {state.progress.currentTest.file}{state.progress.currentTest.line ? `:${state.progress.currentTest.line}` : ''}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Started: {new Date(state.progress.currentTest.startTime).toLocaleTimeString()}
-              </p>
+              {state.progress.currentTest.startTime && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Started: {new Date(state.progress.currentTest.startTime).toLocaleTimeString()}
+                </p>
+              )}
             </div>
           </div>
         )}

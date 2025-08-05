@@ -11,13 +11,13 @@ import {
   Refresh, 
   Schedule,
   CheckCircle,
-  Error,
+  Error as ErrorIcon,
   Warning,
   Settings,
   GitHub
 } from '@mui/icons-material';
-// Temporary simple date formatter to avoid TypeScript module resolution issues
-const formatDate = (date: Date, _formatStr?: string): string => {
+// Simple date formatter
+const formatDate = (date: Date): string => {
   const month = date.toLocaleString('default', { month: 'short' });
   const day = date.getDate().toString().padStart(2, '0');
   const hours = date.getHours().toString().padStart(2, '0');
@@ -75,6 +75,21 @@ interface WorkflowStatistics {
   weeklyTrend: number;
 }
 
+interface ApiResponse<T = unknown> {
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+interface WorkflowRunsResponse {
+  runs: WorkflowRun[];
+}
+
+
+interface StatisticsResponse {
+  statistics: WorkflowStatistics;
+}
+
 const GitHubDashboard: React.FC = () => {
   const [config, setConfig] = useState<GitHubConfig>({
     owner: '',
@@ -105,13 +120,13 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/workflows/runs?${queryParams}`);
-      const data = await response.json() as any;
+      const data = await response.json() as ApiResponse<WorkflowRunsResponse>;
 
       if (!response.ok) {
-        throw Error(data?.error || 'Failed to fetch workflow runs');
+        throw new Error(data?.error || 'Failed to fetch workflow runs');
       }
 
-      setRuns(data.data.runs);
+      setRuns(data.data?.runs || []);
     } catch (err: unknown) {
       const errorMessage = (err as Error)?.message || 'Unknown error';
       setError(errorMessage);
@@ -131,13 +146,13 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/workflows/runs/${runId}/jobs?${queryParams}`);
-      const data = await response.json() as any;
+      const data = await response.json() as ApiResponse<WorkflowJob[]>;
 
       if (!response.ok) {
-        throw Error(data?.error || 'Failed to fetch workflow jobs');
+        throw new Error(data?.error || 'Failed to fetch workflow jobs');
       }
 
-      setJobs(data.data);
+      setJobs(data.data || []);
     } catch (err: unknown) {
       console.error('Error fetching jobs:', err);
     }
@@ -155,13 +170,13 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/analytics/statistics?${queryParams}`);
-      const data = await response.json() as any;
+      const data = await response.json() as ApiResponse<StatisticsResponse>;
 
       if (!response.ok) {
-        throw Error(data?.error || 'Failed to fetch statistics');
+        throw new Error(data?.error || 'Failed to fetch statistics');
       }
 
-      setStatistics(data.data.statistics);
+      setStatistics(data.data?.statistics || null);
     } catch (err: unknown) {
       console.error('Error fetching statistics:', err);
     }
@@ -183,10 +198,10 @@ const GitHubDashboard: React.FC = () => {
         })
       });
 
-      const data = await response.json() as any;
+      const data = await response.json() as ApiResponse;
 
       if (!response.ok) {
-        throw Error(data?.error || 'Failed to cancel workflow run');
+        throw new Error(data?.error || 'Failed to cancel workflow run');
       }
 
       // Refresh the runs list
@@ -218,10 +233,10 @@ const GitHubDashboard: React.FC = () => {
         })
       });
 
-      const data = await response.json() as any;
+      const data = await response.json() as ApiResponse;
 
       if (!response.ok) {
-        throw Error(data?.error || 'Failed to trigger workflow');
+        throw new Error(data?.error || 'Failed to trigger workflow');
       }
 
       // Refresh the runs list after a delay
@@ -245,7 +260,7 @@ const GitHubDashboard: React.FC = () => {
     if (status === 'in_progress') return <CircularProgress size={16} />;
     if (status === 'queued') return <Schedule fontSize="small" />;
     if (conclusion === 'success') return <CheckCircle fontSize="small" color="success" />;
-    if (conclusion === 'failure') return <Error fontSize="small" color="error" />;
+    if (conclusion === 'failure') return <ErrorIcon fontSize="small" color="error" />;
     if (conclusion === 'cancelled') return <Warning fontSize="small" />;
     return <Schedule fontSize="small" />;
   };
@@ -463,7 +478,7 @@ const GitHubDashboard: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {formatDate(new Date(run.created_at), 'MMM dd, HH:mm')}
+                            {formatDate(new Date(run.created_at))}
                           </Typography>
                         </TableCell>
                         <TableCell>

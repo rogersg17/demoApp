@@ -132,8 +132,8 @@ const SettingsPage: React.FC = () => {
           setSettings({ ...defaultSettings, ...JSON.parse(localSettings) })
         }
       }
-    } catch (err) {
-      console.error('Error loading settings:', err)
+    } catch (error) {
+      console.error('Error loading settings:', error)
       // Load from localStorage as fallback
       const localSettings = localStorage.getItem('testSettings')
       if (localSettings) {
@@ -222,6 +222,7 @@ const SettingsPage: React.FC = () => {
         setError(`JIRA connection failed: ${result.error}`)
       }
     } catch (err) {
+      console.error('JIRA connection test failed:', err)
       setError('Failed to test JIRA connection')
     } finally {
       setTestingJira(false)
@@ -254,6 +255,7 @@ const SettingsPage: React.FC = () => {
         setError(`Azure DevOps connection failed: ${result.error}`)
       }
     } catch (err) {
+      console.error('Azure DevOps connection test failed:', err)
       setError('Failed to test Azure DevOps connection')
     } finally {
       setTestingAdo(false)

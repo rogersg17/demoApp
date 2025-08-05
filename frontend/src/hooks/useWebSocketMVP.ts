@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface WebSocketMessage {
   type: 'build_completed' | 'test_failure' | 'jira_issue_created' | 'pipeline_status' | 'system_health';
-  data: any;
+  data: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -21,7 +21,12 @@ export interface WebSocketState {
   reconnectAttempts: number;
 }
 
-export const useWebSocketMVP = (config: WebSocketConfig) => {
+export const useWebSocketMVP = (config: WebSocketConfig): WebSocketState & {
+  connect: () => void;
+  disconnect: () => void;
+  sendMessage: (message: Record<string, unknown>) => boolean;
+  subscribe: (messageType: string, handler: (data: Record<string, unknown>) => void) => () => void;
+} => {
   const [state, setState] = useState<WebSocketState>({
     isConnected: false,
     isConnecting: false,
@@ -33,7 +38,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const messageHandlersRef = useRef<Map<string, ((data: any) => void)[]>>(new Map());
+  const messageHandlersRef = useRef<Map<string, ((data: Record<string, unknown>) => void)[]>>(new Map());
 
   const {
     url,
@@ -64,7 +69,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
     
     heartbeatIntervalRef.current = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'ping' }));
+        wsRef.current.send(JSON.stringify({ type: 'ping' } as const));
       }
     }, heartbeatInterval);
   }, [heartbeatInterval]);
@@ -80,7 +85,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = (): void => {
         setState(prev => ({
           ...prev,
           isConnected: true,
@@ -91,7 +96,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
         startHeartbeat();
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (event: MessageEvent): void => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           setState(prev => ({ ...prev, lastMessage: message }));
@@ -110,7 +115,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
         }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = (event: CloseEvent): void => {
         setState(prev => ({ 
           ...prev, 
           isConnected: false, 
@@ -133,7 +138,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (): void => {
         setState(prev => ({ 
           ...prev, 
           error: 'WebSocket connection error',
@@ -141,7 +146,8 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
         }));
       };
 
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to create WebSocket connection:', err)
       setState(prev => ({ 
         ...prev, 
         error: 'Failed to create WebSocket connection',
@@ -161,7 +167,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
     }));
   }, [cleanup]);
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
       return true;
@@ -169,7 +175,7 @@ export const useWebSocketMVP = (config: WebSocketConfig) => {
     return false;
   }, []);
 
-  const subscribe = useCallback((messageType: string, handler: (data: any) => void) => {
+  const subscribe = useCallback((messageType: string, handler: (data: Record<string, unknown>) => void) => {
     const handlers = messageHandlersRef.current.get(messageType) || [];
     handlers.push(handler);
     messageHandlersRef.current.set(messageType, handlers);
