@@ -38,7 +38,7 @@ const Database = require('./database/database');
 import { prismaDb } from './database/prisma-database';
 
 // Configure environment
-config();
+config(); // Force restart after .env creation
 
 // Create Express app and HTTP server
 const app = express();
@@ -367,11 +367,11 @@ function setupRoutes(): void {
     }
 
     // Load route modules
-    const authModule = require('./routes/auth.ts');
+    const authModule = require('./routes/auth');
     const authRoutes = authModule.default;
     const testRoutes = require('./routes/tests');
     const gitRoutes = require('./routes/git');
-    const usersModule = require('./routes/users.ts');
+    const usersModule = require('./routes/users');
     const usersRoutes = usersModule.default;
     
     // Initialize auth routes with database
