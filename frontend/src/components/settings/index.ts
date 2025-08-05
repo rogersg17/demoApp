@@ -1,0 +1,6 @@
+export { default as GeneralTab } from './GeneralTab'
+export { default as AzureDevOpsTab } from './AzureDevOpsTab'
+export { default as PlaywrightTab } from './PlaywrightTab'
+export { default as GitHubTab } from './GitHubTab'
+export { default as JenkinsTab } from './JenkinsTab'
+export { default as SecurityTab } from './SecurityTab'

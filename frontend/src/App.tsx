@@ -7,7 +7,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import TestManagementPage from './pages/TestManagementPage'
 import FlakyTestsPage from './pages/FlakyTestsPage'
-import SettingsPage from './pages/SettingsPage'
+import TabbedSettingsPage from './pages/TabbedSettingsPage'
 import UserManagementPage from './pages/UserManagementPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
@@ -64,7 +64,7 @@ function App() {
         path="/settings"
         element={
           <ProtectedRoute>
-            <SettingsPage />
+            <TabbedSettingsPage />
           </ProtectedRoute>
         }
       />

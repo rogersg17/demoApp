@@ -444,6 +444,12 @@ function setupRoutes(): void {
     app.use('/api/git', gitRoutes);
     app.use('/api/users', usersRoutes);
     
+    // Settings routes
+    try {
+      const settingsRoutes = require('./routes/settings');
+      app.use('/api/settings', settingsRoutes);
+    } catch (e) { console.warn('Settings routes not available'); }
+    
     // Health check endpoint
     app.get('/api/health', (req: Request, res: Response) => {
       res.json({
