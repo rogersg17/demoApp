@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Grid, Typography, Button, Box, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Alert, CircularProgress, LinearProgress } from '@mui/material';
+import { Card, Typography, Button, Box, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Alert, CircularProgress, LinearProgress } from '@mui/material';
 import { 
   PlayArrow, 
   Stop, 
@@ -16,7 +16,14 @@ import {
   Settings,
   GitHub
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+// Temporary simple date formatter to avoid TypeScript module resolution issues
+const formatDate = (date: Date, _formatStr?: string): string => {
+  const month = date.toLocaleString('default', { month: 'short' });
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${month} ${day}, ${hours}:${minutes}`;
+};
 
 interface GitHubConfig {
   owner: string;
@@ -98,15 +105,15 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/workflows/runs?${queryParams}`);
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch workflow runs');
+        throw Error(data?.error || 'Failed to fetch workflow runs');
       }
 
       setRuns(data.data.runs);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = (err as Error)?.message || 'Unknown error';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -124,10 +131,10 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/workflows/runs/${runId}/jobs?${queryParams}`);
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch workflow jobs');
+        throw Error(data?.error || 'Failed to fetch workflow jobs');
       }
 
       setJobs(data.data);
@@ -148,10 +155,10 @@ const GitHubDashboard: React.FC = () => {
       });
 
       const response = await fetch(`/api/github/analytics/statistics?${queryParams}`);
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch statistics');
+        throw Error(data?.error || 'Failed to fetch statistics');
       }
 
       setStatistics(data.data.statistics);
@@ -176,16 +183,16 @@ const GitHubDashboard: React.FC = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel workflow run');
+        throw Error(data?.error || 'Failed to cancel workflow run');
       }
 
       // Refresh the runs list
       fetchWorkflowRuns();
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = (err as Error)?.message || 'Unknown error';
       setError(errorMessage);
     }
   };
@@ -211,16 +218,16 @@ const GitHubDashboard: React.FC = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to trigger workflow');
+        throw Error(data?.error || 'Failed to trigger workflow');
       }
 
       // Refresh the runs list after a delay
       setTimeout(fetchWorkflowRuns, 2000);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = (err as Error)?.message || 'Unknown error';
       setError(errorMessage);
     }
   };
@@ -349,8 +356,8 @@ const GitHubDashboard: React.FC = () => {
 
       {/* Statistics */}
       {statistics && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
+        <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+          <Box sx={{ flex: '1 1 200px', minWidth: 200 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="h4" color="primary">
                 {statistics.totalRuns}
@@ -359,8 +366,8 @@ const GitHubDashboard: React.FC = () => {
                 Total Runs
               </Typography>
             </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          </Box>
+          <Box sx={{ flex: '1 1 200px', minWidth: 200 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="h4" color="success.main">
                 {Math.round(statistics.successRate)}%
@@ -369,8 +376,8 @@ const GitHubDashboard: React.FC = () => {
                 Success Rate
               </Typography>
             </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          </Box>
+          <Box sx={{ flex: '1 1 200px', minWidth: 200 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="h4" color="info.main">
                 {Math.round(statistics.averageDuration)}m
@@ -379,8 +386,8 @@ const GitHubDashboard: React.FC = () => {
                 Avg Duration
               </Typography>
             </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          </Box>
+          <Box sx={{ flex: '1 1 200px', minWidth: 200 }}>
             <Card sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="h4" color="warning.main">
                 {statistics.todaysRuns}
@@ -389,13 +396,13 @@ const GitHubDashboard: React.FC = () => {
                 Today's Runs
               </Typography>
             </Card>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       )}
 
-      <Grid container spacing={3}>
+      <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         {/* Workflow Runs */}
-        <Grid item xs={12} lg={8}>
+        <Box sx={{ flex: '2 1 600px', minWidth: 600 }}>
           <Card>
             <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="h6">Recent Workflow Runs</Typography>
@@ -456,7 +463,7 @@ const GitHubDashboard: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {format(new Date(run.created_at), 'MMM dd, HH:mm')}
+                            {formatDate(new Date(run.created_at), 'MMM dd, HH:mm')}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -480,10 +487,10 @@ const GitHubDashboard: React.FC = () => {
               </TableContainer>
             )}
           </Card>
-        </Grid>
+        </Box>
 
         {/* Job Details */}
-        <Grid item xs={12} lg={4}>
+        <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
           <Card>
             <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="h6">
@@ -500,7 +507,7 @@ const GitHubDashboard: React.FC = () => {
                         {getStatusIcon(job.status, job.conclusion)}
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        {job.started_at && `Started: ${format(new Date(job.started_at), 'HH:mm:ss')}`}
+                        {job.started_at && `Started: ${new Date(job.started_at).toLocaleTimeString()}`}
                       </Typography>
                       {job.status === 'in_progress' && (
                         <LinearProgress sx={{ mt: 1 }} />
@@ -534,8 +541,8 @@ const GitHubDashboard: React.FC = () => {
               </Box>
             )}
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 };
