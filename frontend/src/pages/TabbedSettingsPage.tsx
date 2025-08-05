@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import Layout from '../components/Layout'
 import { updateTestExecutionSetting } from '../store/slices/settingsSlice'
@@ -6,6 +6,17 @@ import type { RootState } from '../store/store'
 import { ValidationProvider } from '../contexts/ValidationContext'
 import SaveSettingsComponent from '../components/settings/SaveSettingsComponent'
 import LoadingOverlay from '../components/LoadingOverlay'
+import ErrorNotification from '../components/ErrorNotification'
+import SuccessNotification from '../components/SuccessNotification'
+import { 
+  SettingsError, 
+  parseApiError, 
+  createSaveSuccessInfo, 
+  createLoadSuccessInfo, 
+  createConnectionSuccessInfo, 
+  createResetSuccessInfo 
+} from '../utils/errorUtils'
+import type { SuccessInfo } from '../utils/errorUtils'
 import '../styles/SaveSettingsComponent.css'
 
 // Import tab components
@@ -228,23 +239,24 @@ const TabbedSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [connectionTesting, setConnectionTesting] = useState<{[key: string]: boolean}>({})
-  const [tabLoading, setTabLoading] = useState<{[key: string]: boolean}>({})
   const [error, setError] = useState<string | null>(null)
+  const [settingsError, setSettingsError] = useState<SettingsError | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('general')
-
-  useEffect(() => {
-    loadSettings()
-  }, [])
 
   // Sync liveLogs setting with Redux store
   useEffect(() => {
     setSettings(prev => ({ ...prev, liveLogs: reduxLiveLogs }))
   }, [reduxLiveLogs])
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true)
+      setSettingsError(null)
+      setError(null)
+      setSuccessInfo(null)
+      
       const response = await fetch('/api/settings', {
         credentials: 'include'
       })
@@ -252,78 +264,78 @@ const TabbedSettingsPage: React.FC = () => {
       if (response.ok) {
         const loadedSettings = await response.json()
         setSettings({ ...defaultSettings, ...loadedSettings })
+        
+        // Show success notification for server load
+        setSuccessInfo(createLoadSuccessInfo('server', {
+          details: 'All settings have been synchronized from the server'
+        }))
       } else {
+        // Create SettingsError from API response
+        const apiError = await parseApiError(response)
+        const settingsError = new SettingsError({
+          type: 'network',
+          message: apiError.errorInfo.message,
+          operation: 'load-settings',
+          code: response.status,
+          details: apiError.errorInfo.message,
+          timestamp: new Date()
+        })
+        setSettingsError(settingsError)
+        
         // Load from localStorage as fallback
         const localSettings = localStorage.getItem('testSettings')
         if (localSettings) {
           setSettings({ ...defaultSettings, ...JSON.parse(localSettings) })
+          // Show success notification for local fallback
+          setSuccessInfo(createLoadSuccessInfo('local', {
+            details: 'Server unavailable, using cached settings'
+          }))
         }
       }
     } catch (err) {
       console.error('Error loading settings:', err)
+      
+      // Create appropriate error based on error type
+      let settingsError: SettingsError
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        settingsError = new SettingsError({
+          type: 'network',
+          message: 'Failed to connect to server',
+          operation: 'load-settings',
+          details: 'Network connection failed',
+          timestamp: new Date()
+        })
+      } else {
+        settingsError = new SettingsError({
+          type: 'unknown',
+          message: err instanceof Error ? err.message : 'Unknown error loading settings',
+          operation: 'load-settings',
+          details: 'Unexpected error occurred',
+          timestamp: new Date()
+        })
+      }
+      
+      setSettingsError(settingsError)
+      
       // Load from localStorage as fallback
       const localSettings = localStorage.getItem('testSettings')
       if (localSettings) {
         setSettings({ ...defaultSettings, ...JSON.parse(localSettings) })
+        // Show success notification for local fallback
+        setSuccessInfo(createLoadSuccessInfo('local', {
+          details: 'Using cached settings due to connection error'
+        }))
       }
-      setError('Failed to load settings from server, using local cache.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const saveSettings = async () => {
-    try {
-      setSaving(true)
-      setError(null)
-      setSuccess(null)
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
 
-      // Validate critical fields before saving
-      const validationErrors = validateCriticalFields();
-      if (validationErrors.length > 0) {
-        setError(`Validation failed: ${validationErrors.join(', ')}`);
-        return;
-      }
-
-      // Save to server
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-        credentials: 'include'
-      })
-
-      if (response.ok) {
-        await response.json(); // Parse response but don't need to store it
-        setSuccess('Settings saved successfully!');
-        
-        // Update Redux store for live logs
-        if (settings.liveLogs !== reduxLiveLogs) {
-          dispatch(updateTestExecutionSetting({ key: 'liveLogs', value: settings.liveLogs }))
-        }
-        
-        // Also save to localStorage as backup
-        localStorage.setItem('testSettings', JSON.stringify(settings))
-        
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save settings to server');
-      }
-    } catch (err) {
-      console.error('Error saving settings:', err)
-      // Save to localStorage even if server fails
-      localStorage.setItem('testSettings', JSON.stringify(settings))
-      setError(`Settings saved locally, but failed to sync with server: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const validateCriticalFields = (): string[] => {
+  const validateCriticalFields = useCallback((): string[] => {
     const errors: string[] = [];
     
     // Validate GitHub settings if enabled
@@ -354,21 +366,114 @@ const TabbedSettingsPage: React.FC = () => {
     }
 
     return errors;
-  }
+  }, [settings])
 
-  const resetToDefaults = () => {
-    if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-      setSettings(defaultSettings)
-      setSuccess('Settings reset to defaults')
+  const saveSettings = useCallback(async () => {
+    try {
+      setSaving(true)
       setError(null)
-      
-      // Clear validation errors
-      setTimeout(() => setSuccess(null), 3000);
-    }
-  }
+      setSettingsError(null)
+      setSuccess(null)
+      setSuccessInfo(null)
 
-  const testConnection = async (service: string) => {
+      // Validate critical fields before saving
+      const validationErrors = validateCriticalFields();
+      if (validationErrors.length > 0) {
+        const validationError = new SettingsError({
+          type: 'validation',
+          message: `Validation failed: ${validationErrors.join(', ')}`,
+          operation: 'save-settings',
+          details: validationErrors.join('\n'),
+          timestamp: new Date()
+        })
+        setSettingsError(validationError)
+        return;
+      }
+
+      // Save to server
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        await response.json(); // Parse response but don't need to store it
+        
+        // Create comprehensive success notification
+        const changedSettings: string[] = []; // Could track which settings changed
+        setSuccessInfo(createSaveSuccessInfo(changedSettings, {
+          details: 'Settings synchronized with server and saved locally'
+        }))
+        
+        // Keep the old success state for backward compatibility
+        setSuccess('Settings saved successfully!');
+        
+        // Update Redux store for live logs
+        if (settings.liveLogs !== reduxLiveLogs) {
+          dispatch(updateTestExecutionSetting({ key: 'liveLogs', value: settings.liveLogs }))
+        }
+        
+        // Also save to localStorage as backup
+        localStorage.setItem('testSettings', JSON.stringify(settings))
+        
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        // Parse API error and create SettingsError
+        const apiError = await parseApiError(response)
+        const saveError = new SettingsError({
+          type: response.status >= 500 ? 'server' : 'network',
+          message: apiError.message || 'Failed to save settings to server',
+          operation: 'save-settings',
+          code: response.status,
+          details: apiError.message,
+          timestamp: new Date()
+        })
+        setSettingsError(saveError)
+        
+        // Save to localStorage even if server fails
+        localStorage.setItem('testSettings', JSON.stringify(settings))
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err)
+      
+      // Create appropriate error based on error type
+      let saveError: SettingsError
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        saveError = new SettingsError({
+          type: 'network',
+          message: 'Failed to connect to server while saving',
+          operation: 'save-settings',
+          details: 'Network connection failed during save operation',
+          timestamp: new Date()
+        })
+      } else {
+        saveError = new SettingsError({
+          type: 'unknown',
+          message: err instanceof Error ? err.message : 'Unknown error saving settings',
+          operation: 'save-settings',
+          details: 'Unexpected error occurred during save',
+          timestamp: new Date()
+        })
+      }
+      
+      setSettingsError(saveError)
+      
+      // Save to localStorage even if server fails
+      localStorage.setItem('testSettings', JSON.stringify(settings))
+    } finally {
+      setSaving(false)
+    }
+  }, [settings, reduxLiveLogs, dispatch, validateCriticalFields])
+
+  const testConnection = useCallback(async (service: string) => {
     setConnectionTesting(prev => ({ ...prev, [service]: true }));
+    setSettingsError(null)
+    setSuccessInfo(null)
     
     try {
       const response = await fetch(`/api/settings/test-connection/${service}`, {
@@ -382,31 +487,93 @@ const TabbedSettingsPage: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
+        
+        // Use success notification instead of legacy success state
+        setSuccessInfo(createConnectionSuccessInfo(service, result.message, {
+          details: `Connection verified successfully with ${service} service`
+        }))
+        
+        // Keep legacy success for backward compatibility
         setSuccess(`${service} connection test successful: ${result.message}`);
         setTimeout(() => setSuccess(null), 5000);
       } else {
-        const errorData = await response.json();
-        setError(`${service} connection test failed: ${errorData.error}`);
-        setTimeout(() => setError(null), 5000);
+        const apiError = await parseApiError(response);
+        const connectionError = new SettingsError({
+          type: 'network',
+          message: `${service} connection test failed: ${apiError.message}`,
+          operation: `test-connection-${service}`,
+          code: response.status,
+          details: apiError.message,
+          timestamp: new Date()
+        })
+        setSettingsError(connectionError);
       }
     } catch (err) {
-      setError(`${service} connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setTimeout(() => setError(null), 5000);
+      console.error(`${service} connection test error:`, err);
+      
+      const connectionError = new SettingsError({
+        type: err instanceof TypeError && err.message.includes('fetch') ? 'network' : 'unknown',
+        message: `${service} connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        operation: `test-connection-${service}`,
+        details: 'Connection test could not be completed',
+        timestamp: new Date()
+      })
+      setSettingsError(connectionError);
     } finally {
       setConnectionTesting(prev => ({ ...prev, [service]: false }));
     }
-  }
+  }, [settings])
 
-  const setTabLoadingState = (tab: string, loading: boolean) => {
-    setTabLoading(prev => ({ ...prev, [tab]: loading }));
-  }
+  const resetToDefaults = useCallback(() => {
+    if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+      setSettings(defaultSettings)
+      
+      // Use success notification instead of legacy success state
+      setSuccessInfo(createResetSuccessInfo({
+        details: 'All configuration has been restored to factory defaults'
+      }))
+      
+      // Keep legacy success for backward compatibility
+      setSuccess('Settings reset to defaults')
+      setError(null)
+      setSettingsError(null)
+      
+      // Clear validation errors
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  }, [])
 
-  const updateSetting = (key: string, value: string | number | boolean | string[] | { email: boolean; push: boolean; sms: boolean }) => {
+  const handleRetryOperation = useCallback((operation: string) => {
+    switch (operation) {
+      case 'load-settings':
+        loadSettings();
+        break;
+      case 'save-settings':
+        saveSettings();
+        break;
+      default:
+        if (operation.startsWith('test-connection-')) {
+          const service = operation.replace('test-connection-', '');
+          testConnection(service);
+        }
+        break;
+    }
+  }, [loadSettings, saveSettings, testConnection])
+
+  const handleDismissError = useCallback(() => {
+    setSettingsError(null);
+  }, [])
+
+  const handleDismissSuccess = useCallback(() => {
+    setSuccessInfo(null);
+  }, [])
+
+  const updateSetting = useCallback((key: string, value: string | number | boolean | string[] | { email: boolean; push: boolean; sms: boolean }) => {
     setSettings(prev => ({
       ...prev,
       [key]: value
     }))
-  }
+  }, [])
 
   if (loading) {
     return (
@@ -524,7 +691,7 @@ const TabbedSettingsPage: React.FC = () => {
                 updateSetting={updateSetting}
                 testConnection={() => testConnection('github')}
                 isConnectionTesting={connectionTesting.github || false}
-                isLoading={tabLoading.github || false}
+                isLoading={loading}
               />
             )}
 
@@ -583,6 +750,23 @@ const TabbedSettingsPage: React.FC = () => {
           />
         </div>
         </LoadingOverlay>
+        
+        {/* Error Notification */}
+        {settingsError && (
+          <ErrorNotification
+            error={settingsError.errorInfo}
+            onDismiss={handleDismissError}
+            onRetry={() => handleRetryOperation(settingsError.errorInfo.operation || '')}
+          />
+        )}
+        
+        {/* Success Notification */}
+        {successInfo && (
+          <SuccessNotification
+            success={successInfo}
+            onDismiss={handleDismissSuccess}
+          />
+        )}
       </ValidationProvider>
     </Layout>
   )
