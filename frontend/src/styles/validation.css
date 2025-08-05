@@ -1,0 +1,185 @@
+/* Validation styling */
+.validation-error {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+/* Input validation states */
+input.valid {
+  border-color: #28a745;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+input.invalid {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+input.valid:focus {
+  border-color: #28a745;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+input.invalid:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Form group with validation */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group.has-error .form-control {
+  border-color: #dc3545;
+}
+
+.form-group.has-success .form-control {
+  border-color: #28a745;
+}
+
+/* Validation icons */
+.validation-icon {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  font-size: 0.875rem;
+}
+
+.validation-icon.success {
+  color: #28a745;
+}
+
+.validation-icon.error {
+  color: #dc3545;
+}
+
+/* Form validation summary */
+.validation-summary {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 0.25rem;
+  color: #721c24;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.validation-summary h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.validation-summary ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.validation-summary li {
+  margin-bottom: 0.25rem;
+}
+
+/* Success summary */
+.validation-summary.success {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+/* Required field indicator */
+.required::after {
+  content: " *";
+  color: #dc3545;
+}
+
+/* Tooltip validation messages */
+.validation-tooltip {
+  position: relative;
+}
+
+.validation-tooltip .tooltip-text {
+  visibility: hidden;
+  width: 200px;
+  background-color: #dc3545;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  padding: 8px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.validation-tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.validation-tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #dc3545 transparent transparent transparent;
+}
+
+/* Real-time validation feedback */
+.real-time-validation {
+  transition: all 0.3s ease;
+}
+
+.real-time-validation.validating {
+  opacity: 0.7;
+}
+
+/* Connection test validation */
+.connection-test {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.connection-test.success {
+  color: #28a745;
+}
+
+.connection-test.error {
+  color: #dc3545;
+}
+
+.connection-test.testing {
+  color: #6c757d;
+}
+
+.connection-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #6c757d;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

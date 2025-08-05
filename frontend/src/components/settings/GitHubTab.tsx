@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { ValidatedInput, ValidationErrors } from '../ValidationComponents'
+import LoadingOverlay from '../LoadingOverlay'
 
 interface GitHubTabProps {
   settings: {
@@ -12,16 +14,32 @@ interface GitHubTabProps {
     issueTracking: boolean
   }
   updateSetting: (key: string, value: string | boolean | string[]) => void
+  testConnection?: () => Promise<void>
+  isConnectionTesting?: boolean
+  isLoading?: boolean
 }
 
-const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
-  const [testingConnection, setTestingConnection] = useState(false)
+const GitHubTab: React.FC<GitHubTabProps> = ({ 
+  settings, 
+  updateSetting, 
+  testConnection,
+  isConnectionTesting = false,
+  isLoading = false 
+}) => {
   const [branchInput, setBranchInput] = useState('')
+
+  const handleTestConnection = async () => {
+    if (testConnection) {
+      await testConnection();
+    } else {
+      // Fallback to local implementation if external function not provided
+      await testGitHubConnection();
+    }
+  };
 
   const testGitHubConnection = async () => {
     try {
-      setTestingConnection(true)
-      
+      // This is now handled by the parent component
       // Parse repository to get organization and repo name
       const [organization, repository] = settings.githubRepository.split('/')
       
@@ -50,8 +68,6 @@ const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
     } catch (error) {
       console.error('GitHub connection test failed:', error)
       alert('Failed to test GitHub connection')
-    } finally {
-      setTestingConnection(false)
     }
   }
 
@@ -67,8 +83,9 @@ const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
   }
 
   return (
-    <div className="settings-panel">
-      <h3>GitHub Integration</h3>
+    <LoadingOverlay isLoading={isLoading} message="Loading GitHub settings...">
+      <div className="settings-panel">
+        <h3>GitHub Integration</h3>
       
       <div className="setting-group">
         <label>
@@ -86,13 +103,16 @@ const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
 
       <div className="setting-group">
         <label>Repository</label>
-        <input 
+        <ValidatedInput 
           type="text" 
+          fieldName="githubRepository"
+          validationType="github-repo"
           value={settings.githubRepository}
           onChange={(e) => updateSetting('githubRepository', e.target.value)}
           placeholder="owner/repository-name"
           disabled={!settings.githubEnabled}
         />
+        <ValidationErrors fieldName="githubRepository" />
         <small className="setting-description">
           Format: owner/repository-name (e.g., microsoft/playwright)
         </small>
@@ -100,13 +120,16 @@ const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
 
       <div className="setting-group">
         <label>Personal Access Token</label>
-        <input 
+        <ValidatedInput 
           type="password" 
+          fieldName="githubToken"
+          validationType="github-token"
           value={settings.githubToken}
           onChange={(e) => updateSetting('githubToken', e.target.value)}
           placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
           disabled={!settings.githubEnabled}
         />
+        <ValidationErrors fieldName="githubToken" />
         <small className="setting-description">
           Required scopes: repo, webhook, issues (for private repos)
         </small>
@@ -220,14 +243,24 @@ const GitHubTab: React.FC<GitHubTabProps> = ({ settings, updateSetting }) => {
           <button 
             type="button"
             className="btn btn-secondary"
-            onClick={testGitHubConnection}
-            disabled={testingConnection || !settings.githubToken || !settings.githubRepository}
+            onClick={handleTestConnection}
+            disabled={isConnectionTesting || !settings.githubToken || !settings.githubRepository}
           >
-            {testingConnection ? 'Testing...' : 'Test GitHub Connection'}
+            {isConnectionTesting ? (
+              <>
+                <div className="connection-test-loading">
+                  <span className="spinner"></span>
+                  Testing...
+                </div>
+              </>
+            ) : (
+              'Test GitHub Connection'
+            )}
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </LoadingOverlay>
   )
 }
 

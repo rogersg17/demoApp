@@ -3,6 +3,10 @@ import { useDispatch, useSelector } from 'react-redux'
 import Layout from '../components/Layout'
 import { updateTestExecutionSetting } from '../store/slices/settingsSlice'
 import type { RootState } from '../store/store'
+import { ValidationProvider } from '../contexts/ValidationContext'
+import SaveSettingsComponent from '../components/settings/SaveSettingsComponent'
+import LoadingOverlay from '../components/LoadingOverlay'
+import '../styles/SaveSettingsComponent.css'
 
 // Import tab components
 import GeneralTab from '../components/settings/GeneralTab'
@@ -143,8 +147,8 @@ const defaultSettings: Settings = {
   liveLogs: true,
   
   // Environment Configuration
-  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
-  apiEndpoint: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000') + '/api',
+  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
+  apiEndpoint: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001') + '/api',
   testEnvironment: 'development',
   
   // JIRA Integration (legacy)
@@ -223,6 +227,8 @@ const TabbedSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [connectionTesting, setConnectionTesting] = useState<{[key: string]: boolean}>({})
+  const [tabLoading, setTabLoading] = useState<{[key: string]: boolean}>({})
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('general')
@@ -272,6 +278,13 @@ const TabbedSettingsPage: React.FC = () => {
       setError(null)
       setSuccess(null)
 
+      // Validate critical fields before saving
+      const validationErrors = validateCriticalFields();
+      if (validationErrors.length > 0) {
+        setError(`Validation failed: ${validationErrors.join(', ')}`);
+        return;
+      }
+
       // Save to server
       const response = await fetch('/api/settings', {
         method: 'POST',
@@ -283,7 +296,8 @@ const TabbedSettingsPage: React.FC = () => {
       })
 
       if (response.ok) {
-        setSuccess('Settings saved successfully!')
+        await response.json(); // Parse response but don't need to store it
+        setSuccess('Settings saved successfully!');
         
         // Update Redux store for live logs
         if (settings.liveLogs !== reduxLiveLogs) {
@@ -292,22 +306,99 @@ const TabbedSettingsPage: React.FC = () => {
         
         // Also save to localStorage as backup
         localStorage.setItem('testSettings', JSON.stringify(settings))
+        
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
       } else {
-        throw new Error('Failed to save settings to server')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save settings to server');
       }
     } catch (err) {
       console.error('Error saving settings:', err)
       // Save to localStorage even if server fails
       localStorage.setItem('testSettings', JSON.stringify(settings))
-      setError('Settings saved locally, but failed to sync with server.')
+      setError(`Settings saved locally, but failed to sync with server: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setSaving(false)
     }
   }
 
+  const validateCriticalFields = (): string[] => {
+    const errors: string[] = [];
+    
+    // Validate GitHub settings if enabled
+    if (settings.githubEnabled) {
+      if (!settings.githubRepository || !settings.githubRepository.includes('/')) {
+        errors.push('GitHub repository must be in format "owner/repository"');
+      }
+      if (!settings.githubToken || (!settings.githubToken.startsWith('ghp_') && !settings.githubToken.startsWith('github_pat_'))) {
+        errors.push('GitHub token must start with "ghp_" or "github_pat_"');
+      }
+    }
+
+    // Validate Jenkins settings if enabled
+    if (settings.jenkinsEnabled) {
+      if (!settings.jenkinsUrl) {
+        errors.push('Jenkins URL is required when Jenkins integration is enabled');
+      }
+      if (!settings.jenkinsUsername || !settings.jenkinsApiToken) {
+        errors.push('Jenkins username and API token are required when Jenkins integration is enabled');
+      }
+    }
+
+    // Validate Azure DevOps settings if enabled
+    if (settings.adoEnabled) {
+      if (!settings.adoOrganization || !settings.adoProject || !settings.adoPat) {
+        errors.push('Azure DevOps organization, project, and PAT are required when ADO integration is enabled');
+      }
+    }
+
+    return errors;
+  }
+
   const resetToDefaults = () => {
-    setSettings(defaultSettings)
-    setSuccess('Settings reset to defaults')
+    if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+      setSettings(defaultSettings)
+      setSuccess('Settings reset to defaults')
+      setError(null)
+      
+      // Clear validation errors
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  }
+
+  const testConnection = async (service: string) => {
+    setConnectionTesting(prev => ({ ...prev, [service]: true }));
+    
+    try {
+      const response = await fetch(`/api/settings/test-connection/${service}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSuccess(`${service} connection test successful: ${result.message}`);
+        setTimeout(() => setSuccess(null), 5000);
+      } else {
+        const errorData = await response.json();
+        setError(`${service} connection test failed: ${errorData.error}`);
+        setTimeout(() => setError(null), 5000);
+      }
+    } catch (err) {
+      setError(`${service} connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setConnectionTesting(prev => ({ ...prev, [service]: false }));
+    }
+  }
+
+  const setTabLoadingState = (tab: string, loading: boolean) => {
+    setTabLoading(prev => ({ ...prev, [tab]: loading }));
   }
 
   const updateSetting = (key: string, value: string | number | boolean | string[] | { email: boolean; push: boolean; sms: boolean }) => {
@@ -338,162 +429,161 @@ const TabbedSettingsPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="settings-container">
-        <header className="page-header">
-          <h1>Settings</h1>
-          <p>Configure application settings, integrations, and security options</p>
-        </header>
+      <ValidationProvider>
+        <LoadingOverlay isLoading={saving} message="Saving settings...">
+          <div className="settings-container">
+            <header className="page-header">
+              <h1>Settings</h1>
+              <p>Configure application settings, integrations, and security options</p>
+            </header>
 
-        {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
+            {success && <div className="alert alert-success">{success}</div>}
 
-        {/* Settings Tabs */}
-        <div className="settings-tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="tab-icon">{tab.icon}</span>
-              <span className="tab-label">{tab.label}</span>
-            </button>
-          ))}
+            {/* Settings Tabs */}
+            <div className="settings-tabs">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  disabled={saving}
+                >
+                  <span className="tab-icon">{tab.icon}</span>
+                  <span className="tab-label">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+          {/* Tab Content */}
+          <div className="settings-content">
+            {activeTab === 'general' && (
+              <GeneralTab 
+                settings={{
+                  applicationName: settings.applicationName,
+                  defaultLanguage: settings.defaultLanguage,
+                  timezone: settings.timezone,
+                  notificationPreferences: settings.notificationPreferences
+                }}
+                updateSetting={updateSetting}
+              />
+            )}
+
+            {activeTab === 'azure-devops' && (
+              <AzureDevOpsTab 
+                settings={{
+                  adoEnabled: settings.adoEnabled,
+                  adoOrganization: settings.adoOrganization,
+                  adoProject: settings.adoProject,
+                  adoPat: settings.adoPat,
+                  adoWebhookSecret: settings.adoWebhookSecret,
+                  pipelineMonitoring: settings.pipelineMonitoring,
+                  buildDefinitionId: settings.buildDefinitionId
+                }}
+                updateSetting={updateSetting}
+              />
+            )}
+
+            {activeTab === 'playwright' && (
+              <PlaywrightTab 
+                settings={{
+                  defaultBrowser: settings.defaultBrowser,
+                  headlessMode: settings.headlessMode,
+                  browserTimeout: settings.browserTimeout,
+                  maxRetries: settings.maxRetries,
+                  parallelWorkers: settings.parallelWorkers,
+                  testTimeout: settings.testTimeout,
+                  slowTestThreshold: settings.slowTestThreshold,
+                  reportFormat: settings.reportFormat,
+                  screenshotMode: settings.screenshotMode,
+                  videoRecording: settings.videoRecording,
+                  verboseLogging: settings.verboseLogging,
+                  liveLogs: settings.liveLogs,
+                  fullyParallel: settings.fullyParallel,
+                  forbidOnly: settings.forbidOnly,
+                  updateSnapshots: settings.updateSnapshots,
+                  ignoreHttpsErrors: settings.ignoreHttpsErrors,
+                  playwrightConfigPath: settings.playwrightConfigPath
+                }}
+                updateSetting={updateSetting}
+              />
+            )}
+
+            {activeTab === 'github' && (
+              <GitHubTab 
+                settings={{
+                  githubEnabled: settings.githubEnabled,
+                  githubToken: settings.githubToken,
+                  githubRepository: settings.githubRepository,
+                  githubWebhookSecret: settings.githubWebhookSecret,
+                  branchMonitoring: settings.branchMonitoring,
+                  monitoredBranches: settings.monitoredBranches,
+                  prChecks: settings.prChecks,
+                  issueTracking: settings.issueTracking
+                }}
+                updateSetting={updateSetting}
+                testConnection={() => testConnection('github')}
+                isConnectionTesting={connectionTesting.github || false}
+                isLoading={tabLoading.github || false}
+              />
+            )}
+
+            {activeTab === 'jenkins' && (
+              <JenkinsTab 
+                settings={{
+                  jenkinsEnabled: settings.jenkinsEnabled,
+                  jenkinsUrl: settings.jenkinsUrl,
+                  jenkinsUsername: settings.jenkinsUsername,
+                  jenkinsApiToken: settings.jenkinsApiToken,
+                  jenkinsWebhookSecret: settings.jenkinsWebhookSecret,
+                  jobMonitoring: settings.jobMonitoring,
+                  monitoredJobs: settings.monitoredJobs,
+                  buildTriggers: settings.buildTriggers,
+                  pipelineIntegration: settings.pipelineIntegration
+                }}
+                updateSetting={updateSetting}
+              />
+            )}
+
+            {activeTab === 'security' && (
+              <SecurityTab 
+                settings={{
+                  authenticationMethod: settings.authenticationMethod,
+                  requireMfa: settings.requireMfa,
+                  sessionTimeout: settings.sessionTimeout,
+                  maxLoginAttempts: settings.maxLoginAttempts,
+                  passwordMinLength: settings.passwordMinLength,
+                  passwordRequireUppercase: settings.passwordRequireUppercase,
+                  passwordRequireLowercase: settings.passwordRequireLowercase,
+                  passwordRequireNumbers: settings.passwordRequireNumbers,
+                  passwordRequireSpecialChars: settings.passwordRequireSpecialChars,
+                  passwordExpirationDays: settings.passwordExpirationDays,
+                  rateLimitEnabled: settings.rateLimitEnabled,
+                  rateLimitPerMinute: settings.rateLimitPerMinute,
+                  rateLimitPerHour: settings.rateLimitPerHour,
+                  rbacEnabled: settings.rbacEnabled,
+                  defaultUserRole: settings.defaultUserRole,
+                  adminApprovalRequired: settings.adminApprovalRequired,
+                  enableCsrf: settings.enableCsrf,
+                  enableCors: settings.enableCors,
+                  corsOrigins: settings.corsOrigins,
+                  securityHeaders: settings.securityHeaders
+                }}
+                updateSetting={updateSetting}
+              />
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <SaveSettingsComponent
+            onSave={saveSettings}
+            onReset={resetToDefaults}
+            saving={saving}
+            disabled={loading}
+          />
         </div>
-
-        {/* Tab Content */}
-        <div className="settings-content">
-          {activeTab === 'general' && (
-            <GeneralTab 
-              settings={{
-                applicationName: settings.applicationName,
-                defaultLanguage: settings.defaultLanguage,
-                timezone: settings.timezone,
-                notificationPreferences: settings.notificationPreferences
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-
-          {activeTab === 'azure-devops' && (
-            <AzureDevOpsTab 
-              settings={{
-                adoEnabled: settings.adoEnabled,
-                adoOrganization: settings.adoOrganization,
-                adoProject: settings.adoProject,
-                adoPat: settings.adoPat,
-                adoWebhookSecret: settings.adoWebhookSecret,
-                pipelineMonitoring: settings.pipelineMonitoring,
-                buildDefinitionId: settings.buildDefinitionId
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-
-          {activeTab === 'playwright' && (
-            <PlaywrightTab 
-              settings={{
-                defaultBrowser: settings.defaultBrowser,
-                headlessMode: settings.headlessMode,
-                browserTimeout: settings.browserTimeout,
-                maxRetries: settings.maxRetries,
-                parallelWorkers: settings.parallelWorkers,
-                testTimeout: settings.testTimeout,
-                slowTestThreshold: settings.slowTestThreshold,
-                reportFormat: settings.reportFormat,
-                screenshotMode: settings.screenshotMode,
-                videoRecording: settings.videoRecording,
-                verboseLogging: settings.verboseLogging,
-                liveLogs: settings.liveLogs,
-                fullyParallel: settings.fullyParallel,
-                forbidOnly: settings.forbidOnly,
-                updateSnapshots: settings.updateSnapshots,
-                ignoreHttpsErrors: settings.ignoreHttpsErrors,
-                playwrightConfigPath: settings.playwrightConfigPath
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-
-          {activeTab === 'github' && (
-            <GitHubTab 
-              settings={{
-                githubEnabled: settings.githubEnabled,
-                githubToken: settings.githubToken,
-                githubRepository: settings.githubRepository,
-                githubWebhookSecret: settings.githubWebhookSecret,
-                branchMonitoring: settings.branchMonitoring,
-                monitoredBranches: settings.monitoredBranches,
-                prChecks: settings.prChecks,
-                issueTracking: settings.issueTracking
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-
-          {activeTab === 'jenkins' && (
-            <JenkinsTab 
-              settings={{
-                jenkinsEnabled: settings.jenkinsEnabled,
-                jenkinsUrl: settings.jenkinsUrl,
-                jenkinsUsername: settings.jenkinsUsername,
-                jenkinsApiToken: settings.jenkinsApiToken,
-                jenkinsWebhookSecret: settings.jenkinsWebhookSecret,
-                jobMonitoring: settings.jobMonitoring,
-                monitoredJobs: settings.monitoredJobs,
-                buildTriggers: settings.buildTriggers,
-                pipelineIntegration: settings.pipelineIntegration
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-
-          {activeTab === 'security' && (
-            <SecurityTab 
-              settings={{
-                authenticationMethod: settings.authenticationMethod,
-                requireMfa: settings.requireMfa,
-                sessionTimeout: settings.sessionTimeout,
-                maxLoginAttempts: settings.maxLoginAttempts,
-                passwordMinLength: settings.passwordMinLength,
-                passwordRequireUppercase: settings.passwordRequireUppercase,
-                passwordRequireLowercase: settings.passwordRequireLowercase,
-                passwordRequireNumbers: settings.passwordRequireNumbers,
-                passwordRequireSpecialChars: settings.passwordRequireSpecialChars,
-                passwordExpirationDays: settings.passwordExpirationDays,
-                rateLimitEnabled: settings.rateLimitEnabled,
-                rateLimitPerMinute: settings.rateLimitPerMinute,
-                rateLimitPerHour: settings.rateLimitPerHour,
-                rbacEnabled: settings.rbacEnabled,
-                defaultUserRole: settings.defaultUserRole,
-                adminApprovalRequired: settings.adminApprovalRequired,
-                enableCsrf: settings.enableCsrf,
-                enableCors: settings.enableCors,
-                corsOrigins: settings.corsOrigins,
-                securityHeaders: settings.securityHeaders
-              }}
-              updateSetting={updateSetting}
-            />
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="settings-actions">
-          <button 
-            className="btn btn-primary" 
-            onClick={saveSettings}
-            disabled={saving}
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </button>
-          <button 
-            className="btn btn-secondary" 
-            onClick={resetToDefaults}
-          >
-            Reset to Defaults
-          </button>
-        </div>
-      </div>
+        </LoadingOverlay>
+      </ValidationProvider>
     </Layout>
   )
 }
