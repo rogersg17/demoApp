@@ -413,6 +413,9 @@ function setupRoutes(): void {
       const adoProjectConfigRouter = require('./routes/ado-project-config.ts').default;
       const adoDashboardRouter = require('./routes/ado-dashboard');
       const adoTestRouter = require('./routes/ado-test.ts').default;
+      
+      // GitHub Actions routes
+      const githubActionsRouter = require('./routes/github-actions.ts').default;
 
       // Store io instance for webhook access
       app.set('io', io);
@@ -421,6 +424,9 @@ function setupRoutes(): void {
       app.use('/api/ado', adoProjectConfigRouter);
       app.use('/api/ado', adoTestRouter);
       app.use('/api/ado/dashboard', adoDashboardRouter);
+      
+      // GitHub Actions routes
+      app.use('/api/github', githubActionsRouter);
     } catch (e) { console.warn('Azure DevOps routes not available'); }
 
     // Week 9+ orchestration routes

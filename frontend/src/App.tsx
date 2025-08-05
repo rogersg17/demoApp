@@ -9,6 +9,7 @@ import TestManagementPage from './pages/TestManagementPage'
 import FlakyTestsPage from './pages/FlakyTestsPage'
 import TabbedSettingsPage from './pages/TabbedSettingsPage'
 import UserManagementPage from './pages/UserManagementPage'
+import GitHubActionsPage from './pages/GitHubActionsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 import './styles/pages.css'
@@ -73,6 +74,14 @@ function App() {
         element={
           <ProtectedRoute>
             <UserManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/github-actions"
+        element={
+          <ProtectedRoute>
+            <GitHubActionsPage />
           </ProtectedRoute>
         }
       />
