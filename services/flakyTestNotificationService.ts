@@ -1,18 +1,56 @@
-const EventEmitter = require('events');
+import { EventEmitter } from 'events';
+
+interface NotificationAction {
+  label: string;
+  url?: string;
+  action?: string;
+  testName?: string;
+}
+
+interface Notification {
+  id?: string;
+  timestamp?: string;
+  read?: boolean;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical' | 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  testName?: string;
+  flakyScore?: number;
+  classification?: string;
+  actionRequired?: boolean;
+  actions?: NotificationAction[];
+  stats?: any;
+  threshold?: number;
+  count?: number;
+  pattern?: string;
+  impactedTests?: string[];
+  recommendedAction?: string;
+}
+
+interface NotificationWithId extends Notification {
+  id: string;
+  timestamp: string;
+  read: boolean;
+}
 
 class FlakyTestNotificationService extends EventEmitter {
+  private notifications: NotificationWithId[];
+  private maxNotifications: number;
+  private notificationListeners: Set<any>;
+
   constructor() {
     super();
     this.notifications = [];
     this.maxNotifications = 100;
-    this.listeners = new Set();
+    this.notificationListeners = new Set();
   }
 
   /**
    * Add a new flaky test detection notification
    */
-  addNotification(notification) {
-    const notificationWithId = {
+  addNotification(notification: Notification): NotificationWithId {
+    const notificationWithId: NotificationWithId = {
       id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       read: false,

@@ -1,8 +1,66 @@
-const crypto = require('crypto');
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs').promises;
-const EventEmitter = require('events');
+import * as crypto from 'crypto';
+import { spawn, ChildProcess } from 'child_process';
+import * as path from 'path';
+import { promises as fs } from 'fs';
+import { EventEmitter } from 'events';
+import Database from '../database/database';
+
+interface RepositoryConfig {
+  name: string;
+  url: string;
+  defaultBranch?: string;
+  webhookSecret?: string;
+}
+
+interface RepositoryInfo {
+  id: string | number;
+  name: string;
+  url: string;
+  defaultBranch: string;
+  webhookSecret?: string;
+  lastSync: Date;
+}
+
+interface WebhookPayload {
+  ref?: string;
+  before?: string;
+  after?: string;
+  commits?: CommitInfo[];
+  repository?: {
+    name: string;
+    url: string;
+  };
+  pusher?: {
+    name: string;
+    email: string;
+  };
+}
+
+interface CommitInfo {
+  id: string;
+  message: string;
+  timestamp: string;
+  author: {
+    name: string;
+    email: string;
+  };
+  added: string[];
+  removed: string[];
+  modified: string[];
+}
+
+interface FileChange {
+  path: string;
+  type: 'added' | 'modified' | 'removed';
+  content?: string;
+}
+
+interface ScanResult {
+  testFiles: string[];
+  sourceFiles: string[];
+  changes: FileChange[];
+  commit: string;
+}
 
 /**
  * Git Integration Service
@@ -10,7 +68,10 @@ const EventEmitter = require('events');
  * Part of ADR-001 implementation for test code and metadata separation
  */
 class GitIntegrationService extends EventEmitter {
-  constructor(database) {
+  private db: Database;
+  private repositories: Map<string | number, RepositoryInfo>;
+
+  constructor(database: Database) {
     super();
     this.db = database;
     this.repositories = new Map();
@@ -19,7 +80,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Register a Git repository for monitoring
    */
-  async registerRepository(repositoryConfig) {
+  async registerRepository(repositoryConfig: RepositoryConfig): Promise<string | number> {
     const { name, url, defaultBranch = 'main', webhookSecret } = repositoryConfig;
     
     try {
@@ -50,7 +111,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Process incoming Git webhook
    */
-  async processWebhook(headers, payload, repositoryId) {
+  async processWebhook(headers: any, payload: any, repositoryId: string | number): Promise<any> {
     try {
       const repository = await this.db.getGitRepository(repositoryId);
       if (!repository) {

@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const path = require('path');
+import * as crypto from 'crypto';
+import * as path from 'path';
 
 /**
  * Test Identifier Service
@@ -7,6 +7,8 @@ const path = require('path');
  * Part of ADR-001 implementation for test code and metadata separation
  */
 class TestIdentifierService {
+  private identifierCache: Map<string, string>;
+
   constructor() {
     this.identifierCache = new Map();
   }
@@ -15,7 +17,7 @@ class TestIdentifierService {
    * Generate a unique test identifier
    * Format: {file_hash}-{test_hash}
    */
-  generateTestId(filePath, testName, context = null, parameters = null) {
+  generateTestId(filePath: string, testName: string, context: string | null = null, parameters: any = null): string {
     // Normalize file path (remove leading ./ and use forward slashes)
     const normalizedPath = filePath.replace(/^\.\//, '').replace(/\\/g, '/');
     
@@ -39,7 +41,7 @@ class TestIdentifierService {
   /**
    * Create a test signature for consistent identification
    */
-  createTestSignature(filePath, testName, context = null, parameters = null) {
+  createTestSignature(filePath: string, testName: string, context: string | null = null, parameters: any = null): string {
     const components = [
       filePath,
       testName
@@ -269,14 +271,14 @@ class TestIdentifierService {
   /**
    * Clear identifier cache
    */
-  clearCache() {
+  clearCache(): void {
     this.identifierCache.clear();
   }
 
   /**
    * Get cache statistics
    */
-  getCacheStats() {
+  getCacheStats(): any {
     return {
       size: this.identifierCache.size,
       entries: Array.from(this.identifierCache.keys()).slice(0, 5) // First 5 entries for debugging
@@ -284,4 +286,4 @@ class TestIdentifierService {
   }
 }
 
-module.exports = TestIdentifierService;
+export default TestIdentifierService;

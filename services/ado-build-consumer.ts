@@ -1,7 +1,80 @@
-const AdoClient = require('../lib/ado-client');
-const Database = require('../database/database');
+import AdoClient from '../lib/ado-client';
+import Database from '../database/database';
+
+interface BuildData {
+    buildId: string | number;
+    projectId: string;
+    buildDefinitionId: string | number;
+    buildNumber: string;
+    status: string;
+    result: string;
+    startTime: string;
+    finishTime: string;
+    duration: number;
+    sourceBranch: string;
+    sourceVersion: string;
+    repository?: string;
+    definitionName?: string;
+    requestedBy?: string;
+}
+
+interface TestResult {
+    runId: string | number;
+    runName: string;
+    state: string;
+    totalTests: number;
+    passedTests: number;
+    failedTests: number;
+    skippedTests: number;
+    durationInMs: number;
+    startedDate: string;
+    completedDate: string;
+    results: TestResultDetail[];
+}
+
+interface TestResultDetail {
+    id: string | number;
+    testCaseTitle: string;
+    outcome: string;
+    durationInMs: number;
+    errorMessage?: string;
+    stackTrace?: string;
+    automatedTestName?: string;
+    automatedTestStorage?: string;
+}
+
+interface TaskResult {
+    id: string;
+    name: string;
+    status: string;
+    result: string;
+    startTime: string;
+    finishTime: string;
+    duration: number;
+    errorCount: number;
+    warningCount: number;
+    log?: {
+        id: string;
+        type: string;
+        url: string;
+    } | null;
+}
+
+interface ProjectConfiguration {
+    id: string | number;
+    name: string;
+    build_definition_id: string | number;
+}
+
+interface BatchResult {
+    results: any[];
+    errors: { buildId: string | number; error: string }[];
+}
 
 class AdoBuildConsumer {
+    private client: AdoClient;
+    private db: Database;
+    private debug: boolean;
     constructor(client = null, database = null) {
         this.client = client || new AdoClient();
         this.db = database || new Database();

@@ -92,7 +92,7 @@ class HealthCheckService {
     }
 
     // Memory usage check
-    checkMemory() {
+    checkMemory(): HealthCheckResult {
         const usage = process.memoryUsage();
         const totalMB = Math.round(usage.heapTotal / 1024 / 1024);
         const usedMB = Math.round(usage.heapUsed / 1024 / 1024);
@@ -114,7 +114,7 @@ class HealthCheckService {
     }
 
     // CPU and uptime check
-    checkSystem() {
+    checkSystem(): HealthCheckResult {
         const uptime = Date.now() - this.startTime;
         const uptimeHours = Math.round(uptime / (1000 * 60 * 60) * 100) / 100;
         
@@ -131,7 +131,7 @@ class HealthCheckService {
     }
 
     // Disk space check
-    checkDisk() {
+    checkDisk(): HealthCheckResult {
         try {
             const stats = fs.statSync(this.dbPath);
             const sizeKB = Math.round(stats.size / 1024);
@@ -165,14 +165,14 @@ class HealthCheckService {
             return {
                 status: 'error',
                 message: 'Disk space check failed',
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             };
         }
     }
 
     // External services connectivity check
-    async checkExternalServices() {
-        const services = [];
+    async checkExternalServices(): Promise<HealthCheckResult> {
+        const services: ServiceInfo[] = [];
 
         // Check if environment variables for external services are set
         if (process.env.JIRA_URL) {
@@ -199,9 +199,9 @@ class HealthCheckService {
     }
 
     // Overall system health check
-    async performHealthCheck() {
+    async performHealthCheck(): Promise<HealthReport> {
         const timestamp = new Date().toISOString();
-        const checks = {};
+        const checks: HealthReport['checks'] = {};
 
         try {
             // Run all health checks
@@ -212,8 +212,8 @@ class HealthCheckService {
             checks.externalServices = await this.checkExternalServices();
 
             // Determine overall status
-            const statuses = Object.values(checks).map(check => check.status);
-            let overallStatus = 'healthy';
+            const statuses = Object.values(checks).map(check => check?.status);
+            let overallStatus: HealthReport['status'] = 'healthy';
 
             if (statuses.includes('error')) {
                 overallStatus = 'error';
@@ -223,7 +223,7 @@ class HealthCheckService {
                 overallStatus = 'warning';
             }
 
-            const healthResult = {
+            const healthResult: HealthReport = {
                 status: overallStatus,
                 timestamp,
                 version: process.env.npm_package_version || '1.0.0',
@@ -243,19 +243,19 @@ class HealthCheckService {
                 status: 'error',
                 timestamp,
                 message: 'Health check failed',
-                error: error.message,
+                error: error instanceof Error ? error.message : String(error),
                 checks
             };
         }
     }
 
     // Get health history
-    getHealthHistory() {
+    getHealthHistory(): HealthReport[] {
         return this.healthHistory;
     }
 
     // Get metrics for monitoring
-    getMetrics() {
+    getMetrics(): any {
         const latest = this.healthHistory[0];
         if (!latest) return null;
 
@@ -270,4 +270,4 @@ class HealthCheckService {
     }
 }
 
-module.exports = HealthCheckService;
+export default HealthCheckService;

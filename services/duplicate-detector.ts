@@ -5,8 +5,122 @@
  * and consolidate related test failures.
  */
 
+import Database from '../database/database';
+
+interface DetectionThresholds {
+    exact_match: number;
+    high_similarity: number;
+    medium_similarity: number;
+    low_similarity: number;
+}
+
+interface DetectionRules {
+    timeWindow: number;
+    maxSimilarIssues: number;
+    consolidationThreshold: number;
+    autoMergeThreshold: number;
+}
+
+interface IssueData {
+    project_key: string;
+    test_name?: string;
+    failure_message?: string;
+    repository_id?: string;
+    timeWindowHours?: number;
+    summary?: string;
+    description?: string;
+    test_file_path?: string;
+}
+
+interface DuplicateCheckOptions {
+    repository_id?: string;
+    test_name?: string;
+    limit?: number;
+}
+
+interface IssueSimilarity {
+    issueKey: string;
+    issueId: string | number;
+    similarity: number;
+    factors: {
+        testName?: number;
+        failureMessage?: number;
+        summary?: number;
+        description?: number;
+        repository?: number;
+        filePath?: number;
+        temporal?: number;
+    };
+    error?: string;
+}
+
+interface SimilarityFactors {
+    testName?: number;
+    failureMessage?: number;
+    summary?: number;
+    description?: number;
+    repository?: number;
+    filePath?: number;
+}
+
+interface RecommendationResult {
+    action: 'create_new' | 'link_to_existing' | 'update_existing' | 'consolidate_issues' | 'create_with_reference';
+    confidence: number;
+    reasoning: string;
+}
+
+interface ConsolidationOpportunity {
+    type: 'merge_candidates' | 'epic_opportunity';
+    issues: string[];
+    reason: string;
+    confidence: number;
+}
+
+interface DuplicateCheckResult {
+    hasDuplicates: boolean;
+    duplicates: IssueSimilarity[];
+    bestMatch?: IssueSimilarity;
+    recommendation: string;
+    confidence: number;
+    reasoning?: string;
+    consolidationOpportunities?: ConsolidationOpportunity[];
+}
+
+interface RecentIssue {
+    id: string | number;
+    issue_key: string;
+    project_key: string;
+    summary: string;
+    description: string;
+    status: string;
+    created_at: string;
+    failure_test_name?: string;
+    failure_message?: string;
+    test_file_path?: string;
+    repository_id?: string;
+    build_id?: string;
+    pipeline_id?: string;
+}
+
+interface ConsolidationAction {
+    type: 'merge_issues' | 'create_epic' | 'link_issues';
+    sourceIssues?: string[];
+    targetIssue?: string;
+    issues?: string[];
+    epicData?: any;
+    linkType?: string;
+}
+
+interface ConsolidationPlan {
+    actions: ConsolidationAction[];
+}
+
 class DuplicateDetector {
-    constructor(database) {
+    private db: Database;
+    private debug: boolean;
+    private thresholds: DetectionThresholds;
+    private detectionRules: DetectionRules;
+    constructor(database: Database) {
         this.db = database;
         this.debug = process.env.DUPLICATE_DETECTOR_DEBUG === 'true';
         
@@ -32,7 +146,7 @@ class DuplicateDetector {
     /**
      * Check for duplicate JIRA issues before creating a new one
      */
-    async checkForDuplicates(issueData, options = {}) {
+    async checkForDuplicates(issueData: IssueData, options: DuplicateCheckOptions = {}): Promise<DuplicateCheckResult> {
         try {
             const {
                 project_key,
@@ -99,7 +213,7 @@ class DuplicateDetector {
     /**
      * Get recent JIRA issues from the database
      */
-    async getRecentIssues(projectKey, cutoffTime, options = {}) {
+    async getRecentIssues(projectKey: string, cutoffTime: string, options: DuplicateCheckOptions = {}): Promise<RecentIssue[]> {
         try {
             let query = `
                 SELECT 
@@ -118,7 +232,7 @@ class DuplicateDetector {
                   AND j.status NOT IN ('Done', 'Closed', 'Resolved')
             `;
             
-            const params = [projectKey, cutoffTime];
+            const params: any[] = [projectKey, cutoffTime];
             
             // Add repository filter if specified
             if (options.repository_id) {
@@ -138,7 +252,7 @@ class DuplicateDetector {
             `;
             params.push(options.limit || 50);
             
-            const issues = await this.db.all(query, params);
+            const issues = await this.db.all(query, params) as RecentIssue[];
             
             this.log(`Found ${issues.length} recent issues in project ${projectKey}`);
             return issues;
@@ -152,9 +266,9 @@ class DuplicateDetector {
     /**
      * Calculate similarity between new issue data and existing issue
      */
-    async calculateIssueSimilarity(newIssueData, existingIssue) {
+    async calculateIssueSimilarity(newIssueData: IssueData, existingIssue: RecentIssue): Promise<IssueSimilarity> {
         try {
-            const similarity = {
+            const similarity: IssueSimilarity = {
                 issueKey: existingIssue.issue_key,
                 issueId: existingIssue.id,
                 similarity: 0,
@@ -227,7 +341,7 @@ class DuplicateDetector {
                 issueId: existingIssue.id,
                 similarity: 0,
                 factors: {},
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             };
         }
     }
@@ -235,7 +349,7 @@ class DuplicateDetector {
     /**
      * Calculate text similarity using multiple algorithms
      */
-    calculateTextSimilarity(text1, text2) {
+    calculateTextSimilarity(text1: string, text2: string): number {
         if (!text1 || !text2) return 0;
         
         // Normalize texts
@@ -256,7 +370,7 @@ class DuplicateDetector {
     /**
      * Calculate file path similarity
      */
-    calculatePathSimilarity(path1, path2) {
+    calculatePathSimilarity(path1: string, path2: string): number {
         if (!path1 || !path2) return 0;
         
         // Normalize paths
@@ -286,7 +400,7 @@ class DuplicateDetector {
     /**
      * Calculate weighted similarity from multiple factors
      */
-    calculateWeightedSimilarity(factors) {
+    calculateWeightedSimilarity(factors: SimilarityFactors): number {
         const weights = {
             testName: 0.3,
             failureMessage: 0.25,
@@ -300,9 +414,10 @@ class DuplicateDetector {
         let totalWeight = 0;
         
         for (const [factor, value] of Object.entries(factors)) {
-            if (weights[factor] && typeof value === 'number') {
-                weightedSum += value * weights[factor];
-                totalWeight += weights[factor];
+            const weight = weights[factor as keyof typeof weights];
+            if (weight && typeof value === 'number') {
+                weightedSum += value * weight;
+                totalWeight += weight;
             }
         }
         
@@ -312,7 +427,7 @@ class DuplicateDetector {
     /**
      * Generate recommendation based on similarity analysis
      */
-    generateRecommendation(bestMatch, allSimilarities) {
+    generateRecommendation(bestMatch: IssueSimilarity, allSimilarities: IssueSimilarity[]): RecommendationResult {
         const similarity = bestMatch.similarity;
         
         if (similarity >= this.thresholds.exact_match) {
@@ -362,8 +477,8 @@ class DuplicateDetector {
     /**
      * Identify consolidation opportunities
      */
-    identifyConsolidationOpportunities(similarities) {
-        const opportunities = [];
+    identifyConsolidationOpportunities(similarities: IssueSimilarity[]): ConsolidationOpportunity[] {
+        const opportunities: ConsolidationOpportunity[] = [];
         
         // Group by high similarity
         const highSimilarityGroups = this.groupBySimilarity(
@@ -402,14 +517,14 @@ class DuplicateDetector {
     /**
      * Group similarities by threshold ranges
      */
-    groupBySimilarity(similarities) {
-        const groups = [];
-        const processed = new Set();
+    groupBySimilarity(similarities: IssueSimilarity[]): IssueSimilarity[][] {
+        const groups: IssueSimilarity[][] = [];
+        const processed = new Set<string>();
         
         for (const similarity of similarities) {
             if (processed.has(similarity.issueKey)) continue;
             
-            const group = [similarity];
+            const group: IssueSimilarity[] = [similarity];
             processed.add(similarity.issueKey);
             
             // Find similar items
@@ -431,25 +546,41 @@ class DuplicateDetector {
     /**
      * Execute consolidation action
      */
-    async executeConsolidation(consolidationPlan) {
+    async executeConsolidation(consolidationPlan: ConsolidationPlan): Promise<any> {
         try {
-            const results = [];
+            const results: any[] = [];
             
             for (const action of consolidationPlan.actions) {
                 switch (action.type) {
                     case 'merge_issues':
-                        const mergeResult = await this.mergeIssues(action.sourceIssues, action.targetIssue);
-                        results.push(mergeResult);
+                        // Note: These methods would need to be implemented based on your JIRA integration
+                        // const mergeResult = await this.mergeIssues(action.sourceIssues, action.targetIssue);
+                        // results.push(mergeResult);
+                        results.push({
+                            action: action.type,
+                            status: 'not_implemented',
+                            reason: 'Merge issues functionality not implemented yet'
+                        });
                         break;
                         
                     case 'create_epic':
-                        const epicResult = await this.createEpic(action.issues, action.epicData);
-                        results.push(epicResult);
+                        // const epicResult = await this.createEpic(action.issues, action.epicData);
+                        // results.push(epicResult);
+                        results.push({
+                            action: action.type,
+                            status: 'not_implemented',
+                            reason: 'Create epic functionality not implemented yet'
+                        });
                         break;
                         
                     case 'link_issues':
-                        const linkResult = await this.linkRelatedIssues(action.issues, action.linkType);
-                        results.push(linkResult);
+                        // const linkResult = await this.linkRelatedIssues(action.issues, action.linkType);
+                        // results.push(linkResult);
+                        results.push({
+                            action: action.type,
+                            status: 'not_implemented',
+                            reason: 'Link issues functionality not implemented yet'
+                        });
                         break;
                         
                     default:
@@ -476,7 +607,7 @@ class DuplicateDetector {
     /**
      * Normalize text for comparison
      */
-    normalizeText(text) {
+    normalizeText(text: string): string {
         return text
             .toLowerCase()
             .replace(/[^\w\s]/g, ' ')
@@ -487,8 +618,8 @@ class DuplicateDetector {
     /**
      * Calculate Levenshtein similarity
      */
-    levenshteinSimilarity(str1, str2) {
-        const matrix = [];
+    levenshteinSimilarity(str1: string, str2: string): number {
+        const matrix: number[][] = [];
         const len1 = str1.length;
         const len2 = str2.length;
 
@@ -521,7 +652,7 @@ class DuplicateDetector {
     /**
      * Calculate Jaccard similarity
      */
-    jaccardSimilarity(str1, str2) {
+    jaccardSimilarity(str1: string, str2: string): number {
         const words1 = new Set(str1.split(/\s+/));
         const words2 = new Set(str2.split(/\s+/));
         
@@ -534,13 +665,13 @@ class DuplicateDetector {
     /**
      * Calculate cosine similarity
      */
-    cosineSimilarity(str1, str2) {
+    cosineSimilarity(str1: string, str2: string): number {
         const words1 = str1.split(/\s+/);
         const words2 = str2.split(/\s+/);
         
         const wordSet = new Set([...words1, ...words2]);
-        const vector1 = [];
-        const vector2 = [];
+        const vector1: number[] = [];
+        const vector2: number[] = [];
         
         for (const word of wordSet) {
             vector1.push(words1.filter(w => w === word).length);
@@ -557,7 +688,7 @@ class DuplicateDetector {
     /**
      * Log debug information
      */
-    log(...args) {
+    log(...args: any[]): void {
         if (this.debug) {
             console.log('[DUPLICATE-DETECTOR]', ...args);
         }
@@ -566,9 +697,9 @@ class DuplicateDetector {
     /**
      * Log error information
      */
-    error(...args) {
+    error(...args: any[]): void {
         console.error('[DUPLICATE-DETECTOR ERROR]', ...args);
     }
 }
 
-module.exports = DuplicateDetector;
+export default DuplicateDetector;

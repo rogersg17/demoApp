@@ -1,7 +1,51 @@
-const Database = require('../database/database');
-const EventEmitter = require('events');
+import Database from '../database/database';
+import { EventEmitter } from 'events';
+
+interface ResourceRequirements {
+  cpu?: number;
+  memory?: number;
+  storage?: number;
+  networkBandwidth?: number;
+  concurrency?: number;
+}
+
+interface Runner {
+  id: string | number;
+  name: string;
+  status: string;
+  max_concurrent_tests: number;
+  cpu_cores: number;
+  memory_gb: number;
+  storage_gb: number;
+  network_mbps: number;
+}
+
+interface ResourceAllocation {
+  id: string | number;
+  execution_id: string | number;
+  runner_id: string | number;
+  cpu_cores: number;
+  memory_gb: number;
+  storage_gb: number;
+  network_mbps: number;
+  allocated_at: string;
+  status: string;
+}
+
+interface AvailableResources {
+  cpu: number;
+  memory: number;
+  storage: number;
+  networkBandwidth: number;
+  concurrency: number;
+}
 
 class ResourceAllocationService extends EventEmitter {
+  private db: Database;
+  private activeAllocations: Map<string | number, ResourceAllocation>;
+  private resourceLimits: Map<string | number, any>;
+  private monitoringInterval: NodeJS.Timeout | null;
+
   constructor() {
     super();
     this.db = new Database();
