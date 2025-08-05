@@ -19,7 +19,7 @@ const AzureDevOpsTab: React.FC<AzureDevOpsTabProps> = ({ settings, updateSetting
   const testAdoConnection = async () => {
     try {
       setTestingConnection(true)
-      const response = await fetch('/api/test-ado-connection', {
+      const response = await fetch('/api/ado/test-connection', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

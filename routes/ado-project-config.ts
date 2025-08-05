@@ -1,10 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Session } from 'express-session';
+import AdoClient from '../lib/ado-client';
 
 const AdoBuildDefinitionService = require('../services/ado-build-definition');
 const AdoProjectConfigurationService = require('../services/ado-project-configuration');
-const AdoClient = require('../lib/ado-client');
 const Database = require('../database/database');
 
 const router = express.Router();

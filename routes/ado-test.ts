@@ -1,8 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { Session } from 'express-session';
-
-const AdoClient = require('../lib/ado-client');
+import AdoClient from '../lib/ado-client';
 
 const router = express.Router();
 

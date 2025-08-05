@@ -1,10 +1,125 @@
-const { WebApi, getPersonalAccessTokenHandler } = require('azure-devops-node-api');
+import { WebApi, getPersonalAccessTokenHandler } from 'azure-devops-node-api';
+
+interface AdoClientOptions {
+    orgUrl?: string;
+    pat?: string;
+    projectId?: string;
+}
+
+interface ProjectInfo {
+    id: string;
+    name: string;
+}
+
+interface TestConnectionResult {
+    success: boolean;
+    projects?: ProjectInfo[];
+    error?: string;
+}
+
+interface ValidationResult {
+    scope: string;
+    status: 'success' | 'failed';
+    error?: string;
+}
+
+interface BuildDefinitionInfo {
+    id: number;
+    name: string;
+    path: string;
+    type: any;
+    quality: any;
+    project: {
+        id: string;
+        name: string;
+    };
+    repository?: {
+        id: string;
+        name: string;
+        type: string;
+        url: string;
+        defaultBranch?: string;
+    } | null;
+    queue?: {
+        id: number;
+        name: string;
+    } | null;
+    createdDate: Date;
+    revision: number;
+    _links: any;
+    process?: any;
+    variables?: any;
+    triggers?: any;
+}
+
+interface BuildInfo {
+    id: number;
+    buildNumber: string;
+    status: any;
+    result: any;
+    queueTime: Date;
+    startTime: Date;
+    finishTime: Date;
+    url: string;
+    definition: {
+        id: number;
+        name: string;
+    };
+    project: {
+        id: string;
+        name: string;
+    };
+    requestedFor: any;
+    requestedBy: any;
+    sourceBranch: string;
+    sourceVersion: string;
+    priority: any;
+    reason: any;
+    tags: string[];
+    _links: any;
+}
+
+interface TestResultInfo {
+    id: number;
+    testCaseTitle: string;
+    automatedTestName: string;
+    testCaseReferenceId: number;
+    outcome: string;
+    state: string;
+    priority: number;
+    failureType: string;
+    errorMessage: string;
+    stackTrace: string;
+    startedDate: Date;
+    completedDate: Date;
+    durationInMs: number;
+    runBy: any;
+    testRun: {
+        id: number;
+        name: string;
+        url: string;
+        buildConfiguration: any;
+    };
+    build: {
+        id: number;
+    };
+    project: {
+        id: string;
+    };
+}
 
 class AdoClient {
-    constructor(options = {}) {
-        this.orgUrl = options.orgUrl || process.env.ADO_ORGANIZATION;
-        this.pat = options.pat || process.env.ADO_PAT;
-        this.projectId = options.projectId || process.env.ADO_PROJECT;
+    private orgUrl: string;
+    private pat: string;
+    private projectId: string;
+    private authHandler: any;
+    private connection: WebApi;
+    private debug: boolean;
+
+    constructor(options: AdoClientOptions = {}) {
+        this.orgUrl = options.orgUrl || process.env.ADO_ORGANIZATION || '';
+        this.pat = options.pat || process.env.ADO_PAT || '';
+        this.projectId = options.projectId || process.env.ADO_PROJECT || '';
         
         if (!this.orgUrl || !this.pat) {
             throw new Error('Azure DevOps organization URL and PAT are required');
@@ -53,10 +168,10 @@ class AdoClient {
     /**
      * Test the connection to Azure DevOps
      */
-    async testConnection() {
+    async testConnection(): Promise<TestConnectionResult> {
         try {
-            const workItemApi = await this.getWorkItemTrackingApi();
-            const projects = await workItemApi.getProjects();
+            const coreApi = await this.connection.getCoreApi();
+            const projects = await coreApi.getProjects();
             
             if (this.debug) {
                 console.log('✅ ADO Connection successful');
@@ -65,9 +180,9 @@ class AdoClient {
             
             return {
                 success: true,
-                projects: projects.map(p => ({ id: p.id, name: p.name }))
+                projects: projects.map(p => ({ id: p.id || '', name: p.name || '' }))
             };
-        } catch (error) {
+        } catch (error: any) {
             if (this.debug) {
                 console.error('❌ ADO Connection failed:', error.message);
             }
@@ -82,17 +197,17 @@ class AdoClient {
     /**
      * Get project information
      */
-    async getProject(projectName = null) {
+    async getProject(projectName: string | null = null) {
         try {
-            const workItemApi = await this.getWorkItemTrackingApi();
-            const projects = await workItemApi.getProjects();
+            const coreApi = await this.connection.getCoreApi();
+            const projects = await coreApi.getProjects();
             
             if (projectName) {
                 return projects.find(p => p.name === projectName || p.id === projectName);
             }
             
             return projects.find(p => p.name === this.projectId || p.id === this.projectId);
-        } catch (error) {
+        } catch (error: any) {
             throw new Error(`Failed to get project: ${error.message}`);
         }
     }
@@ -100,24 +215,24 @@ class AdoClient {
     /**
      * Validate required scopes/permissions
      */
-    async validatePermissions() {
-        const validations = [];
+    async validatePermissions(): Promise<ValidationResult[]> {
+        const validations: ValidationResult[] = [];
 
         try {
             // Test Work Item access
             const workItemApi = await this.getWorkItemTrackingApi();
             await workItemApi.getWorkItemTypes(this.projectId);
             validations.push({ scope: 'Work Items', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Work Items', status: 'failed', error: error.message });
         }
 
         try {
             // Test Test Management access
             const testApi = await this.getTestApi();
-            await testApi.getTestPlans(this.projectId);
+            await testApi.getTestRuns(this.projectId);
             validations.push({ scope: 'Test Management', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Test Management', status: 'failed', error: error.message });
         }
 
@@ -126,7 +241,7 @@ class AdoClient {
             const buildApi = await this.getBuildApi();
             await buildApi.getBuilds(this.projectId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 1);
             validations.push({ scope: 'Build', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Build', status: 'failed', error: error.message });
         }
 
@@ -136,7 +251,7 @@ class AdoClient {
     /**
      * Get all build definitions for a project
      */
-    async getBuildDefinitions(projectId = null) {
+    async getBuildDefinitions(projectId: string | null = null): Promise<BuildDefinitionInfo[]> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -144,30 +259,25 @@ class AdoClient {
             const definitions = await buildApi.getDefinitions(project);
             
             return definitions.map(def => ({
-                id: def.id,
-                name: def.name,
-                path: def.path,
+                id: def.id || 0,
+                name: def.name || '',
+                path: def.path || '',
                 type: def.type,
                 quality: def.quality,
                 project: {
-                    id: def.project.id,
-                    name: def.project.name
+                    id: def.project?.id || '',
+                    name: def.project?.name || ''
                 },
-                repository: def.repository ? {
-                    id: def.repository.id,
-                    name: def.repository.name,
-                    type: def.repository.type,
-                    url: def.repository.url
-                } : null,
+                repository: null, // Repository info not available in BuildDefinitionReference
                 queue: def.queue ? {
-                    id: def.queue.id,
-                    name: def.queue.name
+                    id: def.queue.id || 0,
+                    name: def.queue.name || ''
                 } : null,
-                createdDate: def.createdDate,
-                revision: def.revision,
+                createdDate: def.createdDate || new Date(),
+                revision: def.revision || 0,
                 _links: def._links
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get build definitions:', error.message);
             throw new Error(`Failed to get build definitions: ${error.message}`);
         }
@@ -176,7 +286,7 @@ class AdoClient {
     /**
      * Get a specific build definition by ID
      */
-    async getBuildDefinition(definitionId, projectId = null) {
+    async getBuildDefinition(definitionId: number, projectId: string | null = null): Promise<BuildDefinitionInfo> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -184,31 +294,34 @@ class AdoClient {
             const definition = await buildApi.getDefinition(project, definitionId);
             
             return {
-                id: definition.id,
-                name: definition.name,
-                path: definition.path,
+                id: definition.id || 0,
+                name: definition.name || '',
+                path: definition.path || '',
                 type: definition.type,
                 quality: definition.quality,
                 project: {
-                    id: definition.project.id,
-                    name: definition.project.name
+                    id: definition.project?.id || '',
+                    name: definition.project?.name || ''
                 },
                 repository: definition.repository ? {
-                    id: definition.repository.id,
-                    name: definition.repository.name,
-                    type: definition.repository.type,
-                    url: definition.repository.url,
+                    id: definition.repository.id || '',
+                    name: definition.repository.name || '',
+                    type: definition.repository.type || '',
+                    url: definition.repository.url || '',
                     defaultBranch: definition.repository.defaultBranch
                 } : null,
                 process: definition.process,
-                queue: definition.queue,
+                queue: definition.queue ? {
+                    id: definition.queue.id || 0,
+                    name: definition.queue.name || ''
+                } : null,
                 variables: definition.variables,
                 triggers: definition.triggers,
-                createdDate: definition.createdDate,
-                revision: definition.revision,
+                createdDate: definition.createdDate || new Date(),
+                revision: definition.revision || 0,
                 _links: definition._links
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build definition ${definitionId}:`, error.message);
             throw new Error(`Failed to get build definition: ${error.message}`);
         }
@@ -217,7 +330,7 @@ class AdoClient {
     /**
      * Get builds for a specific definition
      */
-    async getBuildsForDefinition(definitionId, options = {}) {
+    async getBuildsForDefinition(definitionId: number, options: any = {}): Promise<BuildInfo[]> {
         try {
             const buildApi = await this.getBuildApi();
             const project = options.projectId || this.projectId;
@@ -234,51 +347,51 @@ class AdoClient {
             const builds = await buildApi.getBuilds(
                 project,
                 [definitionId], // definitions
-                null, // queues
-                null, // buildNumber
+                undefined, // queues
+                undefined, // buildNumber
                 minTime, // minTime
                 maxTime, // maxTime
-                null, // requestedFor
-                null, // reasonFilter
+                undefined, // requestedFor
+                undefined, // reasonFilter
                 statusFilter, // statusFilter
                 resultFilter, // resultFilter
-                null, // tagFilters
-                null, // properties
+                undefined, // tagFilters
+                undefined, // properties
                 top, // top
-                null, // continuationToken
-                null, // maxBuildsPerDefinition
-                null, // deletedFilter
-                null, // queryOrder
+                undefined, // continuationToken
+                undefined, // maxBuildsPerDefinition
+                undefined, // deletedFilter
+                undefined, // queryOrder
                 branchName // branchName
             );
 
             return builds.map(build => ({
-                id: build.id,
-                buildNumber: build.buildNumber,
+                id: build.id || 0,
+                buildNumber: build.buildNumber || '',
                 status: build.status,
                 result: build.result,
-                queueTime: build.queueTime,
-                startTime: build.startTime,
-                finishTime: build.finishTime,
-                url: build.url,
+                queueTime: build.queueTime || new Date(),
+                startTime: build.startTime || new Date(),
+                finishTime: build.finishTime || new Date(),
+                url: build.url || '',
                 definition: {
-                    id: build.definition.id,
-                    name: build.definition.name
+                    id: build.definition?.id || 0,
+                    name: build.definition?.name || ''
                 },
                 project: {
-                    id: build.project.id,
-                    name: build.project.name
+                    id: build.project?.id || '',
+                    name: build.project?.name || ''
                 },
                 requestedFor: build.requestedFor,
                 requestedBy: build.requestedBy,
-                sourceBranch: build.sourceBranch,
-                sourceVersion: build.sourceVersion,
+                sourceBranch: build.sourceBranch || '',
+                sourceVersion: build.sourceVersion || '',
                 priority: build.priority,
                 reason: build.reason,
                 tags: build.tags || [],
                 _links: build._links
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get builds for definition ${definitionId}:`, error.message);
             throw new Error(`Failed to get builds for definition: ${error.message}`);
         }
@@ -287,7 +400,7 @@ class AdoClient {
     /**
      * Get a specific build by ID
      */
-    async getBuild(buildId, projectId = null) {
+    async getBuild(buildId: number, projectId: string | null = null): Promise<any> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -321,7 +434,7 @@ class AdoClient {
                 tags: build.tags || [],
                 _links: build._links
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build ${buildId}:`, error.message);
             throw new Error(`Failed to get build: ${error.message}`);
         }
@@ -330,39 +443,39 @@ class AdoClient {
     /**
      * Get test results for a build
      */
-    async getTestResultsForBuild(buildId, projectId = null) {
+    async getTestResultsForBuild(buildId: number, projectId: string | null = null): Promise<TestResultInfo[]> {
         try {
             const testApi = await this.getTestApi();
             const project = projectId || this.projectId;
             
             // First get test runs for the build
-            const testRuns = await testApi.getTestRuns(project, buildId);
+            const testRuns = await testApi.getTestRuns(project, buildId.toString());
             
-            const allResults = [];
+            const allResults: TestResultInfo[] = [];
             
             for (const run of testRuns) {
                 const results = await testApi.getTestResults(project, run.id);
                 
                 for (const result of results) {
                     allResults.push({
-                        id: result.id,
-                        testCaseTitle: result.testCaseTitle,
-                        automatedTestName: result.automatedTestName,
-                        testCaseReferenceId: result.testCaseReferenceId,
-                        outcome: result.outcome,
-                        state: result.state,
-                        priority: result.priority,
-                        failureType: result.failureType,
-                        errorMessage: result.errorMessage,
-                        stackTrace: result.stackTrace,
-                        startedDate: result.startedDate,
-                        completedDate: result.completedDate,
-                        durationInMs: result.durationInMs,
+                        id: result.id || 0,
+                        testCaseTitle: result.testCaseTitle || '',
+                        automatedTestName: result.automatedTestName || '',
+                        testCaseReferenceId: result.testCaseReferenceId || 0,
+                        outcome: result.outcome || '',
+                        state: result.state || '',
+                        priority: result.priority || 0,
+                        failureType: result.failureType || '',
+                        errorMessage: result.errorMessage || '',
+                        stackTrace: result.stackTrace || '',
+                        startedDate: result.startedDate || new Date(),
+                        completedDate: result.completedDate || new Date(),
+                        durationInMs: result.durationInMs || 0,
                         runBy: result.runBy,
                         testRun: {
-                            id: run.id,
-                            name: run.name,
-                            url: run.url,
+                            id: run.id || 0,
+                            name: run.name || '',
+                            url: run.url || '',
                             buildConfiguration: run.buildConfiguration
                         },
                         build: {
@@ -376,7 +489,7 @@ class AdoClient {
             }
             
             return allResults;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get test results for build ${buildId}:`, error.message);
             throw new Error(`Failed to get test results: ${error.message}`);
         }
@@ -385,7 +498,7 @@ class AdoClient {
     /**
      * Test connection to ADO and validate build definition access
      */
-    async validateBuildDefinitionAccess(definitionId, projectId = null) {
+    async validateBuildDefinitionAccess(definitionId: number, projectId: string | null = null): Promise<any> {
         try {
             const project = projectId || this.projectId;
             
@@ -407,7 +520,7 @@ class AdoClient {
                 canAccessBuilds: true,
                 canAccessTestResults: true // We'll validate this separately if needed
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`❌ Build definition access validation failed:`, error.message);
             
             return {
@@ -422,13 +535,13 @@ class AdoClient {
     /**
      * Get organizations accessible to the current user
      */
-    async getOrganizations() {
+    async getOrganizations(): Promise<{ name: string; url: string }[]> {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
             
             // Extract unique organizations from project URLs
-            const organizations = new Set();
+            const organizations = new Set<string>();
             
             for (const project of projects) {
                 if (project.url) {
@@ -443,7 +556,7 @@ class AdoClient {
                 name: org,
                 url: `https://dev.azure.com/${org}`
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get organizations:', error.message);
             throw new Error(`Failed to get organizations: ${error.message}`);
         }
@@ -452,7 +565,7 @@ class AdoClient {
     /**
      * Get projects for the current organization
      */
-    async getProjects() {
+    async getProjects(): Promise<any[]> {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
@@ -467,7 +580,7 @@ class AdoClient {
                 visibility: project.visibility,
                 lastUpdateTime: project.lastUpdateTime
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get projects:', error.message);
             throw new Error(`Failed to get projects: ${error.message}`);
         }
@@ -476,7 +589,7 @@ class AdoClient {
     /**
      * Log debug information
      */
-    log(...args) {
+    log(...args: any[]): void {
         if (this.debug) {
             console.log('[ADO-CLIENT]', ...args);
         }
@@ -485,9 +598,9 @@ class AdoClient {
     /**
      * Log error information
      */
-    error(...args) {
+    error(...args: any[]): void {
         console.error('[ADO-CLIENT ERROR]', ...args);
     }
 }
 
-module.exports = AdoClient;
+export default AdoClient;

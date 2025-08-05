@@ -1,0 +1,161 @@
+/* Test Execution Progress Styles */
+
+.test-execution-progress {
+  width: 100%;
+  padding: 16px;
+}
+
+.execution-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.execution-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.perf-metric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.suite-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.suite-header:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.suite-info {
+  display: flex;
+  align-items: center;
+}
+
+/* Animations for status changes */
+.suite-header .MuiSvgIcon-root {
+  transition: all 0.3s ease;
+}
+
+.status-running .MuiSvgIcon-root {
+  animation: rotate 2s linear infinite;
+}
+
+.status-completed .suite-header {
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.status-failed .suite-header {
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Test item animations */
+.MuiListItem-root {
+  transition: all 0.3s ease;
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+.MuiListItem-root:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Status-specific styling */
+.test-status-running {
+  animation: pulse 2s infinite;
+}
+
+.test-status-completed {
+  background-color: rgba(76, 175, 80, 0.05);
+}
+
+.test-status-failed {
+  background-color: rgba(244, 67, 54, 0.05);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .test-execution-progress {
+    padding: 8px;
+  }
+  
+  .header-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .execution-controls {
+    align-self: flex-end;
+  }
+  
+  .stat-item {
+    padding: 4px;
+  }
+  
+  .perf-metric {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .suite-info {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .suite-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .MuiGrid-container {
+    flex-direction: column;
+  }
+}

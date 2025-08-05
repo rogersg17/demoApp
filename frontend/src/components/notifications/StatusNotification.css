@@ -1,0 +1,122 @@
+/* Status Notification Styles */
+
+.status-notifications {
+  position: fixed;
+  z-index: 1400;
+  pointer-events: none;
+}
+
+.status-notifications > * {
+  pointer-events: auto;
+}
+
+.position-top-right {
+  top: 24px;
+  right: 24px;
+}
+
+.position-top-left {
+  top: 24px;
+  left: 24px;
+}
+
+.position-bottom-right {
+  bottom: 24px;
+  right: 24px;
+}
+
+.position-bottom-left {
+  bottom: 24px;
+  left: 24px;
+}
+
+.position-top-center {
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.position-bottom-center {
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.notification-content {
+  width: 100%;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.notification-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-overflow {
+  margin-top: 8px;
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Animation keyframes */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .status-notifications {
+    left: 16px !important;
+    right: 16px !important;
+    top: 16px !important;
+    bottom: auto !important;
+    transform: none !important;
+  }
+  
+  .position-top-center,
+  .position-bottom-center {
+    left: 16px;
+    right: 16px;
+    transform: none;
+  }
+  
+  .status-notifications .MuiAlert-root {
+    min-width: auto !important;
+    max-width: none !important;
+  }
+}
