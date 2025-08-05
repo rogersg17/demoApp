@@ -1,14 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './SuccessNotification.css';
-
-export interface SuccessInfo {
-  message: string;
-  details?: string;
-  operation?: string;
-  timestamp: Date;
-  autoHide?: boolean;
-  hideDelay?: number;
-}
+import type { SuccessInfo } from '../utils/errorUtils';
 
 interface SuccessNotificationProps {
   success: SuccessInfo | null;

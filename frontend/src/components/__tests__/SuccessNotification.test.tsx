@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import SuccessNotification from '../SuccessNotification';
 import type { SuccessInfo } from '../../utils/errorUtils';
@@ -97,9 +96,9 @@ describe('SuccessNotification', () => {
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('auto-hides when autoHide is true', async () => {
+  it('auto-hides when autoHide is not set to false', async () => {
     const success = createSuccessInfo({
-      autoHide: true,
+      autoHide: undefined, // undefined means it will auto-hide (default behavior)
       hideDelay: 2000
     });
     
@@ -117,6 +116,29 @@ describe('SuccessNotification', () => {
     vi.advanceTimersByTime(300);
     
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-hide when autoHide is false', async () => {
+    const success = createSuccessInfo({
+      autoHide: false,
+      hideDelay: 2000
+    });
+    
+    render(
+      <SuccessNotification 
+        success={success} 
+        onDismiss={mockOnDismiss} 
+      />
+    );
+
+    // Fast-forward past the hide delay
+    vi.advanceTimersByTime(2000);
+    
+    // Wait additional time
+    vi.advanceTimersByTime(1000);
+    
+    // Should not have been called
+    expect(mockOnDismiss).not.toHaveBeenCalled();
   });
 
   it('does not render when success is null', () => {
