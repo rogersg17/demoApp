@@ -369,7 +369,8 @@ function setupRoutes(): void {
     // Load route modules
     const authModule = require('./routes/auth');
     const authRoutes = authModule.default;
-    const testRoutes = require('./routes/tests');
+    const testModule = require('./routes/tests');
+    const testRoutes = testModule.default;
     const gitRoutes = require('./routes/git');
     const usersModule = require('./routes/users');
     const usersRoutes = usersModule.default;
@@ -381,7 +382,7 @@ function setupRoutes(): void {
     usersModule.setDatabase(db.db);
     
     // Initialize test routes with database
-    testRoutes.setDatabase(db);
+    testModule.setDatabase(db);
     
     // Initialize git routes with database
     gitRoutes.setDatabase(db);
@@ -449,7 +450,8 @@ function setupRoutes(): void {
     
     // Settings routes
     try {
-      const settingsRoutes = require('./routes/settings');
+      const settingsModule = require('./routes/settings');
+      const settingsRoutes = settingsModule.default;
       app.use('/api/settings', settingsRoutes);
     } catch (e) { console.warn('Settings routes not available'); }
     

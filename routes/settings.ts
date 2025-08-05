@@ -1,32 +1,84 @@
-const express = require('express');
-const router = express.Router();
-const fs = require('fs').promises;
-const path = require('path');
+import express, { Request, Response, NextFunction, Router } from 'express';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { Session } from 'express-session';
+
+const router: Router = express.Router();
 
 /**
  * Settings API Routes
  * Handles application settings management and connection testing
  */
 
+// TypeScript interfaces
+interface AuthenticatedRequest extends Request {
+  session: Session & {
+    user?: {
+      id: string;
+      username: string;
+      email: string;
+      role: string;
+    };
+  };
+}
+
+interface Settings {
+  defaultBrowser: string;
+  headlessMode: boolean;
+  jiraEnabled: boolean;
+  adoEnabled: boolean;
+  githubEnabled: boolean;
+  jenkinsEnabled: boolean;
+  lastModified?: string;
+  modifiedBy?: string;
+  [key: string]: any;
+}
+
+interface GitHubTestRequest {
+  token: string;
+  organization?: string;
+  repository?: string;
+}
+
+interface JenkinsTestRequest {
+  url: string;
+  username?: string;
+  apiToken?: string;
+}
+
+interface JiraTestRequest {
+  url: string;
+  username: string;
+  apiToken: string;
+  projectKey?: string;
+}
+
+interface AdoTestRequest {
+  organization: string;
+  project: string;
+  pat: string;
+}
+
 // Authentication middleware
-const requireAuth = (req, res, next) => {
+const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.session || !req.session.user) {
-        return res.status(401).json({ 
+        res.status(401).json({ 
             success: false, 
             error: 'Authentication required' 
         });
+        return;
     }
     next();
 };
 
 // Path to settings file
-const getSettingsPath = () => path.join(__dirname, '..', 'config', 'test-settings.json');
+const getSettingsPath = (): string => path.join(__dirname, '..', 'config', 'test-settings.json');
 
 /**
  * GET /api/settings
  * Get current application settings
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         const settingsPath = getSettingsPath();
         
@@ -35,18 +87,19 @@ router.get('/', requireAuth, async (req, res) => {
         
         if (exists) {
             const settingsData = await fs.readFile(settingsPath, 'utf8');
-            const settings = JSON.parse(settingsData);
+            const settings: Settings = JSON.parse(settingsData);
             res.json(settings);
         } else {
             // Return default settings if no file exists
-            res.json({
+            const defaultSettings: Settings = {
                 defaultBrowser: "chromium",
                 headlessMode: true,
                 jiraEnabled: false,
                 adoEnabled: false,
                 githubEnabled: false,
                 jenkinsEnabled: false
-            });
+            };
+            res.json(defaultSettings);
         }
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -61,13 +114,13 @@ router.get('/', requireAuth, async (req, res) => {
  * POST /api/settings
  * Update application settings
  */
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        const settings = req.body;
+        const settings: Settings = req.body;
         
         // Add metadata
         settings.lastModified = new Date().toISOString();
-        settings.modifiedBy = req.session.user.username || 'unknown';
+        settings.modifiedBy = req.session.user?.username || 'unknown';
         
         const settingsPath = getSettingsPath();
         
@@ -95,15 +148,16 @@ router.post('/', requireAuth, async (req, res) => {
  * POST /api/settings/test-connection/github
  * Test GitHub connection
  */
-router.post('/test-connection/github', requireAuth, async (req, res) => {
+router.post('/test-connection/github', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        const { token, organization, repository } = req.body;
+        const { token, organization, repository }: GitHubTestRequest = req.body;
         
         if (!token) {
-            return res.status(400).json({
+            res.status(400).json({
                 success: false,
                 error: 'GitHub token is required'
             });
+            return;
         }
         
         // Test GitHub API connection
@@ -135,7 +189,7 @@ router.post('/test-connection/github', requireAuth, async (req, res) => {
                             pull: repo.permissions?.pull || false
                         }
                     };
-                } catch (repoError) {
+                } catch (repoError: any) {
                     console.warn('Repository access test failed:', repoError.message);
                 }
             }
@@ -153,7 +207,7 @@ router.post('/test-connection/github', requireAuth, async (req, res) => {
                 message: 'GitHub connection successful'
             });
             
-        } catch (apiError) {
+        } catch (apiError: any) {
             console.error('GitHub API error:', apiError);
             res.status(400).json({
                 success: false,
@@ -162,7 +216,7 @@ router.post('/test-connection/github', requireAuth, async (req, res) => {
             });
         }
         
-    } catch (error) {
+    } catch (error: any) {
         console.error('GitHub connection test error:', error);
         res.status(500).json({
             success: false,
@@ -176,15 +230,16 @@ router.post('/test-connection/github', requireAuth, async (req, res) => {
  * POST /api/settings/test-connection/jenkins
  * Test Jenkins connection
  */
-router.post('/test-connection/jenkins', requireAuth, async (req, res) => {
+router.post('/test-connection/jenkins', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        const { url, username, apiToken } = req.body;
+        const { url, username, apiToken }: JenkinsTestRequest = req.body;
         
         if (!url) {
-            return res.status(400).json({
+            res.status(400).json({
                 success: false,
                 error: 'Jenkins URL is required'
             });
+            return;
         }
         
         // Test Jenkins connection using HTTP requests
@@ -200,7 +255,7 @@ router.post('/test-connection/jenkins', requireAuth, async (req, res) => {
                 ? Buffer.from(`${username}:${apiToken}`).toString('base64')
                 : null;
             
-            const headers = {
+            const headers: Record<string, string> = {
                 'Content-Type': 'application/json'
             };
             
@@ -244,7 +299,7 @@ router.post('/test-connection/jenkins', requireAuth, async (req, res) => {
                 message: 'Jenkins connection successful'
             });
             
-        } catch (jenkinsError) {
+        } catch (jenkinsError: any) {
             console.error('Jenkins API error:', jenkinsError);
             res.status(400).json({
                 success: false,
@@ -253,7 +308,7 @@ router.post('/test-connection/jenkins', requireAuth, async (req, res) => {
             });
         }
         
-    } catch (error) {
+    } catch (error: any) {
         console.error('Jenkins connection test error:', error);
         res.status(500).json({
             success: false,
@@ -267,15 +322,16 @@ router.post('/test-connection/jenkins', requireAuth, async (req, res) => {
  * POST /api/settings/test-connection/jira
  * Test JIRA connection (uses existing enhanced JIRA integration)
  */
-router.post('/test-connection/jira', requireAuth, async (req, res) => {
+router.post('/test-connection/jira', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        const { url, username, apiToken, projectKey } = req.body;
+        const { url, username, apiToken, projectKey }: JiraTestRequest = req.body;
         
         if (!url || !username || !apiToken) {
-            return res.status(400).json({
+            res.status(400).json({
                 success: false,
                 error: 'JIRA URL, username, and API token are required'
             });
+            return;
         }
         
         // Use the existing JIRA integration from test-result-processing
@@ -306,12 +362,12 @@ router.post('/test-connection/jira', requireAuth, async (req, res) => {
                         key: project.key,
                         name: project.name,
                         projectTypeKey: project.projectTypeKey,
-                        issueTypes: project.issueTypes?.map(type => ({
+                        issueTypes: project.issueTypes?.map((type: any) => ({
                             id: type.id,
                             name: type.name
                         })) || []
                     };
-                } catch (projectError) {
+                } catch (projectError: any) {
                     console.warn('Project access test failed:', projectError.message);
                 }
             }
@@ -328,7 +384,7 @@ router.post('/test-connection/jira', requireAuth, async (req, res) => {
                 message: 'JIRA connection successful'
             });
             
-        } catch (jiraError) {
+        } catch (jiraError: any) {
             console.error('JIRA API error:', jiraError);
             res.status(400).json({
                 success: false,
@@ -337,7 +393,7 @@ router.post('/test-connection/jira', requireAuth, async (req, res) => {
             });
         }
         
-    } catch (error) {
+    } catch (error: any) {
         console.error('JIRA connection test error:', error);
         res.status(500).json({
             success: false,
@@ -351,17 +407,18 @@ router.post('/test-connection/jira', requireAuth, async (req, res) => {
  * POST /api/settings/test-connection/ado
  * Test Azure DevOps connection (delegates to existing route)
  */
-router.post('/test-connection/ado', requireAuth, async (req, res) => {
+router.post('/test-connection/ado', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
         // Delegate to existing ADO test connection endpoint
         const AdoClient = require('../lib/ado-client');
-        const { organization, project, pat } = req.body;
+        const { organization, project, pat }: AdoTestRequest = req.body;
         
         if (!organization || !project || !pat) {
-            return res.status(400).json({
+            res.status(400).json({
                 success: false,
                 error: 'Organization, project, and PAT are required'
             });
+            return;
         }
         
         const testClient = new AdoClient({
@@ -374,7 +431,7 @@ router.post('/test-connection/ado', requireAuth, async (req, res) => {
         
         res.json(result);
         
-    } catch (error) {
+    } catch (error: any) {
         console.error('ADO connection test error:', error);
         res.status(500).json({
             success: false,
@@ -384,4 +441,4 @@ router.post('/test-connection/ado', requireAuth, async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
