@@ -13,12 +13,9 @@ const router: Router = express.Router();
 // TypeScript interfaces
 interface AuthenticatedRequest extends Request {
   session: Session & {
-    user?: {
-      id: string;
-      username: string;
-      email: string;
-      role: string;
-    };
+    userId?: string;
+    username?: string;
+    userRole?: string;
   };
 }
 
@@ -61,7 +58,7 @@ interface AdoTestRequest {
 
 // Authentication middleware
 const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    if (!req.session || !req.session.user) {
+    if (!req.session || !req.session.userId) {
         res.status(401).json({ 
             success: false, 
             error: 'Authentication required' 
@@ -120,7 +117,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
         
         // Add metadata
         settings.lastModified = new Date().toISOString();
-        settings.modifiedBy = req.session.user?.username || 'unknown';
+        settings.modifiedBy = req.session.username || 'unknown';
         
         const settingsPath = getSettingsPath();
         
