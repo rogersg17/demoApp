@@ -48,7 +48,7 @@ const server = createServer(app);
 // Enhanced CORS configuration
 const corsOptions: cors.CorsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(',');
+    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',');
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -75,7 +75,7 @@ const db = new Database();
 const serverConfig: ServerConfig = {
   port: parseInt(process.env.PORT || '3000'),
   sessionSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000').split(','),
+  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(','),
   rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 minutes
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100'),
   webhookToken: process.env.TMS_WEBHOOK_TOKEN

@@ -111,9 +111,11 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
-        state.user = action.payload.user
+        // Handle both possible response formats
+        const user = action.payload.user || action.payload
+        state.user = user
         state.isAuthenticated = true
-        sessionStorage.setItem('loggedInUser', action.payload.user.username)
+        sessionStorage.setItem('loggedInUser', user.username)
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false

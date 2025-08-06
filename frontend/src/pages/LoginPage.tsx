@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { login, clearError, setError } from '../store/slices/authSlice'
@@ -17,7 +17,14 @@ const LoginPage: React.FC = () => {
 
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
-  const { isLoading, error } = useSelector((state: RootState) => state.auth)
+  const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth)
+
+  // Navigate to dashboard when authentication is successful
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,10 +42,8 @@ const LoginPage: React.FC = () => {
     }
     
     try {
-      const result = await dispatch(login(credentials))
-      if (login.fulfilled.match(result)) {
-        navigate('/dashboard')
-      }
+      await dispatch(login(credentials))
+      // Navigation will be handled by useEffect when isAuthenticated becomes true
     } catch (error) {
       console.error('Login failed:', error)
     }
