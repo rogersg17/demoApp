@@ -115,8 +115,8 @@ function emitTestUpdate(testId: string, update: Partial<ExecutionUpdate>): void 
 // Initialize test execution orchestration
 let testQueue: any = null;
 try {
-  const TestExecutionQueue = require('./services/prisma-orchestration-service');
-  testQueue = new TestExecutionQueue();
+  const { PrismaOrchestrationService } = require('./services/prisma-orchestration-service');
+  testQueue = new PrismaOrchestrationService();
 } catch (error) {
   console.warn('⚠️ Test execution queue service not available:', error);
 }

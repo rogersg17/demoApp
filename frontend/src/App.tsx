@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import type { AppDispatch, RootState } from './store/store'
@@ -7,7 +7,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import TestManagementPage from './pages/TestManagementPage'
 import UserManagementPage from './pages/UserManagementPage'
-import SettingsPage from './pages/SettingsPage'
+import TabbedSettingsPage from './pages/TabbedSettingsPage'
 import FlakyTestsPage from './pages/FlakyTestsPage'
 import GitHubActionsPage from './pages/GitHubActionsPage'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -44,7 +44,7 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/tests" element={<TestManagementPage />} />
               <Route path="/users" element={<UserManagementPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<TabbedSettingsPage />} />
               <Route path="/flaky-tests" element={<FlakyTestsPage />} />
               <Route path="/github-actions" element={<GitHubActionsPage />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Layout from '../components/Layout';
 import './FlakyTestsPage.css';
 
 interface FlakyTest {
@@ -212,17 +213,20 @@ const FlakyTestsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flaky-tests-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading flaky test data...</p>
+      <Layout>
+        <div className="flaky-tests-page">
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading flaky test data...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="flaky-tests-page">
+    <Layout>
+      <div className="flaky-tests-page">
       <div className="page-header">
         <h1>Flaky Test Detection</h1>
         <div className="header-actions">
@@ -453,7 +457,8 @@ const FlakyTestsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 };
 

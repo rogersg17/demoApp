@@ -464,3 +464,6 @@ class AdoProjectConfigurationService {
 }
 
 export default AdoProjectConfigurationService;
+
+// CommonJS export for server.ts compatibility
+module.exports = AdoProjectConfigurationService;

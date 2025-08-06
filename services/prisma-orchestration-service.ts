@@ -375,3 +375,6 @@ export class PrismaOrchestrationService {
     console.log('✅ Prisma Orchestration Service cleanup complete');
   }
 }
+
+// CommonJS export for server.ts compatibility
+module.exports = { PrismaOrchestrationService };
