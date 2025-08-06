@@ -70,3 +70,5 @@ tmp/
 temp/
 *.png
 .env.ado
+database/app.db
+prisma/database/app.db
