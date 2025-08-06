@@ -5,8 +5,124 @@
  * across different frameworks and build configurations.
  */
 
+interface Database {
+    all(sql: string, params: any[]): Promise<any[]>;
+}
+
+interface AdoTestResult {
+    testName: string;
+    filePath?: string;
+    testFile?: string;
+    testDetails?: string;
+}
+
+interface BuildContext {
+    repository?: {
+        id: string;
+    };
+    branch?: string;
+}
+
+interface TestMetadata {
+    id: string;
+    test_name: string;
+    display_name?: string;
+    file_path?: string;
+    framework?: string;
+    description?: string;
+    repository_id?: string;
+    last_updated_branch?: string;
+    last_seen?: string;
+    source?: string;
+}
+
+interface Correlation {
+    adoTest: AdoTestResult;
+    testMetadata: TestMetadata;
+    confidence: number;
+    matchType: string;
+    correlationDetails: any;
+}
+
+interface UnmatchedTest {
+    adoTest: AdoTestResult;
+    bestAttempt: any;
+    reason: string;
+}
+
+interface CorrelationResult {
+    correlations: Correlation[];
+    unmatchedTests: UnmatchedTest[];
+    stats: {
+        total: number;
+        matched: number;
+        unmatched: number;
+        matchRate: number;
+    };
+}
+
+interface NormalizationPattern {
+    pattern: RegExp;
+    replacement: string;
+}
+
+interface FrameworkPatterns {
+    [key: string]: {
+        testNamePattern: RegExp;
+        filePattern: RegExp;
+        normalizeTitle: (title: string) => string;
+    };
+}
+
+interface ConfidenceWeights {
+    exactMatch: number;
+    normalizedMatch: number;
+    fuzzyMatch: number;
+    filePathMatch: number;
+    frameworkMatch: number;
+    partialMatch: number;
+    similarityThreshold: number;
+}
+
+interface Score {
+    nameMatch: number;
+    filePathMatch: number;
+    frameworkMatch: number;
+    contentMatch: number;
+    contextMatch: number;
+    totalScore: number;
+    primaryMatchType: string;
+    strategy: string;
+}
+
+interface Failure {
+    id: string;
+    test_name: string;
+    failure_message?: string;
+    last_seen?: string;
+    created_at?: string;
+    build_id?: string;
+    pipeline_id?: string;
+    correlation_timestamp?: string;
+}
+
+interface FailurePattern {
+    frequency: number;
+    timeSpan: number | null;
+    consistency: number;
+    significance: number;
+    patternType: string;
+}
+
+
 class AdoTestCorrelation {
-    constructor(database) {
+    private db: Database;
+    private debug: boolean;
+    private normalizationPatterns: NormalizationPattern[];
+    private frameworkPatterns: FrameworkPatterns;
+    private confidenceWeights: ConfidenceWeights;
+
+    constructor(database: Database) {
         this.db = database;
         this.debug = process.env.ADO_CORRELATION_DEBUG === 'true';
         
@@ -37,31 +153,31 @@ class AdoTestCorrelation {
                 // Playwright test patterns: file.spec.js > describe > test
                 testNamePattern: /^(.+\.(?:spec|test)\.[jt]s)\s*>\s*(.+?)\s*>\s*(.+)$/,
                 filePattern: /\.(?:spec|test)\.[jt]s$/,
-                normalizeTitle: (title) => title.replace(/['"]/g, '').trim()
+                normalizeTitle: (title: string) => title.replace(/['"]/g, '').trim()
             },
             jest: {
                 // Jest patterns: describe > it/test
                 testNamePattern: /^(.+?)\s*>\s*(.+)$/,
                 filePattern: /\.(?:test|spec)\.[jt]sx?$/,
-                normalizeTitle: (title) => title.replace(/['"]/g, '').trim()
+                normalizeTitle: (title: string) => title.replace(/['"]/g, '').trim()
             },
             mocha: {
                 // Mocha patterns: describe > it
                 testNamePattern: /^(.+?)\s*>\s*(.+)$/,
                 filePattern: /\.(?:test|spec)\.js$/,
-                normalizeTitle: (title) => title.replace(/['"]/g, '').trim()
+                normalizeTitle: (title: string) => title.replace(/['"]/g, '').trim()
             },
             cypress: {
                 // Cypress patterns: file.cy.js > describe > it
                 testNamePattern: /^(.+\.cy\.[jt]s)\s*>\s*(.+?)\s*>\s*(.+)$/,
                 filePattern: /\.cy\.[jt]s$/,
-                normalizeTitle: (title) => title.replace(/['"]/g, '').trim()
+                normalizeTitle: (title: string) => title.replace(/['"]/g, '').trim()
             },
             vitest: {
                 // Vitest patterns similar to Jest
                 testNamePattern: /^(.+?)\s*>\s*(.+)$/,
                 filePattern: /\.(?:test|spec)\.[jt]sx?$/,
-                normalizeTitle: (title) => title.replace(/['"]/g, '').trim()
+                normalizeTitle: (title: string) => title.replace(/['"]/g, '').trim()
             }
         };
         
@@ -82,10 +198,10 @@ class AdoTestCorrelation {
     /**
      * Map ADO test results to test metadata with confidence scoring
      */
-    async correlateTestResults(adoTestResults, buildContext = {}) {
+    async correlateTestResults(adoTestResults: AdoTestResult[], buildContext: BuildContext = {}): Promise<CorrelationResult> {
         try {
-            const correlations = [];
-            const unmatchedTests = [];
+            const correlations: Correlation[] = [];
+            const unmatchedTests: UnmatchedTest[] = [];
 
             for (const adoTest of adoTestResults) {
                 const correlation = await this.findBestMatch(adoTest, buildContext);
@@ -107,14 +223,14 @@ class AdoTestCorrelation {
                 }
             }
 
-            const result = {
+            const result: CorrelationResult = {
                 correlations,
                 unmatchedTests,
                 stats: {
                     total: adoTestResults.length,
                     matched: correlations.length,
                     unmatched: unmatchedTests.length,
-                    matchRate: correlations.length / adoTestResults.length
+                    matchRate: adoTestResults.length > 0 ? correlations.length / adoTestResults.length : 0
                 }
             };
 
@@ -130,7 +246,7 @@ class AdoTestCorrelation {
     /**
      * Find the best match for an ADO test result
      */
-    async findBestMatch(adoTest, buildContext) {
+    async findBestMatch(adoTest: AdoTestResult, buildContext: BuildContext) {
         try {
             const candidates = await this.getCandidateMatches(adoTest, buildContext);
             
@@ -169,8 +285,8 @@ class AdoTestCorrelation {
     /**
      * Get candidate matches from test metadata
      */
-    async getCandidateMatches(adoTest, buildContext) {
-        const candidates = [];
+    async getCandidateMatches(adoTest: AdoTestResult, buildContext: BuildContext): Promise<TestMetadata[]> {
+        const candidates: TestMetadata[] = [];
         
         try {
             // Direct name match
@@ -231,8 +347,8 @@ class AdoTestCorrelation {
     /**
      * Calculate match score for a candidate
      */
-    calculateMatchScore(adoTest, candidate, buildContext) {
-        const score = {
+    calculateMatchScore(adoTest: AdoTestResult, candidate: TestMetadata, buildContext: BuildContext): Score {
+        const score: Score = {
             nameMatch: 0,
             filePathMatch: 0,
             frameworkMatch: 0,
@@ -298,7 +414,7 @@ class AdoTestCorrelation {
     /**
      * Calculate name similarity between ADO test and candidate
      */
-    calculateNameSimilarity(adoName, candidateName) {
+    calculateNameSimilarity(adoName: string, candidateName: string): { score: number; type: string } {
         // Exact match
         if (adoName === candidateName) {
             return { score: 1.0, type: 'exact' };
@@ -325,11 +441,11 @@ class AdoTestCorrelation {
     /**
      * Calculate file path similarity
      */
-    calculateFilePathSimilarity(adoPath, candidatePath) {
+    calculateFilePathSimilarity(adoPath: string, candidatePath: string): number {
         if (!adoPath || !candidatePath) return 0;
 
         // Normalize paths
-        const normalizePathSeparators = (path) => path.replace(/[\\\/]+/g, '/');
+        const normalizePathSeparators = (path: string) => path.replace(/[\\\/]+/g, '/');
         const normAdoPath = normalizePathSeparators(adoPath.toLowerCase());
         const normCandidatePath = normalizePathSeparators(candidatePath.toLowerCase());
 
@@ -360,7 +476,7 @@ class AdoTestCorrelation {
     /**
      * Normalize test name for better matching
      */
-    normalizeTestName(testName) {
+    normalizeTestName(testName: string): string {
         if (!testName) return '';
         
         let normalized = testName;
@@ -376,8 +492,8 @@ class AdoTestCorrelation {
     /**
      * Calculate Levenshtein similarity
      */
-    calculateLevenshteinSimilarity(str1, str2) {
-        const matrix = [];
+    calculateLevenshteinSimilarity(str1: string, str2: string): number {
+        const matrix: number[][] = [];
         const len1 = str1.length;
         const len2 = str2.length;
 
@@ -412,8 +528,8 @@ class AdoTestCorrelation {
     /**
      * Get framework-specific matches
      */
-    async getFrameworkSpecificMatches(adoTest, repository) {
-        const matches = [];
+    async getFrameworkSpecificMatches(adoTest: AdoTestResult, repository: { id: string }): Promise<TestMetadata[]> {
+        const matches: TestMetadata[] = [];
         
         for (const [framework, patterns] of Object.entries(this.frameworkPatterns)) {
             try {
@@ -439,9 +555,9 @@ class AdoTestCorrelation {
     /**
      * Check if test matches framework pattern
      */
-    matchesFrameworkPattern(adoTest, candidate, patterns) {
+    matchesFrameworkPattern(adoTest: AdoTestResult, candidate: TestMetadata, patterns: FrameworkPatterns[string]): boolean {
         const adoMatch = patterns.testNamePattern.exec(adoTest.testName);
-        const candidateMatch = patterns.testNamePattern.exec(candidate.test_name);
+        const candidateMatch = candidate.test_name ? patterns.testNamePattern.exec(candidate.test_name) : null;
         
         if (adoMatch && candidateMatch) {
             // Compare extracted parts
@@ -463,7 +579,7 @@ class AdoTestCorrelation {
     /**
      * Perform fuzzy search
      */
-    async performFuzzySearch(adoTest) {
+    async performFuzzySearch(adoTest: AdoTestResult): Promise<TestMetadata[]> {
         try {
             // Use FTS if available, otherwise fall back to LIKE
             const searchTerm = this.normalizeTestName(adoTest.testName);
@@ -491,8 +607,8 @@ class AdoTestCorrelation {
     /**
      * Remove duplicate candidates
      */
-    removeDuplicateCandidates(candidates) {
-        const seen = new Set();
+    removeDuplicateCandidates(candidates: TestMetadata[]): TestMetadata[] {
+        const seen = new Set<string>();
         return candidates.filter(candidate => {
             const key = `${candidate.id}_${candidate.source}`;
             if (seen.has(key)) {
@@ -506,7 +622,7 @@ class AdoTestCorrelation {
     /**
      * Calculate framework score
      */
-    calculateFrameworkScore(adoTest, candidate) {
+    calculateFrameworkScore(adoTest: AdoTestResult, candidate: TestMetadata): number {
         if (!candidate.framework) return 0;
         
         // Infer framework from ADO test characteristics
@@ -517,7 +633,7 @@ class AdoTestCorrelation {
         }
         
         // Check compatible frameworks
-        const compatibleFrameworks = {
+        const compatibleFrameworks: { [key: string]: string[] } = {
             'jest': ['vitest'],
             'vitest': ['jest'],
             'mocha': ['jasmine'],
@@ -534,7 +650,7 @@ class AdoTestCorrelation {
     /**
      * Infer framework from ADO test characteristics
      */
-    inferFrameworkFromAdoTest(adoTest) {
+    inferFrameworkFromAdoTest(adoTest: AdoTestResult): string {
         const testName = adoTest.testName.toLowerCase();
         const filePath = (adoTest.filePath || '').toLowerCase();
         
@@ -552,7 +668,7 @@ class AdoTestCorrelation {
     /**
      * Calculate content similarity
      */
-    calculateContentSimilarity(adoDetails, candidateDescription) {
+    calculateContentSimilarity(adoDetails: string, candidateDescription: string): number {
         if (!adoDetails || !candidateDescription) return 0;
         
         const normalizedAdo = this.normalizeTestName(adoDetails);
@@ -564,7 +680,7 @@ class AdoTestCorrelation {
     /**
      * Calculate context score
      */
-    calculateContextScore(buildContext, candidate) {
+    calculateContextScore(buildContext: BuildContext, candidate: TestMetadata): number {
         let score = 0;
         
         // Repository match
@@ -581,7 +697,7 @@ class AdoTestCorrelation {
         
         // Recent activity bonus
         if (candidate.last_seen) {
-            const daysSinceLastSeen = (Date.now() - new Date(candidate.last_seen)) / (1000 * 60 * 60 * 24);
+            const daysSinceLastSeen = (Date.now() - new Date(candidate.last_seen).getTime()) / (1000 * 60 * 60 * 24);
             if (daysSinceLastSeen < 30) {
                 score += 0.2 * (1 - daysSinceLastSeen / 30);
             }
@@ -593,7 +709,7 @@ class AdoTestCorrelation {
     /**
      * Detect cross-build failure patterns
      */
-    async detectFailurePatterns(correlations, lookbackBuilds = 10) {
+    async detectFailurePatterns(correlations: Correlation[], lookbackBuilds: number = 10) {
         try {
             const patterns = [];
             
@@ -601,7 +717,7 @@ class AdoTestCorrelation {
                 if (!correlation.testMetadata) continue;
                 
                 // Get recent failures for this test
-                const recentFailures = await this.db.all(`
+                const recentFailures: Failure[] = await this.db.all(`
                     SELECT f.*, c.build_id, c.pipeline_id, c.correlation_timestamp
                     FROM mvp_test_failures f
                     JOIN mvp_ado_jira_correlations c ON f.id = c.failure_id
@@ -633,8 +749,8 @@ class AdoTestCorrelation {
     /**
      * Analyze failure pattern
      */
-    analyzeFailurePattern(failures) {
-        const pattern = {
+    analyzeFailurePattern(failures: Failure[]): FailurePattern {
+        const pattern: FailurePattern = {
             frequency: failures.length,
             timeSpan: null,
             consistency: 0,
@@ -645,7 +761,7 @@ class AdoTestCorrelation {
         if (failures.length < 2) return pattern;
 
         // Calculate time span
-        const timestamps = failures.map(f => new Date(f.last_seen || f.created_at));
+        const timestamps = failures.map(f => new Date(f.last_seen || f.created_at || Date.now()).getTime());
         const earliest = Math.min(...timestamps);
         const latest = Math.max(...timestamps);
         pattern.timeSpan = latest - earliest;
@@ -653,7 +769,7 @@ class AdoTestCorrelation {
         // Analyze failure message consistency
         const messages = failures.map(f => f.failure_message).filter(Boolean);
         const uniqueMessages = new Set(messages);
-        pattern.consistency = 1 - (uniqueMessages.size / messages.length);
+        pattern.consistency = messages.length > 0 ? 1 - (uniqueMessages.size / messages.length) : 0;
 
         // Determine pattern type and significance
         if (pattern.frequency >= 5 && pattern.consistency > 0.8) {
@@ -676,7 +792,7 @@ class AdoTestCorrelation {
     /**
      * Log debug information
      */
-    log(...args) {
+    log(...args: any[]) {
         if (this.debug) {
             console.log('[ADO-TEST-CORRELATION]', ...args);
         }
@@ -685,9 +801,9 @@ class AdoTestCorrelation {
     /**
      * Log error information
      */
-    error(...args) {
+    error(...args: any[]) {
         console.error('[ADO-TEST-CORRELATION ERROR]', ...args);
     }
 }
 
-module.exports = AdoTestCorrelation;
+export default AdoTestCorrelation;

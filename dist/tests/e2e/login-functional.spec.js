@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const test_1 = require("@playwright/test");
-const { LoginPage } = require('../../page-objects/LoginPage.js');
+const LoginPage_1 = require("../../page-objects/LoginPage");
 test_1.test.describe.configure({ mode: 'serial' });
 test_1.test.describe('Login Functional Tests', () => {
     let loginPage;
     test_1.test.beforeEach(async ({ page }) => {
-        loginPage = new LoginPage(page);
+        loginPage = new LoginPage_1.LoginPage(page);
         await loginPage.goto();
         // Add a small delay to avoid rate limiting
         await page.waitForTimeout(1000);

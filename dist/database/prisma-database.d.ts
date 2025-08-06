@@ -61,33 +61,33 @@ export declare class PrismaDatabase {
         metadata?: any;
     }): Promise<{
         id: string;
+        status: string;
         created_at: Date;
+        priority: number;
         execution_id: string;
+        metadata: string | null;
         test_suite: string;
         environment: string;
-        status: string;
-        priority: number;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
     }>;
     getTestExecution(executionId: string): Promise<({
         results: {
             id: number;
-            created_at: Date;
-            execution_id: string;
             status: string;
+            created_at: Date;
             test_name: string;
-            duration: number;
+            execution_id: string;
             error_message: string | null;
+            duration: number;
             stack_trace: string | null;
         }[];
         resource_allocations: {
             id: number;
-            execution_id: string;
             status: string;
+            execution_id: string;
             runner_id: number;
             cpu_allocated: number;
             memory_allocated: number;
@@ -97,10 +97,11 @@ export declare class PrismaDatabase {
             peak_memory_usage: number | null;
         }[];
         assigned_runner: {
-            name: string;
             id: number;
-            created_at: Date;
             status: string;
+            created_at: Date;
+            updated_at: Date;
+            name: string;
             priority: number;
             metadata: string | null;
             type: string;
@@ -110,7 +111,6 @@ export declare class PrismaDatabase {
             capabilities: string | null;
             max_concurrent_jobs: number;
             health_check_url: string | null;
-            updated_at: Date;
             last_health_check: Date | null;
         } | null;
         execution_metrics: {
@@ -123,31 +123,31 @@ export declare class PrismaDatabase {
         }[];
     } & {
         id: string;
+        status: string;
         created_at: Date;
+        priority: number;
         execution_id: string;
+        metadata: string | null;
         test_suite: string;
         environment: string;
-        status: string;
-        priority: number;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
     }) | null>;
     updateTestExecutionStatus(executionId: string, status: string, completedAt?: Date): Promise<{
         id: string;
+        status: string;
         created_at: Date;
+        priority: number;
         execution_id: string;
+        metadata: string | null;
         test_suite: string;
         environment: string;
-        status: string;
-        priority: number;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
     }>;
     createTestRunner(data: {
         name: string;
@@ -162,10 +162,11 @@ export declare class PrismaDatabase {
         health_check_url?: string;
         metadata?: any;
     }): Promise<{
-        name: string;
         id: number;
-        created_at: Date;
         status: string;
+        created_at: Date;
+        updated_at: Date;
+        name: string;
         priority: number;
         metadata: string | null;
         type: string;
@@ -175,7 +176,6 @@ export declare class PrismaDatabase {
         capabilities: string | null;
         max_concurrent_jobs: number;
         health_check_url: string | null;
-        updated_at: Date;
         last_health_check: Date | null;
     }>;
     getTestRunners(options?: {
@@ -184,10 +184,11 @@ export declare class PrismaDatabase {
         orderBy?: 'name' | 'priority' | 'created_at';
         orderDirection?: 'asc' | 'desc';
     }): Promise<{
-        name: string;
         id: number;
-        created_at: Date;
         status: string;
+        created_at: Date;
+        updated_at: Date;
+        name: string;
         priority: number;
         metadata: string | null;
         type: string;
@@ -197,7 +198,6 @@ export declare class PrismaDatabase {
         capabilities: string | null;
         max_concurrent_jobs: number;
         health_check_url: string | null;
-        updated_at: Date;
         last_health_check: Date | null;
     }[]>;
     updateTestRunnerHealth(runnerId: number, healthStatus: string, responseTime?: number, errorMessage?: string): Promise<void>;
@@ -212,16 +212,16 @@ export declare class PrismaDatabase {
         metadata?: any;
     }): Promise<{
         id: number;
-        execution_id: string;
-        test_suite: string;
-        environment: string;
         status: string;
         priority: number;
+        execution_id: string;
+        metadata: string | null;
+        test_suite: string;
+        environment: string;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
         requested_runner_type: string | null;
         requested_runner_id: number | null;
         queued_at: Date;
@@ -230,30 +230,30 @@ export declare class PrismaDatabase {
     getQueuedExecutions(limit?: number): Promise<({
         execution: {
             id: string;
+            status: string;
             created_at: Date;
+            priority: number;
             execution_id: string;
+            metadata: string | null;
             test_suite: string;
             environment: string;
-            status: string;
-            priority: number;
             started_at: Date | null;
             completed_at: Date | null;
             assigned_runner_id: number | null;
             estimated_duration: number | null;
-            metadata: string | null;
         };
     } & {
         id: number;
-        execution_id: string;
-        test_suite: string;
-        environment: string;
         status: string;
         priority: number;
+        execution_id: string;
+        metadata: string | null;
+        test_suite: string;
+        environment: string;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
         requested_runner_type: string | null;
         requested_runner_id: number | null;
         queued_at: Date;
@@ -261,16 +261,16 @@ export declare class PrismaDatabase {
     })[]>;
     assignExecutionToRunner(executionId: string, runnerId: number): Promise<{
         id: number;
-        execution_id: string;
-        test_suite: string;
-        environment: string;
         status: string;
         priority: number;
+        execution_id: string;
+        metadata: string | null;
+        test_suite: string;
+        environment: string;
         started_at: Date | null;
         completed_at: Date | null;
         assigned_runner_id: number | null;
         estimated_duration: number | null;
-        metadata: string | null;
         requested_runner_type: string | null;
         requested_runner_id: number | null;
         queued_at: Date;
@@ -283,8 +283,8 @@ export declare class PrismaDatabase {
         memory_allocated: number;
     }): Promise<{
         id: number;
-        execution_id: string;
         status: string;
+        execution_id: string;
         runner_id: number;
         cpu_allocated: number;
         memory_allocated: number;
@@ -316,9 +316,9 @@ export declare class PrismaDatabase {
         shard_webhook_url?: string;
     }): Promise<{
         id: number;
+        status: string;
         created_at: Date;
         execution_id: string;
-        status: string;
         started_at: Date | null;
         completed_at: Date | null;
         runner_id: number | null;
@@ -330,10 +330,11 @@ export declare class PrismaDatabase {
     }>;
     getParallelExecutions(parentExecutionId: string): Promise<({
         runner: {
-            name: string;
             id: number;
-            created_at: Date;
             status: string;
+            created_at: Date;
+            updated_at: Date;
+            name: string;
             priority: number;
             metadata: string | null;
             type: string;
@@ -343,14 +344,13 @@ export declare class PrismaDatabase {
             capabilities: string | null;
             max_concurrent_jobs: number;
             health_check_url: string | null;
-            updated_at: Date;
             last_health_check: Date | null;
         } | null;
     } & {
         id: number;
+        status: string;
         created_at: Date;
         execution_id: string;
-        status: string;
         started_at: Date | null;
         completed_at: Date | null;
         runner_id: number | null;
@@ -375,10 +375,10 @@ export declare class PrismaDatabase {
         flakiness_percentage?: number;
     }): Promise<{
         id: number;
-        created_at: Date;
         status: string;
-        test_name: string;
+        created_at: Date;
         updated_at: Date;
+        test_name: string;
         failure_count: number;
         success_count: number;
         flakiness_percentage: number;
@@ -387,10 +387,10 @@ export declare class PrismaDatabase {
     }>;
     getFlakyTests(limit?: number): Promise<{
         id: number;
-        created_at: Date;
         status: string;
-        test_name: string;
+        created_at: Date;
         updated_at: Date;
+        test_name: string;
         failure_count: number;
         success_count: number;
         flakiness_percentage: number;

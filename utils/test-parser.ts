@@ -1,4 +1,134 @@
-const TestIdentifierService = require('../services/test-identifier');
+import TestIdentifierService from '../services/test-identifier';
+
+type Framework = 'playwright' | 'jest' | 'mocha' | 'cypress' | 'vitest' | 'jasmine' | 'generic';
+
+interface Import {
+    type: 'es6' | 'commonjs';
+    module: string;
+    line: number;
+}
+
+interface DescribeBlock {
+    name: string;
+    index: number;
+    line: number;
+    modifier: 'only' | 'skip' | null;
+}
+
+interface Mock {
+    module: string;
+    line: number;
+}
+
+interface Command {
+    name: string;
+    line: number;
+}
+
+interface BaseTest {
+    framework: Framework;
+    name: string;
+    filePath: string;
+    lineNumber: number;
+    isAsync: boolean;
+    testId: string;
+    context?: string | null;
+    modifiers?: string[];
+}
+
+interface PlaywrightTest extends BaseTest {
+    framework: 'playwright';
+    browsers: string[];
+    annotations: string[];
+}
+
+interface JestTest extends BaseTest {
+    framework: 'jest';
+    expectations: string[];
+}
+
+interface MochaTest extends BaseTest {
+    framework: 'mocha';
+    timeout: number | null;
+}
+
+interface CypressTest extends BaseTest {
+    framework: 'cypress';
+    cypressCommands: string[];
+}
+
+interface VitestTest extends BaseTest {
+    framework: 'vitest';
+    isConcurrent: boolean;
+}
+
+type ParsedTest = PlaywrightTest | JestTest | MochaTest | CypressTest | VitestTest | BaseTest;
+
+interface BaseParseResult {
+    framework: Framework;
+    filePath: string;
+    tests: ParsedTest[];
+    imports: Import[];
+    metadata: Record<string, any>;
+}
+
+interface PlaywrightParseResult extends BaseParseResult {
+    framework: 'playwright';
+    config: {
+        hasTestUse?: boolean;
+        hasDescribeConfig?: boolean;
+    };
+    metadata: {
+        hasParallelTests: boolean;
+        hasSerialTests: boolean;
+        hasCustomFixtures: boolean;
+        hasPageObjectPattern: boolean;
+    };
+}
+
+interface JestParseResult extends BaseParseResult {
+    framework: 'jest';
+    mocks: Mock[];
+    metadata: {
+        hasSetup: boolean;
+        hasTeardown: boolean;
+        usesSnapshots: boolean;
+        usesMocks: boolean;
+    };
+}
+
+interface MochaParseResult extends BaseParseResult {
+    framework: 'mocha';
+    metadata: {
+        hasHooks: boolean;
+        usesChai: boolean;
+        hasSuites: boolean;
+    };
+}
+
+interface CypressParseResult extends BaseParseResult {
+    framework: 'cypress';
+    commands: Command[];
+    metadata: {
+        hasCustomCommands: boolean;
+        hasFixtures: boolean;
+        hasIntercepts: boolean;
+        hasViewportCommands: boolean;
+    };
+}
+
+interface VitestParseResult extends BaseParseResult {
+    framework: 'vitest';
+    mocks: Mock[];
+    metadata: {
+        hasConcurrentTests: boolean;
+        usesVI: boolean;
+        usesMocks: boolean;
+    };
+}
+
+type ParseResult = PlaywrightParseResult | JestParseResult | MochaParseResult | CypressParseResult | VitestParseResult | BaseParseResult;
+
 
 /**
  * Test Parser Utilities
@@ -6,6 +136,9 @@ const TestIdentifierService = require('../services/test-identifier');
  * Part of ADR-001 implementation for test code and metadata separation
  */
 class TestParserUtils {
+  private testIdentifier: TestIdentifierService;
+  private supportedFrameworks: Framework[];
+
   constructor() {
     this.testIdentifier = new TestIdentifierService();
     this.supportedFrameworks = [
@@ -21,7 +154,7 @@ class TestParserUtils {
   /**
    * Parse test file based on detected framework
    */
-  parseTestFile(content, filePath, framework = null) {
+  parseTestFile(content: string, filePath: string, framework: Framework | null = null): ParseResult {
     const detectedFramework = framework || this.detectFramework(content);
     
     switch (detectedFramework) {
@@ -43,12 +176,11 @@ class TestParserUtils {
   /**
    * Parse Playwright test file
    */
-  parsePlaywrightFile(content, filePath) {
-    const tests = [];
+  parsePlaywrightFile(content: string, filePath: string): PlaywrightParseResult {
+    const tests: PlaywrightTest[] = [];
     const imports = this.extractImports(content);
     const config = this.extractPlaywrightConfig(content);
     
-    // Extract test blocks
     const testPatterns = [
       /test\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*async\s*\(\s*\{\s*page\s*\}\s*\)\s*=>\s*\{/g,
       /test\s*\(\s*['"`]([^'"`]+)['"`]/g,
@@ -64,7 +196,7 @@ class TestParserUtils {
         const testIndex = match.index;
         const context = this.findNearestDescribe(testIndex, describeBlocks);
         
-        const test = {
+        const test: PlaywrightTest = {
           framework: 'playwright',
           name: testName,
           filePath,
@@ -99,8 +231,8 @@ class TestParserUtils {
   /**
    * Parse Jest test file
    */
-  parseJestFile(content, filePath) {
-    const tests = [];
+  parseJestFile(content: string, filePath: string): JestParseResult {
+    const tests: JestTest[] = [];
     const imports = this.extractImports(content);
     const mocks = this.extractJestMocks(content);
     
@@ -118,7 +250,7 @@ class TestParserUtils {
         const testIndex = match.index;
         const context = this.findNearestDescribe(testIndex, describeBlocks);
         
-        const test = {
+        const test: JestTest = {
           framework: 'jest',
           name: testName,
           filePath,
@@ -152,8 +284,8 @@ class TestParserUtils {
   /**
    * Parse Mocha test file
    */
-  parseMochaFile(content, filePath) {
-    const tests = [];
+  parseMochaFile(content: string, filePath: string): MochaParseResult {
+    const tests: MochaTest[] = [];
     const imports = this.extractImports(content);
     
     const testPatterns = [
@@ -170,7 +302,7 @@ class TestParserUtils {
         const testIndex = match.index;
         const context = this.findNearestDescribe(testIndex, describeBlocks);
         
-        const test = {
+        const test: MochaTest = {
           framework: 'mocha',
           name: testName,
           filePath,
@@ -202,8 +334,8 @@ class TestParserUtils {
   /**
    * Parse Cypress test file
    */
-  parseCypressFile(content, filePath) {
-    const tests = [];
+  parseCypressFile(content: string, filePath: string): CypressParseResult {
+    const tests: CypressTest[] = [];
     const imports = this.extractImports(content);
     const commands = this.extractCypressCommands(content);
     
@@ -221,7 +353,7 @@ class TestParserUtils {
         const testIndex = match.index;
         const context = this.findNearestDescribe(testIndex, describeBlocks);
         
-        const test = {
+        const test: CypressTest = {
           framework: 'cypress',
           name: testName,
           filePath,
@@ -255,8 +387,8 @@ class TestParserUtils {
   /**
    * Parse Vitest file
    */
-  parseVitestFile(content, filePath) {
-    const tests = [];
+  parseVitestFile(content: string, filePath: string): VitestParseResult {
+    const tests: VitestTest[] = [];
     const imports = this.extractImports(content);
     const mocks = this.extractVitestMocks(content);
     
@@ -274,7 +406,7 @@ class TestParserUtils {
         const testIndex = match.index;
         const context = this.findNearestDescribe(testIndex, describeBlocks);
         
-        const test = {
+        const test: VitestTest = {
           framework: 'vitest',
           name: testName,
           filePath,
@@ -307,8 +439,8 @@ class TestParserUtils {
   /**
    * Parse generic test file
    */
-  parseGenericFile(content, filePath) {
-    const tests = [];
+  parseGenericFile(content: string, filePath: string): BaseParseResult {
+    const tests: BaseTest[] = [];
     const imports = this.extractImports(content);
     
     // Generic test patterns
@@ -324,7 +456,7 @@ class TestParserUtils {
         const testName = match[1];
         const testIndex = match.index;
         
-        const test = {
+        const test: BaseTest = {
           framework: 'generic',
           name: testName,
           filePath,
@@ -349,8 +481,8 @@ class TestParserUtils {
   /**
    * Detect test framework from file content
    */
-  detectFramework(content) {
-    const frameworks = [
+  detectFramework(content: string): Framework {
+    const frameworks: { name: Framework, indicators: string[] }[] = [
       { name: 'playwright', indicators: ['@playwright/test', 'test.describe', 'page.goto'] },
       { name: 'cypress', indicators: ['cypress', 'cy.visit', 'cy.get'] },
       { name: 'jest', indicators: ['jest', 'expect(', 'jest.mock'] },
@@ -370,8 +502,8 @@ class TestParserUtils {
   /**
    * Extract imports from file content
    */
-  extractImports(content) {
-    const imports = [];
+  extractImports(content: string): Import[] {
+    const imports: Import[] = [];
     
     // ES6 imports
     const importRegex = /import\s+(?:[\w\s{},*]+\s+from\s+)?['"`]([^'"`]+)['"`]/g;
@@ -400,8 +532,8 @@ class TestParserUtils {
   /**
    * Extract describe blocks
    */
-  extractDescribeBlocks(content) {
-    const blocks = [];
+  extractDescribeBlocks(content: string): DescribeBlock[] {
+    const blocks: DescribeBlock[] = [];
     const regex = /describe(?:\.(?:only|skip))?\s*\(\s*['"`]([^'"`]+)['"`]/g;
     let match;
     
@@ -420,8 +552,8 @@ class TestParserUtils {
   /**
    * Find nearest describe block for context
    */
-  findNearestDescribe(testIndex, describeBlocks) {
-    let nearestContext = null;
+  findNearestDescribe(testIndex: number, describeBlocks: DescribeBlock[]): string | null {
+    let nearestContext: string | null = null;
     let minDistance = Infinity;
     
     for (const block of describeBlocks) {
@@ -440,8 +572,8 @@ class TestParserUtils {
   /**
    * Extract test modifiers (only, skip, etc.)
    */
-  extractModifiers(testString) {
-    const modifiers = [];
+  extractModifiers(testString: string): string[] {
+    const modifiers: string[] = [];
     if (testString.includes('.only')) modifiers.push('only');
     if (testString.includes('.skip')) modifiers.push('skip');
     if (testString.includes('.todo')) modifiers.push('todo');
@@ -453,7 +585,7 @@ class TestParserUtils {
   /**
    * Check if test is async
    */
-  isAsyncTest(content, testIndex) {
+  isAsyncTest(content: string, testIndex: number): boolean {
     const testContent = content.substring(testIndex, testIndex + 500);
     return /async\s*\([^)]*\)\s*=>/.test(testContent) || 
            /async\s+function/.test(testContent) ||
@@ -463,15 +595,15 @@ class TestParserUtils {
   /**
    * Get line number from content index
    */
-  getLineNumber(content, index) {
+  getLineNumber(content: string, index: number): number {
     return content.substring(0, index).split('\n').length;
   }
 
   /**
    * Extract Playwright-specific configuration
    */
-  extractPlaywrightConfig(content) {
-    const config = {};
+  extractPlaywrightConfig(content: string): { hasTestUse?: boolean; hasDescribeConfig?: boolean } {
+    const config: { hasTestUse?: boolean; hasDescribeConfig?: boolean } = {};
     
     if (content.includes('test.use(')) {
       config.hasTestUse = true;
@@ -486,8 +618,8 @@ class TestParserUtils {
   /**
    * Extract Jest mocks
    */
-  extractJestMocks(content) {
-    const mocks = [];
+  extractJestMocks(content: string): Mock[] {
+    const mocks: Mock[] = [];
     const mockRegex = /jest\.mock\s*\(\s*['"`]([^'"`]+)['"`]/g;
     let match;
     
@@ -504,8 +636,8 @@ class TestParserUtils {
   /**
    * Extract Vitest mocks
    */
-  extractVitestMocks(content) {
-    const mocks = [];
+  extractVitestMocks(content: string): Mock[] {
+    const mocks: Mock[] = [];
     const mockRegex = /vi\.mock\s*\(\s*['"`]([^'"`]+)['"`]/g;
     let match;
     
@@ -522,8 +654,8 @@ class TestParserUtils {
   /**
    * Extract Cypress commands
    */
-  extractCypressCommands(content) {
-    const commands = [];
+  extractCypressCommands(content: string): Command[] {
+    const commands: Command[] = [];
     const commandRegex = /Cypress\.Commands\.add\s*\(\s*['"`]([^'"`]+)['"`]/g;
     let match;
     
@@ -540,9 +672,9 @@ class TestParserUtils {
   /**
    * Extract Cypress commands used in a test
    */
-  extractTestCypressCommands(content, testIndex) {
+  extractTestCypressCommands(content: string, testIndex: number): string[] {
     const testContent = content.substring(testIndex, testIndex + 1000);
-    const commands = [];
+    const commands: string[] = [];
     const commandRegex = /cy\.(\w+)/g;
     let match;
     
@@ -558,9 +690,9 @@ class TestParserUtils {
   /**
    * Extract browser configurations for Playwright
    */
-  extractBrowsers(content, testIndex) {
+  extractBrowsers(content: string, testIndex: number): string[] {
     const testContent = content.substring(Math.max(0, testIndex - 200), testIndex + 200);
-    const browsers = [];
+    const browsers: string[] = [];
     
     if (testContent.includes('browserName')) {
       // Extract browser names from configuration
@@ -577,15 +709,17 @@ class TestParserUtils {
   /**
    * Extract Playwright annotations
    */
-  extractAnnotations(content, testIndex) {
+  extractAnnotations(content: string, testIndex: number): string[] {
     const beforeTest = content.substring(Math.max(0, testIndex - 300), testIndex);
-    const annotations = [];
+    const annotations: string[] = [];
     
     const annotationRegex = /test\.(?:slow|fixme|fail|skip)\s*\(/g;
     let match;
     while ((match = annotationRegex.exec(beforeTest)) !== null) {
-      const annotation = match[0].match(/test\.(\w+)/)[1];
-      annotations.push(annotation);
+        const annotationMatch = match[0].match(/test\.(\w+)/);
+        if (annotationMatch) {
+            annotations.push(annotationMatch[1]);
+        }
     }
     
     return annotations;
@@ -594,9 +728,9 @@ class TestParserUtils {
   /**
    * Extract test expectations/assertions
    */
-  extractExpectations(content, testIndex) {
+  extractExpectations(content: string, testIndex: number): string[] {
     const testContent = content.substring(testIndex, testIndex + 1000);
-    const expectations = [];
+    const expectations: string[] = [];
     
     const expectRegex = /expect\([^)]+\)\.(\w+)/g;
     let match;
@@ -612,25 +746,25 @@ class TestParserUtils {
   /**
    * Extract timeout configuration
    */
-  extractTimeout(content, testIndex) {
+  extractTimeout(content: string, testIndex: number): number | null {
     const testContent = content.substring(testIndex, testIndex + 500);
     const timeoutMatch = testContent.match(/\.timeout\s*\(\s*(\d+)\s*\)/);
-    return timeoutMatch ? parseInt(timeoutMatch[1]) : null;
+    return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
   }
 
   /**
    * Get supported frameworks
    */
-  getSupportedFrameworks() {
+  getSupportedFrameworks(): Framework[] {
     return [...this.supportedFrameworks];
   }
 
   /**
    * Validate parsed test data
    */
-  validateParsedTest(test) {
+  validateParsedTest(test: ParsedTest): { valid: boolean; missing: string[]; test: ParsedTest } {
     const required = ['framework', 'name', 'filePath', 'testId'];
-    const missing = required.filter(field => !test[field]);
+    const missing = required.filter(field => !(field in test));
     
     return {
       valid: missing.length === 0,
@@ -640,4 +774,4 @@ class TestParserUtils {
   }
 }
 
-module.exports = TestParserUtils;
+export default TestParserUtils;

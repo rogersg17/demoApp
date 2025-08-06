@@ -1,4 +1,47 @@
-const TestIdentifierService = require('../services/test-identifier');
+import TestIdentifierService from '../services/test-identifier';
+
+interface Database {
+    getAllTestMetadata(): Promise<TestMetadata[]>;
+    createOrUpdateTestMetadata(metadata: TestMetadata): Promise<void>;
+}
+
+interface ExecutionResult {
+    filePath: string;
+    testName: string;
+    suite?: string;
+    tags?: string[];
+    framework?: string;
+}
+
+interface TestMetadata {
+    test_id: string;
+    file_path: string;
+    test_name: string;
+    description?: string;
+    tags?: string[];
+    priority?: string;
+    owner?: string | null;
+    repository_id?: string | null;
+    test_type?: string;
+    framework?: string;
+    created_from_execution?: boolean;
+    updated_at?: string;
+}
+
+interface Correlation {
+    executionResult: ExecutionResult;
+    testMetadata: TestMetadata | null;
+    confidence: number;
+    method: string;
+    error?: string;
+}
+
+interface CorrelationStats {
+    direct: number;
+    fuzzy: number;
+    failed: number;
+    total: number;
+}
 
 /**
  * Test Correlation Utilities
@@ -6,7 +49,12 @@ const TestIdentifierService = require('../services/test-identifier');
  * Part of ADR-001 implementation for test code and metadata separation
  */
 class TestCorrelationUtils {
-  constructor(database) {
+  private db: Database;
+  private testIdentifier: TestIdentifierService;
+  private correlationCache: Map<string, Correlation>;
+  private correlationStats: CorrelationStats;
+
+  constructor(database: Database) {
     this.db = database;
     this.testIdentifier = new TestIdentifierService();
     this.correlationCache = new Map();
@@ -21,8 +69,8 @@ class TestCorrelationUtils {
   /**
    * Correlate test execution results with stored test metadata
    */
-  async correlateTestResults(executionResults, platformType) {
-    const correlations = [];
+  async correlateTestResults(executionResults: ExecutionResult[], platformType: string): Promise<Correlation[]> {
+    const correlations: Correlation[] = [];
     
     console.log(`🔗 Correlating ${executionResults.length} test results from ${platformType}`);
     
@@ -34,7 +82,7 @@ class TestCorrelationUtils {
         const correlation = await this.correlateIndividualResult(result, knownTests, platformType);
         correlations.push(correlation);
         this.updateCorrelationStats(correlation.confidence);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`❌ Error correlating test result:`, error);
         correlations.push({
           executionResult: result,
@@ -55,13 +103,13 @@ class TestCorrelationUtils {
   /**
    * Correlate individual test result
    */
-  async correlateIndividualResult(result, knownTests, platformType) {
+  async correlateIndividualResult(result: ExecutionResult, knownTests: TestMetadata[], platformType: string): Promise<Correlation> {
     // Generate cache key
     const cacheKey = this.generateCacheKey(result, platformType);
     
     // Check cache first
     if (this.correlationCache.has(cacheKey)) {
-      return this.correlationCache.get(cacheKey);
+      return this.correlationCache.get(cacheKey)!;
     }
     
     // Attempt correlation using multiple strategies
@@ -78,7 +126,7 @@ class TestCorrelationUtils {
   /**
    * Attempt correlation using multiple strategies
    */
-  async attemptCorrelation(result, knownTests, platformType) {
+  async attemptCorrelation(result: ExecutionResult, knownTests: TestMetadata[], platformType: string): Promise<Correlation> {
     const strategies = [
       () => this.directIdMatch(result, knownTests),
       () => this.filePathAndNameMatch(result, knownTests),
@@ -110,7 +158,7 @@ class TestCorrelationUtils {
   /**
    * Strategy 1: Direct ID match
    */
-  directIdMatch(result, knownTests) {
+  directIdMatch(result: ExecutionResult, knownTests: TestMetadata[]): Correlation | null {
     const expectedId = this.testIdentifier.generateIdFromExecution(result);
     const match = knownTests.find(test => test.test_id === expectedId);
     
@@ -129,7 +177,7 @@ class TestCorrelationUtils {
   /**
    * Strategy 2: File path and test name match
    */
-  filePathAndNameMatch(result, knownTests) {
+  filePathAndNameMatch(result: ExecutionResult, knownTests: TestMetadata[]): Correlation | null {
     const matches = knownTests.filter(test => {
       const pathMatch = this.normalizeFilePath(test.file_path) === this.normalizeFilePath(result.filePath);
       const nameMatch = test.test_name === result.testName;
@@ -164,7 +212,7 @@ class TestCorrelationUtils {
   /**
    * Strategy 3: Test name and suite match
    */
-  testNameAndSuiteMatch(result, knownTests) {
+  testNameAndSuiteMatch(result: ExecutionResult, knownTests: TestMetadata[]): Correlation | null {
     const matches = knownTests.filter(test => {
       const nameMatch = test.test_name === result.testName;
       const suiteMatch = result.suite && test.description && 
@@ -187,8 +235,8 @@ class TestCorrelationUtils {
   /**
    * Strategy 4: Fuzzy string matching
    */
-  fuzzyStringMatch(result, knownTests) {
-    let bestMatch = null;
+  fuzzyStringMatch(result: ExecutionResult, knownTests: TestMetadata[]): Correlation | null {
+    let bestMatch: TestMetadata | null = null;
     let bestScore = 0;
     
     for (const test of knownTests) {
@@ -214,11 +262,11 @@ class TestCorrelationUtils {
   /**
    * Strategy 5: Create new test metadata (last resort)
    */
-  async createNewTestMetadata(result, platformType) {
+  async createNewTestMetadata(result: ExecutionResult, platformType: string): Promise<Correlation | null> {
     try {
       const testId = this.testIdentifier.generateIdFromExecution(result);
       
-      const newTestMetadata = {
+      const newTestMetadata: TestMetadata = {
         test_id: testId,
         file_path: result.filePath || 'unknown',
         test_name: result.testName,
@@ -251,7 +299,7 @@ class TestCorrelationUtils {
   /**
    * Normalize file path for comparison
    */
-  normalizeFilePath(filePath) {
+  normalizeFilePath(filePath: string): string {
     if (!filePath) return '';
     return filePath.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
   }
@@ -259,11 +307,11 @@ class TestCorrelationUtils {
   /**
    * Disambiguate multiple matches
    */
-  disambiguateMatches(result, matches) {
+  disambiguateMatches(result: ExecutionResult, matches: TestMetadata[]): TestMetadata | null {
     // Prefer matches with matching context/suite
     if (result.suite) {
       const contextMatches = matches.filter(test => 
-        test.description && test.description.includes(result.suite)
+        test.description && test.description.includes(result.suite!)
       );
       if (contextMatches.length === 1) {
         return contextMatches[0];
@@ -282,14 +330,14 @@ class TestCorrelationUtils {
     
     // Return the most recently updated match
     return matches.sort((a, b) => 
-      new Date(b.updated_at) - new Date(a.updated_at)
+      new Date(b.updated_at!).getTime() - new Date(a.updated_at!).getTime()
     )[0];
   }
 
   /**
    * Calculate similarity score between result and test metadata
    */
-  calculateSimilarityScore(result, test) {
+  calculateSimilarityScore(result: ExecutionResult, test: TestMetadata): number {
     let score = 0;
     
     // Test name similarity (most important)
@@ -315,7 +363,7 @@ class TestCorrelationUtils {
   /**
    * Calculate string similarity using Levenshtein distance
    */
-  stringSimilarity(str1, str2) {
+  stringSimilarity(str1: string, str2: string): number {
     if (!str1 || !str2) return 0;
     
     const longer = str1.length > str2.length ? str1 : str2;
@@ -328,8 +376,8 @@ class TestCorrelationUtils {
   /**
    * Calculate Levenshtein distance
    */
-  levenshteinDistance(str1, str2) {
-    const matrix = [];
+  levenshteinDistance(str1: string, str2: string): number {
+    const matrix: number[][] = [];
     
     for (let i = 0; i <= str2.length; i++) {
       matrix[i] = [i];
@@ -359,7 +407,7 @@ class TestCorrelationUtils {
   /**
    * Infer test type from result data
    */
-  inferTestType(result) {
+  inferTestType(result: ExecutionResult): string {
     const filePath = (result.filePath || '').toLowerCase();
     const testName = (result.testName || '').toLowerCase();
     
@@ -379,14 +427,14 @@ class TestCorrelationUtils {
   /**
    * Generate cache key for correlation
    */
-  generateCacheKey(result, platformType) {
+  generateCacheKey(result: ExecutionResult, platformType: string): string {
     return `${platformType}:${result.filePath}:${result.testName}:${result.suite || ''}`;
   }
 
   /**
    * Update correlation statistics
    */
-  updateCorrelationStats(confidence) {
+  updateCorrelationStats(confidence: number): void {
     if (confidence >= 0.9) {
       this.correlationStats.direct++;
     } else if (confidence >= 0.6) {
@@ -399,7 +447,7 @@ class TestCorrelationUtils {
   /**
    * Get correlation success rate
    */
-  getSuccessRate() {
+  getSuccessRate(): number {
     if (this.correlationStats.total === 0) return 0;
     const successful = this.correlationStats.direct + this.correlationStats.fuzzy;
     return Math.round((successful / this.correlationStats.total) * 100);
@@ -419,7 +467,7 @@ class TestCorrelationUtils {
   /**
    * Clear correlation cache
    */
-  clearCache() {
+  clearCache(): void {
     this.correlationCache.clear();
     this.testIdentifier.clearCache();
   }
@@ -427,7 +475,7 @@ class TestCorrelationUtils {
   /**
    * Reset correlation statistics
    */
-  resetStats() {
+  resetStats(): void {
     this.correlationStats = {
       direct: 0,
       fuzzy: 0,
@@ -437,4 +485,4 @@ class TestCorrelationUtils {
   }
 }
 
-module.exports = TestCorrelationUtils;
+export default TestCorrelationUtils;

@@ -5,15 +5,88 @@
  * including detailed information about the failure, screenshots, and test metadata.
  */
 
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import { Blob } from 'buffer';
+import { FormData } from 'formdata-node';
+
+interface JiraConfig {
+    jiraUrl: string;
+    username: string;
+    apiToken: string;
+    projectKey: string;
+    issueType?: string;
+    enabled?: boolean;
+    components?: { name: string }[];
+    customFields?: { [key: string]: any };
+}
+
+interface TestResult {
+    status: string;
+    duration: number;
+    errors: { message?: string }[];
+    retry: number;
+    startTime: string;
+    stdout: string[];
+    stderr: string[];
+    attachments: { name: string; path: string }[];
+}
+
+interface TestCase {
+    title: string;
+    location?: {
+        file: string;
+        line: number;
+        column: number;
+    };
+    parent?: {
+        project: () => { name: string };
+    };
+    tags: string[];
+    annotations: { type: string; description?: string }[];
+}
+
+interface FailureDetails {
+    status: string;
+    duration: number;
+    errors: (string | undefined)[];
+    retry: number;
+    startTime: string;
+    stdout: string[];
+    stderr: string[];
+}
+
+interface TestMetadata {
+    title: string;
+    file: string;
+    line: number;
+    column: number;
+    projectName: string;
+    tags: string[];
+    annotations: { type: string; description?: string }[];
+}
+
+interface JiraIssueData {
+    fields: {
+        project: { key: string };
+        summary: string;
+        description: string;
+        issuetype: { name: string };
+        labels: string[];
+        priority: { name: string };
+        components?: { name: string }[];
+        [key: string]: any;
+    };
+}
 
 class JiraIntegration {
-  constructor(config) {
+  private config: JiraConfig;
+
+  constructor(config: Partial<JiraConfig>) {
     this.config = {
-      jiraUrl: config.jiraUrl || process.env.JIRA_URL,
-      username: config.username || process.env.JIRA_USERNAME,
-      apiToken: config.apiToken || process.env.JIRA_API_TOKEN,
+      jiraUrl: config.jiraUrl || process.env.JIRA_URL!,
+      username: config.username || process.env.JIRA_USERNAME!,
+      apiToken: config.apiToken || process.env.JIRA_API_TOKEN!,
       projectKey: config.projectKey || process.env.JIRA_PROJECT_KEY || 'TEST',
       issueType: config.issueType || 'Bug',
       enabled: config.enabled !== false && process.env.JIRA_ENABLED !== 'false',
@@ -26,7 +99,7 @@ class JiraIntegration {
     }
   }
 
-  isConfigValid() {
+  isConfigValid(): boolean {
     return !!(this.config.jiraUrl && this.config.username && this.config.apiToken && this.config.projectKey);
   }
 
@@ -36,7 +109,7 @@ class JiraIntegration {
    * @param {Object} testCase - Playwright test case object
    * @returns {Promise<Object|null>} Created issue details or null if disabled/failed
    */
-  async createIssueForFailure(testResult, testCase) {
+  async createIssueForFailure(testResult: TestResult, testCase: TestCase): Promise<any | null> {
     if (!this.config.enabled) {
       return null;
     }
@@ -52,7 +125,7 @@ class JiraIntegration {
 
       console.log(`✅ Jira issue created: ${issue.key} - ${this.config.jiraUrl}/browse/${issue.key}`);
       return issue;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to create Jira issue:', error.message);
       return null;
     }
@@ -61,7 +134,7 @@ class JiraIntegration {
   /**
    * Builds the issue data structure for Jira
    */
-  async buildIssueData(testResult, testCase) {
+  async buildIssueData(testResult: TestResult, testCase: TestCase): Promise<JiraIssueData> {
     const failureDetails = this.extractFailureDetails(testResult);
     const testMetadata = this.extractTestMetadata(testCase);
     
@@ -84,7 +157,7 @@ class JiraIntegration {
       summary,
       description,
       issuetype: {
-        name: this.config.issueType
+        name: this.config.issueType!
       },
       labels,
       priority: {
@@ -93,7 +166,7 @@ class JiraIntegration {
     };
 
     // Add optional fields only if they are configured and enabled
-    const optionalFields = {};
+    const optionalFields: { [key: string]: any } = {};
     
     // Only add components if explicitly configured
     if (this.config.components && Array.isArray(this.config.components) && this.config.components.length > 0) {
@@ -116,7 +189,7 @@ class JiraIntegration {
   /**
    * Extracts failure details from test result
    */
-  extractFailureDetails(testResult) {
+  extractFailureDetails(testResult: TestResult): FailureDetails {
     const errors = testResult.errors || [];
     const failureMessages = errors.map(error => error.message || error.toString());
     
@@ -134,7 +207,7 @@ class JiraIntegration {
   /**
    * Extracts test metadata
    */
-  extractTestMetadata(testCase) {
+  extractTestMetadata(testCase: TestCase): TestMetadata {
     return {
       title: testCase.title,
       file: testCase.location?.file || 'unknown',
@@ -149,8 +222,8 @@ class JiraIntegration {
   /**
    * Builds the detailed description for the Jira issue
    */
-  buildDescription({ testCase, testResult, failureDetails, testMetadata }) {
-    const sections = [];
+  buildDescription({ testCase, testResult, failureDetails, testMetadata }: { testCase: TestCase, testResult: TestResult, failureDetails: FailureDetails, testMetadata: TestMetadata }): string {
+    const sections: string[] = [];
 
     // Test Information
     sections.push('h2. Test Information');
@@ -236,7 +309,7 @@ class JiraIntegration {
   /**
    * Generates labels for the Jira issue
    */
-  generateLabels(testCase, testResult) {
+  generateLabels(testCase: TestCase, testResult: TestResult): string[] {
     const labels = ['automated-test', 'test-failure'];
     
     // Add project-specific label
@@ -264,7 +337,7 @@ class JiraIntegration {
   /**
    * Determines priority based on test result
    */
-  determinePriority(testResult) {
+  determinePriority(testResult: TestResult): string {
     // High priority for tests that failed multiple times
     if (testResult.retry > 1) {
       return 'High';
@@ -281,9 +354,9 @@ class JiraIntegration {
   /**
    * Gets Playwright version
    */
-  getPlaywrightVersion() {
+  getPlaywrightVersion(): string {
     try {
-      const packageJson = require('@playwright/test/package.json');
+      const packageJson = JSON.parse(fs.readFileSync(require.resolve('@playwright/test/package.json'), 'utf-8'));
       return packageJson.version;
     } catch {
       return 'unknown';
@@ -293,7 +366,7 @@ class JiraIntegration {
   /**
    * Creates a Jira issue via REST API
    */
-  async createJiraIssue(issueData) {
+  async createJiraIssue(issueData: JiraIssueData): Promise<any> {
     const url = `${this.config.jiraUrl}/rest/api/2/issue`;
     const auth = Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64');
 
@@ -319,7 +392,7 @@ class JiraIntegration {
           errorDetails = `\nField errors:\n${fieldErrors}`;
         }
         if (errorJson.errorMessages && errorJson.errorMessages.length > 0) {
-          errorDetails += `\nGeneral errors:\n${errorJson.errorMessages.map(msg => `  - ${msg}`).join('\n')}`;
+          errorDetails += `\nGeneral errors:\n${errorJson.errorMessages.map((msg: string) => `  - ${msg}`).join('\n')}`;
         }
       } catch (parseError) {
         errorDetails = `\nRaw error: ${errorText}`;
@@ -334,7 +407,7 @@ class JiraIntegration {
   /**
    * Attaches files to a Jira issue
    */
-  async attachFilesToIssue(issueKey, attachments) {
+  async attachFilesToIssue(issueKey: string, attachments: { name: string; path: string }[]): Promise<void> {
     if (!attachments || attachments.length === 0) {
       return;
     }
@@ -344,7 +417,7 @@ class JiraIntegration {
         if (attachment.path && fs.existsSync(attachment.path)) {
           await this.attachFileToIssue(issueKey, attachment.path, attachment.name);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Failed to attach file ${attachment.name}:`, error.message);
       }
     }
@@ -353,7 +426,7 @@ class JiraIntegration {
   /**
    * Attaches a single file to a Jira issue
    */
-  async attachFileToIssue(issueKey, filePath, fileName) {
+  async attachFileToIssue(issueKey: string, filePath: string, fileName?: string): Promise<void> {
     const url = `${this.config.jiraUrl}/rest/api/2/issue/${issueKey}/attachments`;
     const auth = Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64');
 
@@ -369,7 +442,7 @@ class JiraIntegration {
         'Authorization': `Basic ${auth}`,
         'X-Atlassian-Token': 'no-check'
       },
-      body: formData
+      body: formData as any
     });
 
     if (!response.ok) {
@@ -382,9 +455,9 @@ class JiraIntegration {
   /**
    * Updates an existing Jira issue (useful for retry scenarios)
    */
-  async updateIssueForRetry(issueKey, testResult, retryCount) {
+  async updateIssueForRetry(issueKey: string, testResult: TestResult, retryCount: number): Promise<void> {
     if (!this.config.enabled) {
-      return null;
+      return;
     }
 
     try {
@@ -408,7 +481,7 @@ class JiraIntegration {
 
       await this.updateJiraIssue(issueKey, updateData);
       console.log(`🔄 Updated Jira issue ${issueKey} with retry information`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to update Jira issue:', error.message);
     }
   }
@@ -416,7 +489,7 @@ class JiraIntegration {
   /**
    * Updates a Jira issue via REST API
    */
-  async updateJiraIssue(issueKey, updateData) {
+  async updateJiraIssue(issueKey: string, updateData: any): Promise<void> {
     const url = `${this.config.jiraUrl}/rest/api/2/issue/${issueKey}`;
     const auth = Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64');
 
@@ -436,4 +509,4 @@ class JiraIntegration {
   }
 }
 
-module.exports = { JiraIntegration };
+export { JiraIntegration };

@@ -43,6 +43,9 @@ pids
 coverage/
 *.lcov
 
+# Distribution folder
+dist/
+
 # Environment variables
 .env
 .env.local
