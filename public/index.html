@@ -13,19 +13,19 @@
         
         <div class="test-section">
             <h2>🔧 System Health</h2>
-            <button onclick="testHealth()">Test Health</button>
+            <button id="health-btn">Test Health</button>
             <div id="health-result" class="result" style="display: none;"></div>
         </div>
 
         <div class="test-section">
             <h2>🔗 Azure DevOps Connection</h2>
-            <button onclick="testAdoConnection()">Test ADO Connection</button>
+            <button id="ado-btn">Test ADO Connection</button>
             <div id="ado-result" class="result" style="display: none;"></div>
         </div>
 
         <div class="test-section">
             <h2>👤 Authentication Test</h2>
-            <button onclick="testAuth()">Test Auth Status</button>
+            <button id="auth-btn">Test Auth Status</button>
             <div id="auth-result" class="result" style="display: none;"></div>
         </div>
 
@@ -38,6 +38,14 @@
     </div>
 
     <script>
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners to buttons
+            document.getElementById('health-btn').addEventListener('click', testHealth);
+            document.getElementById('ado-btn').addEventListener('click', testAdoConnection);
+            document.getElementById('auth-btn').addEventListener('click', testAuth);
+        });
+
         async function testHealth() {
             const result = document.getElementById('health-result');
             result.style.display = 'block';

@@ -355,6 +355,20 @@ class Database {
         console.log('✅ Sample data inserted successfully');
       }
     });
+
+    // Check if test executions already exist
+    this.db.get("SELECT COUNT(*) as count FROM test_executions", async (err, row: { count: number }) => {
+      if (err) {
+        console.error('Error checking test executions:', err);
+        return;
+      }
+
+      if (row.count === 0) {
+        console.log('📝 Inserting sample test executions...');
+        await this.createSampleTestExecutions();
+        console.log('✅ Sample test executions inserted successfully');
+      }
+    });
   }
 
   async createSampleUsers(): Promise<void> {
@@ -505,6 +519,70 @@ class Database {
 
     activities.forEach(activity => {
       stmt.run([activity.user_id, activity.action, activity.description]);
+    });
+
+    stmt.finalize();
+  }
+
+  async createSampleTestExecutions(): Promise<void> {
+    const testExecutions = [
+      {
+        test_id: 'api_test_001',
+        execution_id: 'exec_001',
+        platform_type: 'manual',
+        status: 'completed',
+        start_time: new Date(Date.now() - 120000).toISOString(), // 2 minutes ago
+        end_time: new Date(Date.now() - 60000).toISOString(), // 1 minute ago
+        duration_ms: 60000,
+        metadata: JSON.stringify({ test_type: 'api', endpoint: '/api/users' })
+      },
+      {
+        test_id: 'ui_test_002',
+        execution_id: 'exec_002',
+        platform_type: 'selenium',
+        status: 'failed',
+        start_time: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+        end_time: new Date(Date.now() - 240000).toISOString(), // 4 minutes ago
+        duration_ms: 60000,
+        error_message: 'Element not found: #login-button',
+        metadata: JSON.stringify({ test_type: 'ui', browser: 'chrome' })
+      },
+      {
+        test_id: 'integration_test_003',
+        execution_id: 'exec_003',
+        platform_type: 'docker',
+        status: 'running',
+        start_time: new Date(Date.now() - 30000).toISOString(), // 30 seconds ago
+        metadata: JSON.stringify({ test_type: 'integration', service: 'payment' })
+      },
+      {
+        test_id: 'load_test_004',
+        execution_id: 'exec_004',
+        platform_type: 'k6',
+        status: 'pending',
+        metadata: JSON.stringify({ test_type: 'load', users: 100 })
+      }
+    ];
+
+    const stmt = this.db.prepare(`
+      INSERT INTO test_executions (
+        test_id, execution_id, platform_type, status, start_time, end_time, 
+        duration_ms, error_message, metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    testExecutions.forEach(execution => {
+      stmt.run([
+        execution.test_id,
+        execution.execution_id,
+        execution.platform_type,
+        execution.status,
+        execution.start_time || null,
+        execution.end_time || null,
+        execution.duration_ms || null,
+        execution.error_message || null,
+        execution.metadata
+      ]);
     });
 
     stmt.finalize();
@@ -1342,17 +1420,29 @@ class Database {
     this.db.run(`
       CREATE TABLE IF NOT EXISTS test_executions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        test_id TEXT NOT NULL,
-        execution_id TEXT NOT NULL, -- Platform-specific execution ID
-        platform_type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        command TEXT NOT NULL,
+        environment TEXT DEFAULT 'default',
+        status TEXT DEFAULT 'pending', -- 'pending', 'running', 'completed', 'failed', 'cancelled'
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        started_at DATETIME,
+        completed_at DATETIME,
+        exit_code INTEGER,
+        output TEXT,
+        error_output TEXT,
+        logs TEXT,
+        metadata TEXT, -- JSON string for additional metadata
+        test_id TEXT,
+        execution_id TEXT,
+        platform_type TEXT,
         platform_execution_id TEXT,
-        status TEXT NOT NULL,
         start_time DATETIME,
         end_time DATETIME,
         duration_ms INTEGER,
         error_message TEXT,
-        metadata TEXT, -- JSON string for additional metadata
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id),
         FOREIGN KEY (test_id) REFERENCES test_metadata(test_id)
       )
     `, (err) => {
@@ -2188,3 +2278,4 @@ class Database {
 }
 
 export default Database;
+ 

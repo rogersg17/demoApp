@@ -5,7 +5,7 @@
 
 import express from 'express';
 import type { Request, Response } from 'express';
-import GitHubApiService from '../services/github-api-service.js';
+import GitHubApiService from '../services/github-api-service';
 
 const router = express.Router();
 
@@ -437,4 +437,12 @@ router.post('/webhooks/github-actions', async (req: Request, res: Response) => {
   }
 });
 
+// Database reference for the route
+let db: any = null;
+
+const setDatabase = (database: any): void => {
+  db = database;
+};
+
 export default router;
+export { setDatabase };

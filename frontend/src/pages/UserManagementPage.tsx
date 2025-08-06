@@ -90,7 +90,8 @@ const UserManagementPage: React.FC = () => {
         throw new Error('Failed to load users')
       }
       
-      const userData: UserApiData[] = await response.json()
+      const responseData = await response.json()
+      const userData: UserApiData[] = responseData.users || []
       
       const transformedUsers: User[] = userData.map((user: UserApiData) => ({
         id: user.id,

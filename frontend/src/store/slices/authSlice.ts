@@ -14,9 +14,12 @@ interface AuthState {
   error: string | null
 }
 
+// Check for existing session on initialization
+const loggedInUser = sessionStorage.getItem('loggedInUser')
+
 const initialState: AuthState = {
-  user: null,
-  isAuthenticated: false,
+  user: loggedInUser ? { username: loggedInUser } : null,
+  isAuthenticated: !!loggedInUser,
   isLoading: false,
   error: null,
 }

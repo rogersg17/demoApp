@@ -7,6 +7,7 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+// Apply environment variable changes for query logging - DEBUG exclusion pattern
 
 // Security packages
 import helmet from 'helmet';
@@ -114,7 +115,7 @@ function emitTestUpdate(testId: string, update: Partial<ExecutionUpdate>): void 
 // Initialize test execution orchestration
 let testQueue: any = null;
 try {
-  const TestExecutionQueue = require('./services/test-execution-queue');
+  const TestExecutionQueue = require('./services/prisma-orchestration-service');
   testQueue = new TestExecutionQueue();
 } catch (error) {
   console.warn('⚠️ Test execution queue service not available:', error);
@@ -125,7 +126,7 @@ let mvpServices: Record<string, any> = {};
 
 try {
   // Week 3 services
-  const MVPAdoConfigService = require('./services/mvp-ado-config');
+  const MVPAdoConfigService = require('./services/ado-project-configuration');
   const MVPPipelineMonitorService = require('./services/mvp-pipeline-monitor');
   
   mvpServices.adoConfig = new MVPAdoConfigService();
@@ -158,11 +159,11 @@ try {
 let orchestrationServices: Record<string, any> = {};
 
 try {
-  const EnhancedOrchestrationService = require('./services/enhanced-orchestration-service');
-  const ResourceAllocationService = require('./services/resource-allocation-service');
-  const ParallelExecutionCoordinator = require('./services/parallel-execution-coordinator');
+  const enhancedOrchestrationService = require('./services/enhanced-orchestration-service').default;
+  const ResourceAllocationService = require('./services/resource-allocation-service').default;
+  const ParallelExecutionCoordinator = require('./services/prisma-orchestration-service').PrismaOrchestrationService;
   
-  orchestrationServices.orchestration = new EnhancedOrchestrationService();
+  orchestrationServices.orchestration = enhancedOrchestrationService;
   orchestrationServices.resourceAllocation = new ResourceAllocationService();
   orchestrationServices.parallelExecution = new ParallelExecutionCoordinator();
   
@@ -371,7 +372,8 @@ function setupRoutes(): void {
     const authRoutes = authModule.default;
     const testModule = require('./routes/tests');
     const testRoutes = testModule.default;
-    const gitRoutes = require('./routes/git');
+    const gitModule = require('./routes/github-actions');
+    const gitRoutes = gitModule.default;
     const usersModule = require('./routes/users');
     const usersRoutes = usersModule.default;
     
@@ -382,10 +384,10 @@ function setupRoutes(): void {
     usersModule.setDatabase(db.db);
     
     // Initialize test routes with database
-    testModule.setDatabase(db);
+    testModule.setDatabase(db.db);
     
     // Initialize git routes with database
-    gitRoutes.setDatabase(db);
+    gitModule.setDatabase(db);
     
     // Week 3+ routes
     try {
@@ -410,21 +412,37 @@ function setupRoutes(): void {
 
     // Azure DevOps routes
     try {
-      const adoWebhooksRouter = require('./routes/ado-webhooks');
-      const adoDashboardRouter = require('./routes/ado-dashboard');
       const adoTestRouter = require('./routes/ado-test.ts').default;
-
-      // Store io instance for webhook access
-      app.set('io', io);
-
-      app.use('/api/ado/webhooks', adoWebhooksRouter);
       app.use('/api/ado', adoTestRouter);
-      app.use('/api/ado/dashboard', adoDashboardRouter);
-      
-      console.log('✅ Azure DevOps routes loaded successfully');
+      console.log('✅ Azure DevOps test routes loaded successfully');
     } catch (e) { 
-      console.error('Azure DevOps routes error:', e); 
-      console.warn('Azure DevOps routes not available'); 
+      console.warn('Azure DevOps test routes not available'); 
+    }
+
+    // Azure DevOps project config routes
+    try {
+      const adoProjectConfigRouter = require('./routes/ado-project-config.ts').default;
+      app.use('/api/ado-config', adoProjectConfigRouter);
+      console.log('✅ Azure DevOps project config routes loaded successfully');
+    } catch (e) { 
+      console.warn('Azure DevOps project config routes not available'); 
+    }
+
+    // Additional ADO routes (when they exist)
+    try {
+      const adoWebhooksRouter = require('./routes/ado-webhooks');
+      app.use('/api/ado/webhooks', adoWebhooksRouter);
+      console.log('✅ Azure DevOps webhook routes loaded successfully');
+    } catch (e) { 
+      console.warn('Azure DevOps webhook routes not available'); 
+    }
+
+    try {
+      const adoDashboardRouter = require('./routes/ado-dashboard');
+      app.use('/api/ado/dashboard', adoDashboardRouter);
+      console.log('✅ Azure DevOps dashboard routes loaded successfully');
+    } catch (e) { 
+      console.warn('Azure DevOps dashboard routes not available'); 
     }
 
     // Week 9+ orchestration routes
@@ -525,3 +543,4 @@ async function gracefulShutdown(signal: string): Promise<void> {
     process.exit(1);
   }
 }
+

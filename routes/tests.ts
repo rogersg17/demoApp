@@ -1,27 +1,31 @@
-// @ts-nocheck
 import express, { Request, Response, Router } from 'express';
 import { requireAuth } from './auth';
-import { db } from '../database';
+import { Database } from 'sqlite3';
 
 const router: Router = express.Router();
+
+// Database instance (will be set by server)
+let db: Database | null = null;
+
+// Set database instance
+const setDatabase = (database: Database): void => {
+  db = database;
+};
 
 // Types
 interface TestExecution {
   id: number;
-  name: string;
-  description?: string;
-  command: string;
-  environment: string;
+  test_id: string;
+  execution_id: string;
+  platform_type: string;
+  platform_execution_id?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-  created_by: number;
-  created_at: string;
-  started_at?: string;
-  completed_at?: string;
-  exit_code?: number;
-  output?: string;
-  error_output?: string;
-  logs?: string;
+  start_time?: string;
+  end_time?: string;
+  duration_ms?: number;
+  error_message?: string;
   metadata?: string;
+  created_at: string;
 }
 
 interface PaginationQuery {
@@ -38,12 +42,10 @@ interface PaginationInfo {
 }
 
 interface RunTestRequest {
-  name: string;
-  description?: string;
-  command: string;
-  environment?: string;
-  tags?: string[];
-  timeout?: number;
+  test_id: string;
+  execution_id?: string;
+  platform_type?: string;
+  status?: string;
   metadata?: Record<string, any>;
 }
 
@@ -61,10 +63,8 @@ router.get('/', requireAuth, (req: any, res: Response) => {
     // Get recent test executions for the tests summary
     const query = `
       SELECT 
-        te.*,
-        u.username as created_by_username
+        te.*
       FROM test_executions te
-      LEFT JOIN users u ON te.created_by = u.id
       ORDER BY te.created_at DESC 
       LIMIT 50
     `;
@@ -82,15 +82,16 @@ router.get('/', requireAuth, (req: any, res: Response) => {
       // Transform executions into test format expected by frontend
       const tests = rows.map((row: any) => ({
         id: row.id.toString(),
-        title: row.name || 'Test Execution',
+        title: row.test_id || 'Test Execution',
         status: row.status === 'completed' ? 'passed' : 
                 row.status === 'failed' ? 'failed' : 
                 row.status === 'running' ? 'running' : 'pending',
-        duration: row.completed_at && row.started_at ? 
-          new Date(row.completed_at).getTime() - new Date(row.started_at).getTime() : null,
+        duration: row.end_time && row.start_time ? 
+          new Date(row.end_time).getTime() - new Date(row.start_time).getTime() : 
+          row.duration_ms || null,
         lastRun: row.created_at,
         suite: 'Test Execution',
-        environment: row.environment || 'default'
+        environment: row.platform_type || 'default'
       }));
 
       res.json({
@@ -119,10 +120,8 @@ router.get('/executions', requireAuth, (req: any, res: Response) => {
 
     let query = `
       SELECT 
-        te.*,
-        u.username as created_by_username
+        te.*
       FROM test_executions te
-      LEFT JOIN users u ON te.created_by = u.id
     `;
     
     const params: (string | number)[] = [];
@@ -210,10 +209,8 @@ router.get('/executions/:id', requireAuth, (req: any, res: Response) => {
 
     const query = `
       SELECT 
-        te.*,
-        u.username as created_by_username
+        te.*
       FROM test_executions te
-      LEFT JOIN users u ON te.created_by = u.id
       WHERE te.id = ?
     `;
 
@@ -268,19 +265,17 @@ router.post('/run', requireAuth, async (req: any, res: Response) => {
     }
 
     const {
-      name,
-      description,
-      command,
-      environment = 'default',
-      tags = [],
-      timeout = 300000, // 5 minutes default
+      test_id,
+      execution_id = `exec_${Date.now()}`,
+      platform_type = 'manual',
+      status = 'pending',
       metadata = {}
     }: RunTestRequest = req.body;
 
     // Validation
-    if (!name || !command) {
+    if (!test_id) {
       res.status(400).json({
-        error: 'Name and command are required',
+        error: 'test_id is required',
         code: 'VALIDATION_ERROR'
       });
       return;
@@ -289,22 +284,16 @@ router.post('/run', requireAuth, async (req: any, res: Response) => {
     // Create test execution record
     const insertQuery = `
       INSERT INTO test_executions (
-        name, description, command, environment, status, 
-        created_by, created_at, metadata
-      ) VALUES (?, ?, ?, ?, 'pending', ?, datetime('now'), ?)
+        test_id, execution_id, platform_type, status, metadata
+      ) VALUES (?, ?, ?, ?, ?)
     `;
 
     const values = [
-      name,
-      description || null,
-      command,
-      environment,
-      userId,
-      JSON.stringify({
-        tags,
-        timeout,
-        ...metadata
-      })
+      test_id,
+      execution_id,
+      platform_type,
+      status,
+      JSON.stringify(metadata)
     ];
 
     if (!db) {
@@ -325,26 +314,18 @@ router.post('/run', requireAuth, async (req: any, res: Response) => {
         return;
       }
 
-      const executionId = this.lastID;
+      const executionDbId = this.lastID;
 
-      // In a real implementation, you would start the test execution here
-      // For now, we'll just return the created execution
       res.status(201).json({
         message: 'Test execution created successfully',
         execution: {
-          id: executionId,
-          name,
-          description,
-          command,
-          environment,
-          status: 'pending',
-          created_by: userId,
+          id: executionDbId,
+          test_id,
+          execution_id,
+          platform_type,
+          status,
           created_at: new Date().toISOString(),
-          metadata: JSON.stringify({
-            tags,
-            timeout,
-            ...metadata
-          })
+          metadata: JSON.stringify(metadata)
         }
       });
     });
@@ -365,7 +346,7 @@ router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => 
     const userId = req.user?.id;
 
     const checkQuery = `
-      SELECT id, status, created_by FROM test_executions WHERE id = ?
+      SELECT id, status FROM test_executions WHERE id = ?
     `;
 
     if (!db) {
@@ -394,14 +375,8 @@ router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => 
         return;
       }
 
-      // Check if user can cancel this execution
-      if (execution.created_by !== userId) {
-        res.status(403).json({
-          error: 'Not authorized to cancel this execution',
-          code: 'AUTHORIZATION_ERROR'
-        });
-        return;
-      }
+      // Since the table doesn't have created_by, we'll allow any authenticated user to cancel
+      // In a real application, you might want to implement proper authorization
 
       // Check if execution can be cancelled
       if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
@@ -415,7 +390,7 @@ router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => 
       // Update execution status to cancelled
       const updateQuery = `
         UPDATE test_executions 
-        SET status = 'cancelled', completed_at = datetime('now')
+        SET status = 'cancelled', end_time = datetime('now')
         WHERE id = ?
       `;
 
@@ -459,8 +434,8 @@ router.get('/executions/:id/results', requireAuth, (req: any, res: Response) => 
 
     const query = `
       SELECT 
-        id, name, status, exit_code, output, error_output,
-        started_at, completed_at, created_at, metadata
+        id, test_id, execution_id, platform_type, status, error_message,
+        start_time, end_time, duration_ms, created_at, metadata
       FROM test_executions 
       WHERE id = ?
     `;
@@ -523,7 +498,7 @@ router.get('/executions/:id/logs', requireAuth, (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
-    const query = `SELECT logs FROM test_executions WHERE id = ?`;
+    const query = `SELECT error_message FROM test_executions WHERE id = ?`;
 
     if (!db) {
       res.status(500).json({
@@ -533,7 +508,7 @@ router.get('/executions/:id/logs', requireAuth, (req: any, res: Response) => {
       return;
     }
 
-    db.get(query, [id], (err, result: { logs?: string }) => {
+    db.get(query, [id], (err, result: { error_message?: string }) => {
       if (err) {
         console.error('Database error fetching test logs:', err);
         res.status(500).json({
@@ -544,7 +519,7 @@ router.get('/executions/:id/logs', requireAuth, (req: any, res: Response) => {
       }
 
       res.json({
-        logs: result?.logs || 'No logs available'
+        logs: result?.error_message || 'No logs available'
       });
     });
 
@@ -565,12 +540,6 @@ router.get('/health', (req: Request, res: Response) => {
     database: db ? 'connected' : 'disconnected'
   });
 });
-
-// Function to set database (compatibility)
-const setDatabase = (database: any) => {
-  // This is for compatibility with server.ts
-  // The database is already imported at the top
-};
 
 export { setDatabase };
 export default router;

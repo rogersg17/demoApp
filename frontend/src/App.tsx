@@ -1,18 +1,17 @@
-import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch, RootState } from './store/store'
 import { checkAuth } from './store/slices/authSlice'
-import type { RootState, AppDispatch } from './store/store'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import TestManagementPage from './pages/TestManagementPage'
-import FlakyTestsPage from './pages/FlakyTestsPage'
-import TabbedSettingsPage from './pages/TabbedSettingsPage'
 import UserManagementPage from './pages/UserManagementPage'
+import SettingsPage from './pages/SettingsPage'
+import FlakyTestsPage from './pages/FlakyTestsPage'
 import GitHubActionsPage from './pages/GitHubActionsPage'
-import ProtectedRoute from './components/ProtectedRoute'
+import LoadingSpinner from './components/LoadingSpinner'
 import './App.css'
-import './styles/pages.css'
 
 function App() {
   const dispatch = useDispatch<AppDispatch>()
@@ -24,76 +23,38 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Loading...</p>
+      <div className="app-loading">
+        <LoadingSpinner />
       </div>
     )
   }
 
   return (
-    <Routes>
-      <Route 
-        path="/login" 
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/tests"
-        element={
-          <ProtectedRoute>
-            <TestManagementPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/flaky-tests"
-        element={
-          <ProtectedRoute>
-            <FlakyTestsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <TabbedSettingsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <ProtectedRoute>
-            <UserManagementPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/github-actions"
-        element={
-          <ProtectedRoute>
-            <GitHubActionsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route 
-        path="/" 
-        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
-      />
-      <Route 
-        path="*" 
-        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
-      />
-    </Routes>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <div className="App">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          {isAuthenticated ? (
+            <>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/tests" element={<TestManagementPage />} />
+              <Route path="/users" element={<UserManagementPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/flaky-tests" element={<FlakyTestsPage />} />
+              <Route path="/github-actions" element={<GitHubActionsPage />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            </>
+          ) : (
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          )}
+        </Routes>
+      </div>
+    </Router>
   )
 }
 
