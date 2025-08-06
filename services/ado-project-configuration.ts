@@ -1,5 +1,5 @@
 import AdoClient from '../lib/ado-client';
-import AdoBuildDefinitionService from './ado-build-definition';
+import AdoBuildDefinitionService from './ado-build-definition.js';
 import db, { Database } from '../database';
 import * as crypto from 'crypto';
 import AdoBuildConsumer from './ado-build-consumer';

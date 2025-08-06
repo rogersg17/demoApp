@@ -26,7 +26,7 @@ interface TestResult {
     duration: number;
     errors: { message?: string }[];
     retry: number;
-    startTime: string;
+    startTime: Date;
     stdout: string[];
     stderr: string[];
     attachments: { name: string; path: string }[];
@@ -81,6 +81,18 @@ interface JiraIssueData {
 
 class JiraIntegration {
   private config: JiraConfig;
+
+  public get enabled(): boolean {
+    return this.config.enabled ?? false;
+  }
+
+  public get projectKey(): string {
+    return this.config.projectKey;
+  }
+
+  public get jiraUrl(): string {
+    return this.config.jiraUrl;
+  }
 
   constructor(config: Partial<JiraConfig>) {
     this.config = {
@@ -191,14 +203,14 @@ class JiraIntegration {
    */
   extractFailureDetails(testResult: TestResult): FailureDetails {
     const errors = testResult.errors || [];
-    const failureMessages = errors.map(error => error.message || error.toString());
+    const failureMessages = errors.map(error => error.message || (error as any).toString());
     
     return {
       status: testResult.status,
       duration: testResult.duration,
       errors: failureMessages,
       retry: testResult.retry || 0,
-      startTime: testResult.startTime,
+      startTime: testResult.startTime.toISOString(),
       stdout: testResult.stdout || [],
       stderr: testResult.stderr || []
     };
