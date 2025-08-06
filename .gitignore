@@ -72,3 +72,5 @@ temp/
 .env.ado
 database/app.db
 prisma/database/app.db
+prisma/database/app.db
+database/app.db
