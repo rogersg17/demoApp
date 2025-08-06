@@ -1,7 +1,7 @@
 // @ts-nocheck
 import express, { Request, Response, Router } from 'express';
 import { requireAuth } from './auth';
-import { db } from '../database/database';
+import { db } from '../database';
 
 const router: Router = express.Router();
 

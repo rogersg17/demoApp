@@ -113,7 +113,7 @@ export class GitHubApiService {
   async getWorkflowRuns(options: {
     branch?: string;
     event?: string;
-    status?: string;
+    status?: 'completed' | 'queued' | 'in_progress' | 'cancelled' | 'success' | 'failure' | 'neutral' | 'skipped' | 'timed_out' | 'action_required' | 'stale' | 'requested' | 'waiting' | 'pending';
     per_page?: number;
     page?: number;
   } = {}): Promise<WorkflowRun[]> {
@@ -166,9 +166,10 @@ export class GitHubApiService {
       });
 
       return response.data.jobs as WorkflowJob[];
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching workflow jobs:', error);
-      throw new Error(`Failed to fetch workflow jobs: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch workflow jobs: ${errorMessage}`);
     }
   }
 
@@ -185,9 +186,10 @@ export class GitHubApiService {
 
       // The response is a redirect URL to download logs
       return response.url;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching workflow logs:', error);
-      throw new Error(`Failed to fetch workflow logs: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch workflow logs: ${errorMessage}`);
     }
   }
 
@@ -203,9 +205,10 @@ export class GitHubApiService {
       });
 
       return response.data.artifacts;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching workflow artifacts:', error);
-      throw new Error(`Failed to fetch workflow artifacts: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch workflow artifacts: ${errorMessage}`);
     }
   }
 
@@ -246,9 +249,10 @@ export class GitHubApiService {
         artifacts,
         logs: [], // Logs would need to be fetched and processed separately
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error monitoring workflow run:', error);
-      throw new Error(`Failed to monitor workflow run: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to monitor workflow run: ${errorMessage}`);
     }
   }
 
@@ -263,9 +267,10 @@ export class GitHubApiService {
         event_type: eventType,
         client_payload: clientPayload,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error triggering workflow:', error);
-      throw new Error(`Failed to trigger workflow: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to trigger workflow: ${errorMessage}`);
     }
   }
 
@@ -279,9 +284,10 @@ export class GitHubApiService {
         repo: this.config.repo,
         run_id: runId,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error cancelling workflow run:', error);
-      throw new Error(`Failed to cancel workflow run: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to cancel workflow run: ${errorMessage}`);
     }
   }
 
@@ -337,9 +343,10 @@ export class GitHubApiService {
         averageDuration,
         successRate: Math.round(successRate * 100) / 100,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error getting workflow statistics:', error);
-      throw new Error(`Failed to get workflow statistics: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get workflow statistics: ${errorMessage}`);
     }
   }
 
@@ -368,10 +375,11 @@ export class GitHubApiService {
         rateLimitRemaining: rateLimit.remaining,
         rateLimitReset: new Date(rateLimit.reset * 1000),
       };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         status: 'unhealthy',
-        message: `GitHub API error: ${error.message}`,
+        message: `GitHub API error: ${errorMessage}`,
       };
     }
   }

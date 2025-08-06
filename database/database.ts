@@ -1,8 +1,41 @@
-const sqlite3 = require('sqlite3').verbose();
-const bcrypt = require('bcrypt');
-const path = require('path');
+import sqlite3 from 'sqlite3';
+import bcrypt from 'bcrypt';
+import path from 'path';
+
+// Basic type for user data for broader use
+interface User {
+    id?: number;
+    username: string;
+    email: string;
+    password?: string;
+    first_name: string;
+    last_name: string;
+    department?: string;
+    role?: string;
+    status?: string;
+    created_at?: string;
+    updated_at?: string;
+    last_login?: string;
+    session_count?: number;
+    avg_session_duration?: number;
+}
+
+interface FlakyTest {
+  id?: number;
+  test_name: string;
+  flaky_score?: number;
+  classification?: string;
+  confidence?: number;
+  last_analyzed?: string;
+  pattern_type?: string;
+  analysis_data?: any;
+  created_at?: string;
+  updated_at?: string;
+}
 
 class Database {
+  db: sqlite3.Database;
+
   constructor() {
     const dbPath = path.join(__dirname, 'app.db');
     this.db = new sqlite3.Database(dbPath, (err) => {
@@ -15,7 +48,7 @@ class Database {
     });
   }
 
-  initializeTables() {
+  initializeTables(): void {
     // Users table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -91,7 +124,7 @@ class Database {
     }, 100);
   }
 
-  initializeAdoTables() {
+  initializeAdoTables(): void {
     // Project Configurations table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS project_configurations (
@@ -222,7 +255,7 @@ class Database {
     });
   }
 
-  initializeFlakyTestTables() {
+  initializeFlakyTestTables(): void {
     // Flaky test tracking table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS flaky_tests (
@@ -306,9 +339,9 @@ class Database {
     });
   }
 
-  async insertSampleData() {
+  async insertSampleData(): Promise<void> {
     // Check if users already exist
-    this.db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {
+    this.db.get("SELECT COUNT(*) as count FROM users", async (err, row: { count: number }) => {
       if (err) {
         console.error('Error checking users:', err);
         return;
@@ -324,7 +357,7 @@ class Database {
     });
   }
 
-  async createSampleUsers() {
+  async createSampleUsers(): Promise<void> {
     const sampleUsers = [
       {
         username: 'admin',
@@ -429,7 +462,7 @@ class Database {
     stmt.finalize();
   }
 
-  async createSampleSessions() {
+  async createSampleSessions(): Promise<void> {
     const sessions = [
       { user_id: 1, duration: 3600, login_time: '2024-07-30 09:00:00' },
       { user_id: 1, duration: 2400, login_time: '2024-07-30 14:00:00' },
@@ -453,7 +486,7 @@ class Database {
     stmt.finalize();
   }
 
-  async createSampleActivityLogs() {
+  async createSampleActivityLogs(): Promise<void> {
     const activities = [
       { user_id: 1, action: 'login', description: 'User logged in' },
       { user_id: 1, action: 'view_reports', description: 'Viewed analytics dashboard' },
@@ -478,45 +511,48 @@ class Database {
   }
 
   // User methods
-  async getAllUsers() {
+  async getAllUsers(): Promise<User[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT id, username, email, first_name, last_name, department, role, status, 
                created_at, last_login, session_count, avg_session_duration
         FROM users
         ORDER BY created_at DESC
-      `, (err, rows) => {
+      `, (err, rows: User[]) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
   }
 
-  async getUserById(id) {
+  async getUserById(id: number): Promise<User> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT id, username, email, first_name, last_name, department, role, status, 
                created_at, last_login, session_count, avg_session_duration
         FROM users WHERE id = ?
-      `, [id], (err, row) => {
+      `, [id], (err, row: User) => {
         if (err) reject(err);
         else resolve(row);
       });
     });
   }
 
-  async getUserByUsername(username) {
+  async getUserByUsername(username: string): Promise<User> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT * FROM users WHERE username = ?
-      `, [username], (err, row) => {
+      `, [username], (err, row: User) => {
         if (err) reject(err);
         else resolve(row);
       });
     });
   }
 
-  async createUser(userData) {
+  async createUser(userData: Omit<User, 'id'>): Promise<User> {
+    if (!userData.password) {
+      return Promise.reject(new Error('Password is required to create a user.'));
+    }
     const hashedPassword = await bcrypt.hash(userData.password, 10);
     
     return new Promise((resolve, reject) => {
@@ -539,15 +575,16 @@ class Database {
     });
   }
 
-  async updateUser(id, userData) {
+  async updateUser(id: number, userData: Partial<User>): Promise<Partial<User>> {
     return new Promise((resolve, reject) => {
-      const fields = [];
-      const values = [];
+      const fields: string[] = [];
+      const values: any[] = [];
       
-      Object.keys(userData).forEach(key => {
-        if (userData[key] !== undefined && key !== 'id') {
-          fields.push(`${key} = ?`);
-          values.push(userData[key]);
+      Object.keys(userData).forEach((key) => {
+        const userKey = key as keyof User;
+        if (userData[userKey] !== undefined && userKey !== 'id') {
+          fields.push(`${userKey} = ?`);
+          values.push(userData[userKey]);
         }
       });
       
@@ -568,7 +605,7 @@ class Database {
     });
   }
 
-  async deleteUser(id) {
+  async deleteUser(id: number): Promise<{ deleted: boolean }> {
     return new Promise((resolve, reject) => {
       this.db.run(`DELETE FROM users WHERE id = ?`, [id], function(err) {
         if (err) reject(err);
@@ -578,7 +615,7 @@ class Database {
   }
 
   // Analytics methods
-  async getUserStats() {
+  async getUserStats(): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT 
@@ -595,7 +632,7 @@ class Database {
     });
   }
 
-  async getUsersByDepartment() {
+  async getUsersByDepartment(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT department, COUNT(*) as count
@@ -610,7 +647,7 @@ class Database {
     });
   }
 
-  async getUsersByRole() {
+  async getUsersByRole(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT role, COUNT(*) as count
@@ -624,7 +661,7 @@ class Database {
     });
   }
 
-  async getUsersByStatus() {
+  async getUsersByStatus(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT status, COUNT(*) as count
@@ -638,7 +675,7 @@ class Database {
     });
   }
 
-  async getUserGrowthData() {
+  async getUserGrowthData(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT 
@@ -655,7 +692,7 @@ class Database {
     });
   }
 
-  async getUserActivityData() {
+  async getUserActivityData(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT 
@@ -681,7 +718,7 @@ class Database {
   }
 
   // Session tracking
-  async createSession(userId, ipAddress, userAgent) {
+  async createSession(userId: number, ipAddress: string, userAgent: string): Promise<{ sessionId: number }> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO user_sessions (user_id, ip_address, user_agent)
@@ -693,7 +730,7 @@ class Database {
     });
   }
 
-  async endSession(sessionId, duration) {
+  async endSession(sessionId: number, duration: number): Promise<{ updated: boolean }> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         UPDATE user_sessions 
@@ -707,7 +744,7 @@ class Database {
   }
 
   // Activity logging
-  async logActivity(userId, action, description, ipAddress) {
+  async logActivity(userId: number, action: string, description: string, ipAddress: string): Promise<{ logId: number }> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO activity_logs (user_id, action, description, ip_address)
@@ -720,7 +757,7 @@ class Database {
   }
 
   // Azure DevOps methods
-  async createProjectConfiguration(projectData) {
+  async createProjectConfiguration(projectData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO project_configurations (
@@ -745,12 +782,12 @@ class Database {
     });
   }
 
-  async getProjectConfigurations() {
+  async getProjectConfigurations(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM project_configurations WHERE enabled = 1
         ORDER BY created_at DESC
-      `, (err, rows) => {
+      `, (err, rows: any[]) => {
         if (err) reject(err);
         else {
           const projects = rows.map(row => ({
@@ -763,10 +800,10 @@ class Database {
     });
   }
 
-  async updateProjectConfiguration(projectId, updates) {
+  async updateProjectConfiguration(projectId: string, updates: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      const fields = [];
-      const values = [];
+      const fields: string[] = [];
+      const values: any[] = [];
       
       Object.keys(updates).forEach(key => {
         if (updates[key] !== undefined && key !== 'id') {
@@ -797,7 +834,7 @@ class Database {
     });
   }
 
-  async deleteProjectConfiguration(projectId) {
+  async deleteProjectConfiguration(projectId: string): Promise<{ deleted: boolean }> {
     return new Promise((resolve, reject) => {
       this.db.run(`DELETE FROM project_configurations WHERE id = ?`, [projectId], function(err) {
         if (err) reject(err);
@@ -806,7 +843,7 @@ class Database {
     });
   }
 
-  async createAdoBuild(buildData) {
+  async createAdoBuild(buildData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO ado_builds (
@@ -836,7 +873,7 @@ class Database {
     });
   }
 
-  async createAdoTestResult(testResultData) {
+  async createAdoTestResult(testResultData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO ado_test_results (
@@ -863,7 +900,7 @@ class Database {
     });
   }
 
-  async getProjectStatus(projectId) {
+  async getProjectStatus(projectId: string): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT ps.*, pc.name as project_name, pc.build_definition_id
@@ -877,7 +914,7 @@ class Database {
     });
   }
 
-  async updateProjectStatus(projectId, statusData) {
+  async updateProjectStatus(projectId: string, statusData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT OR REPLACE INTO project_status (
@@ -899,7 +936,7 @@ class Database {
     });
   }
 
-  async getRecentBuilds(projectId, limit = 10) {
+  async getRecentBuilds(projectId?: string, limit = 10): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const query = projectId 
         ? `SELECT * FROM ado_builds WHERE ado_project_id = ? ORDER BY start_time DESC LIMIT ?`
@@ -914,7 +951,7 @@ class Database {
     });
   }
 
-  async getBuildsByDefinition(buildDefinitionId, limit = 50) {
+  async getBuildsByDefinition(buildDefinitionId: number, limit = 50): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM ado_builds 
@@ -928,7 +965,7 @@ class Database {
     });
   }
 
-  async getTestResultsByBuild(adoBuildId) {
+  async getTestResultsByBuild(adoBuildId: number): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM ado_test_results 
@@ -941,7 +978,7 @@ class Database {
     });
   }
 
-  async getBuildStatistics(projectId, days = 30) {
+  async getBuildStatistics(projectId?: string, days = 30): Promise<any> {
     return new Promise((resolve, reject) => {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -972,7 +1009,7 @@ class Database {
   }
 
   // Flaky Test Detection methods
-  async createTestExecutionRecord(testData) {
+  async createTestExecutionRecord(testData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO test_execution_history (
@@ -1000,7 +1037,7 @@ class Database {
     });
   }
 
-  async getTestExecutionHistory(testName, limit = 50) {
+  async getTestExecutionHistory(testName: string, limit = 50): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_execution_history 
@@ -1014,7 +1051,7 @@ class Database {
     });
   }
 
-  async getAllTestExecutionHistory(limit = 1000) {
+  async getAllTestExecutionHistory(limit = 1000): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_execution_history 
@@ -1027,19 +1064,19 @@ class Database {
     });
   }
 
-  async getAllUniqueTestNames() {
+  async getAllUniqueTestNames(): Promise<string[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT DISTINCT test_name FROM test_execution_history 
         ORDER BY test_name
-      `, (err, rows) => {
+      `, (err, rows: { test_name: string }[]) => {
         if (err) reject(err);
         else resolve(rows.map(row => row.test_name));
       });
     });
   }
 
-  async upsertFlakyTest(flakyTestData) {
+  async upsertFlakyTest(flakyTestData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT OR REPLACE INTO flaky_tests (
@@ -1060,12 +1097,12 @@ class Database {
     });
   }
 
-  async getFlakyTests() {
+  async getFlakyTests(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM flaky_tests 
         ORDER BY flaky_score DESC, last_analyzed DESC
-      `, (err, rows) => {
+      `, (err, rows: any[]) => {
         if (err) reject(err);
         else {
           const tests = rows.map(row => ({
@@ -1078,15 +1115,15 @@ class Database {
     });
   }
 
-  async getFlakyTestByName(testName) {
+  async getFlakyTestByName(testName: string): Promise<FlakyTest | null> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT * FROM flaky_tests WHERE test_name = ?
-      `, [testName], (err, row) => {
+      `, [testName], (err, row: FlakyTest) => {
         if (err) reject(err);
         else {
           if (row) {
-            row.analysis_data = row.analysis_data ? JSON.parse(row.analysis_data) : null;
+            row.analysis_data = row.analysis_data ? JSON.parse(row.analysis_data as string) : null;
           }
           resolve(row);
         }
@@ -1094,7 +1131,7 @@ class Database {
     });
   }
 
-  async updateTestStabilityMetrics(metricsData) {
+  async updateTestStabilityMetrics(metricsData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT OR REPLACE INTO test_stability_metrics (
@@ -1119,7 +1156,7 @@ class Database {
     });
   }
 
-  async getTestStabilityMetrics(testName, days = 30) {
+  async getTestStabilityMetrics(testName: string, days = 30): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -1128,7 +1165,7 @@ class Database {
         SELECT * FROM test_stability_metrics 
         WHERE test_name = ? AND date >= ?
         ORDER BY date DESC
-      `, [testName, cutoffDate.toISOString().split('T')[0]], (err, rows) => {
+      `, [testName, cutoffDate.toISOString().split('T')[0]], (err, rows: any[]) => {
         if (err) reject(err);
         else {
           const metrics = rows.map(row => ({
@@ -1141,7 +1178,7 @@ class Database {
     });
   }
 
-  async createFlakyAnalysisRun(runData) {
+  async createFlakyAnalysisRun(runData: any): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         INSERT INTO flaky_analysis_runs (
@@ -1165,7 +1202,7 @@ class Database {
     });
   }
 
-  async getRecentFlakyAnalysisRuns(limit = 10) {
+  async getRecentFlakyAnalysisRuns(limit = 10): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM flaky_analysis_runs 
@@ -1178,7 +1215,7 @@ class Database {
     });
   }
 
-  async getFlakyTestStatistics() {
+  async getFlakyTestStatistics(): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT 
@@ -1196,7 +1233,43 @@ class Database {
     });
   }
 
-  close() {
+  get(sql: string, params: any[] = []): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.db.get(sql, params, (err, row) => {
+        if (err) {
+          console.error('DB GET Error:', err);
+          reject(err);
+        }
+        else resolve(row);
+      });
+    });
+  }
+
+  all(sql: string, params: any[] = []): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, params, (err, rows) => {
+        if (err) {
+          console.error('DB ALL Error:', err);
+          reject(err);
+        }
+        else resolve(rows);
+      });
+    });
+  }
+
+  run(sql: string, params: any[] = []): Promise<{ lastID: number, changes: number }> {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          console.error('DB RUN Error:', err);
+          reject(err);
+        }
+        else resolve({ lastID: this.lastID, changes: this.changes });
+      });
+    });
+  }
+
+  close(): void {
     this.db.close((err) => {
       if (err) {
         console.error('Error closing database:', err.message);
@@ -1207,7 +1280,7 @@ class Database {
   }
 
   // ADR-001: Initialize TMS tables for test code and metadata separation
-  initializeTMSTables() {
+  initializeTMSTables(): void {
     // Git repositories table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS git_repositories (
@@ -1310,7 +1383,7 @@ class Database {
     setTimeout(() => this.createTMSIndexes(), 100);
   }
 
-  createTMSIndexes() {
+  createTMSIndexes(): void {
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_test_metadata_test_id ON test_metadata(test_id)',
       'CREATE INDEX IF NOT EXISTS idx_test_metadata_file_path ON test_metadata(file_path)', 
@@ -1336,7 +1409,7 @@ class Database {
   }
 
   // Initialize MVP tables for Azure DevOps integration (Week 3)
-  initializeMVPTables() {
+  initializeMVPTables(): void {
     // MVP Pipeline Configurations table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS mvp_pipeline_configs (
@@ -1469,7 +1542,7 @@ class Database {
     setTimeout(() => this.createMVPIndexesAndViews(), 200);
   }
 
-  createMVPIndexesAndViews() {
+  createMVPIndexesAndViews(): void {
     // Indexes for MVP tables
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_mvp_pipeline_configs_active ON mvp_pipeline_configs(active)',
@@ -1559,7 +1632,7 @@ class Database {
   }
 
   // Initialize Enhanced Orchestration tables for Week 11
-  initializeEnhancedOrchestrationTables() {
+  initializeEnhancedOrchestrationTables(): void {
     // Test Runners table - Track registered test runners and their capabilities
     this.db.run(`
       CREATE TABLE IF NOT EXISTS test_runners (
@@ -1715,7 +1788,7 @@ class Database {
     this.createOrchestrationIndexes();
   }
 
-  createOrchestrationIndexes() {
+  createOrchestrationIndexes(): void {
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_execution_queue_status ON execution_queue(status)',
       'CREATE INDEX IF NOT EXISTS idx_execution_queue_priority ON execution_queue(priority DESC)',
@@ -1740,7 +1813,7 @@ class Database {
   // TMS Database Methods
 
   // Git Repository Methods
-  createGitRepository(repositoryData) {
+  createGitRepository(repositoryData: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const { name, url, default_branch, webhook_secret } = repositoryData;
       this.db.run(`
@@ -1753,7 +1826,7 @@ class Database {
     });
   }
 
-  getGitRepository(id) {
+  getGitRepository(id: number): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT * FROM git_repositories WHERE id = ?
@@ -1764,7 +1837,7 @@ class Database {
     });
   }
 
-  getAllGitRepositories() {
+  getAllGitRepositories(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM git_repositories ORDER BY created_at DESC
@@ -1775,7 +1848,7 @@ class Database {
     });
   }
 
-  updateGitRepository(id, updates) {
+  updateGitRepository(id: number, updates: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
       const values = Object.values(updates);
@@ -1792,7 +1865,7 @@ class Database {
     });
   }
 
-  updateGitRepositorySync(id) {
+  updateGitRepositorySync(id: number): Promise<number> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         UPDATE git_repositories 
@@ -1805,7 +1878,7 @@ class Database {
     });
   }
 
-  deleteGitRepository(id) {
+  deleteGitRepository(id: number): Promise<number> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         DELETE FROM git_repositories WHERE id = ?
@@ -1817,7 +1890,7 @@ class Database {
   }
 
   // Test Metadata Methods
-  createOrUpdateTestMetadata(testData) {
+  createOrUpdateTestMetadata(testData: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const {
         test_id, file_path, test_name, description, tags, priority,
@@ -1840,11 +1913,11 @@ class Database {
     });
   }
 
-  getTestMetadata(testId) {
+  getTestMetadata(testId: string): Promise<any> {
     return new Promise((resolve, reject) => {
       this.db.get(`
         SELECT * FROM test_metadata WHERE test_id = ?
-      `, [testId], (err, row) => {
+      `, [testId], (err, row: any) => {
         if (err) reject(err);
         else {
           if (row && row.tags) {
@@ -1860,11 +1933,11 @@ class Database {
     });
   }
 
-  getAllTestMetadata() {
+  getAllTestMetadata(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_metadata ORDER BY updated_at DESC
-      `, [], (err, rows) => {
+      `, [], (err, rows: any[]) => {
         if (err) reject(err);
         else {
           rows.forEach(row => {
@@ -1882,13 +1955,13 @@ class Database {
     });
   }
 
-  getTestsByRepository(repositoryId) {
+  getTestsByRepository(repositoryId: number): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_metadata 
         WHERE repository_id = ? 
         ORDER BY file_path, test_name
-      `, [repositoryId], (err, rows) => {
+      `, [repositoryId], (err, rows: any[]) => {
         if (err) reject(err);
         else {
           rows.forEach(row => {
@@ -1906,7 +1979,7 @@ class Database {
     });
   }
 
-  removeTestsByFilePath(repositoryId, filePath) {
+  removeTestsByFilePath(repositoryId: number, filePath: string): Promise<number> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         DELETE FROM test_metadata 
@@ -1918,19 +1991,15 @@ class Database {
     });
   }
 
-  deactivateTestsByFilePath(repositoryId, filePath) {
-    return new Promise((resolve, reject) => {
-      // For now, we'll delete them. In the future, we might want to mark as inactive
-      this.removeTestsByFilePath(repositoryId, filePath)
-        .then(resolve)
-        .catch(reject);
-    });
+  deactivateTestsByFilePath(repositoryId: number, filePath: string): Promise<number> {
+    // For now, we'll delete them. In the future, we might want to mark as inactive
+    return this.removeTestsByFilePath(repositoryId, filePath);
   }
 
-  searchTests(criteria) {
+  searchTests(criteria: any): Promise<any[]> {
     return new Promise((resolve, reject) => {
       let sql = 'SELECT * FROM test_metadata WHERE 1=1';
-      const params = [];
+      const params: any[] = [];
 
       if (criteria.testName) {
         sql += ' AND test_name LIKE ?';
@@ -1964,7 +2033,7 @@ class Database {
         params.push(criteria.limit);
       }
 
-      this.db.all(sql, params, (err, rows) => {
+      this.db.all(sql, params, (err, rows: any[]) => {
         if (err) reject(err);
         else {
           rows.forEach(row => {
@@ -1983,7 +2052,7 @@ class Database {
   }
 
   // Test Execution Methods
-  createTestExecution(executionData) {
+  createTestExecution(executionData: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const {
         test_id, execution_id, platform_type, platform_execution_id,
@@ -2006,14 +2075,14 @@ class Database {
     });
   }
 
-  getTestExecutions(testId, limit = 50) {
+  getTestExecutions(testId: string, limit = 50): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_executions 
         WHERE test_id = ? 
         ORDER BY created_at DESC 
         LIMIT ?
-      `, [testId, limit], (err, rows) => {
+      `, [testId, limit], (err, rows: any[]) => {
         if (err) reject(err);
         else {
           rows.forEach(row => {
@@ -2032,7 +2101,7 @@ class Database {
   }
 
   // Platform Integration Methods
-  createPlatformIntegration(integrationData) {
+  createPlatformIntegration(integrationData: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const { platform_type, configuration, is_active } = integrationData;
       const configJson = typeof configuration === 'object' ? JSON.stringify(configuration) : configuration;
@@ -2047,13 +2116,13 @@ class Database {
     });
   }
 
-  getPlatformIntegrations() {
+  getPlatformIntegrations(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM platform_integrations 
         WHERE is_active = 1 
         ORDER BY platform_type
-      `, [], (err, rows) => {
+      `, [], (err, rows: any[]) => {
         if (err) reject(err);
         else {
           rows.forEach(row => {
@@ -2072,7 +2141,7 @@ class Database {
   }
 
   // Test File Changes Methods
-  recordTestFileChange(changeData) {
+  recordTestFileChange(changeData: any): Promise<number> {
     return new Promise((resolve, reject) => {
       const {
         repository_id, file_path, change_type, commit_hash,
@@ -2091,7 +2160,7 @@ class Database {
     });
   }
 
-  getUnprocessedTestFileChanges() {
+  getUnprocessedTestFileChanges(): Promise<any[]> {
     return new Promise((resolve, reject) => {
       this.db.all(`
         SELECT * FROM test_file_changes 
@@ -2104,7 +2173,7 @@ class Database {
     });
   }
 
-  markTestFileChangeProcessed(id) {
+  markTestFileChangeProcessed(id: number): Promise<number> {
     return new Promise((resolve, reject) => {
       this.db.run(`
         UPDATE test_file_changes 
@@ -2118,4 +2187,4 @@ class Database {
   }
 }
 
-module.exports = Database;
+export default Database;

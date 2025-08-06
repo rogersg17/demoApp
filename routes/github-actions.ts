@@ -9,6 +9,9 @@ import GitHubApiService from '../services/github-api-service.js';
 
 const router = express.Router();
 
+// Define the allowed status types for GitHub workflow runs
+type WorkflowRunStatus = "queued" | "completed" | "cancelled" | "skipped" | "pending" | "success" | "in_progress" | "failure" | "neutral" | "timed_out" | "action_required" | "stale" | "requested" | "waiting";
+
 // Helper function to safely parse query string values
 function parseStringParam(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
@@ -39,7 +42,7 @@ router.get('/workflows/runs', async (req: Request, res: Response) => {
     const token = parseStringParam(req.query.token);
     const branch = parseStringParam(req.query.branch);
     const event = parseStringParam(req.query.event);
-    const status = parseStringParam(req.query.status);
+    const status = parseStringParam(req.query.status) as WorkflowRunStatus | undefined;
     const perPage = parseNumberParam(req.query.per_page, 20);
     const page = parseNumberParam(req.query.page, 1);
 

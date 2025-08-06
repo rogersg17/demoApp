@@ -1,20 +1,73 @@
-const AdoClient = require('../lib/ado-client');
-const AdoBuildDefinitionService = require('./ado-build-definition');
-const Database = require('../database/database');
-const crypto = require('crypto');
+import AdoClient from '../lib/ado-client';
+import AdoBuildDefinitionService from './ado-build-definition';
+import db, { Database } from '../database';
+import * as crypto from 'crypto';
+import AdoBuildConsumer from './ado-build-consumer';
+
+// Define interfaces for project configuration and status
+interface ProjectHealthThresholds {
+    healthy: number;
+    warning: number;
+    critical: number;
+}
+
+interface ProjectNotifications {
+    onFailure: boolean;
+    onSuccess: boolean;
+    channels: string[];
+}
+
+interface ProjectConfigurationOptions {
+    trackBranches: string[];
+    healthThresholds: ProjectHealthThresholds;
+    notifications: ProjectNotifications;
+    retentionDays: number;
+    autoSync: boolean;
+    includeTestResults: boolean;
+    includeBuildTasks: boolean;
+}
+
+interface ProjectData {
+    id: string;
+    name: string;
+    buildDefinitionId: number;
+    adoProjectId: string;
+    adoProjectName: string;
+    repositoryName?: string;
+    repositoryType?: string;
+    path: string;
+    enabled: boolean;
+    configuration: ProjectConfigurationOptions;
+    updated_at?: string;
+}
+
+interface ProjectStatus {
+    projectName: string;
+    buildDefinitionId: number;
+    lastBuildId: number | null;
+    overallHealth: 'unknown' | 'healthy' | 'warning' | 'critical';
+    successRate: number;
+    totalTests: number;
+    last_updated?: string;
+}
 
 class AdoProjectConfigurationService {
-    constructor(client = null, database = null) {
+    private client: AdoClient;
+    private buildDefService: AdoBuildDefinitionService;
+    private db: Database;
+    private debug: boolean;
+
+    constructor(client: AdoClient | null = null, database: Database | null = null) {
         this.client = client || new AdoClient();
         this.buildDefService = new AdoBuildDefinitionService(this.client);
-        this.db = database || new Database();
+        this.db = database || db;
         this.debug = process.env.ADO_DEBUG === 'true';
     }
 
     /**
      * Configure a new project based on a build definition
      */
-    async configureProject(buildDefinitionId, projectConfig) {
+    async configureProject(buildDefinitionId: number, projectConfig: Partial<ProjectData> & { configuration?: Partial<ProjectConfigurationOptions>, syncHistoricalData?: boolean }): Promise<ProjectData> {
         try {
             // Validate build definition exists
             const buildDefinition = await this.buildDefService.getBuildDefinitionDetails(buildDefinitionId);
@@ -37,7 +90,7 @@ class AdoProjectConfigurationService {
             const projectId = this.generateProjectId(buildDefinitionId, buildDefinition.name);
 
             // Create project configuration
-            const projectData = {
+            const projectData: ProjectData = {
                 id: projectId,
                 name: projectConfig.name || buildDefinition.name,
                 buildDefinitionId: buildDefinitionId,
@@ -48,21 +101,21 @@ class AdoProjectConfigurationService {
                 path: buildDefinition.path,
                 enabled: projectConfig.enabled !== false,
                 configuration: {
-                    trackBranches: projectConfig.trackBranches || ['main', 'master'],
-                    healthThresholds: projectConfig.healthThresholds || {
+                    trackBranches: projectConfig.configuration?.trackBranches || ['main', 'master'],
+                    healthThresholds: projectConfig.configuration?.healthThresholds || {
                         healthy: 90,
                         warning: 75,
                         critical: 50
                     },
-                    notifications: projectConfig.notifications || {
+                    notifications: projectConfig.configuration?.notifications || {
                         onFailure: true,
                         onSuccess: false,
                         channels: []
                     },
-                    retentionDays: projectConfig.retentionDays || 90,
-                    autoSync: projectConfig.autoSync !== false,
-                    includeTestResults: projectConfig.includeTestResults !== false,
-                    includeBuildTasks: projectConfig.includeBuildTasks !== false
+                    retentionDays: projectConfig.configuration?.retentionDays || 90,
+                    autoSync: projectConfig.configuration?.autoSync !== false,
+                    includeTestResults: projectConfig.configuration?.includeTestResults !== false,
+                    includeBuildTasks: projectConfig.configuration?.includeBuildTasks !== false
                 }
             };
 
@@ -82,7 +135,7 @@ class AdoProjectConfigurationService {
             this.log(`Project configured: ${projectData.name} (${projectId})`);
             return projectData;
             
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to configure project:', error.message);
             throw error;
         }
@@ -91,12 +144,12 @@ class AdoProjectConfigurationService {
     /**
      * Get all configured projects
      */
-    async getConfiguredProjects() {
+    async getConfiguredProjects(): Promise<any[]> {
         try {
             const projects = await this.db.getProjectConfigurations();
             
             // Enrich with current status and metrics
-            const enrichedProjects = [];
+            const enrichedProjects: any[] = [];
             for (const project of projects) {
                 try {
                     const status = await this.db.getProjectStatus(project.id);
@@ -108,7 +161,7 @@ class AdoProjectConfigurationService {
                         recentBuilds: recentBuilds || [],
                         lastUpdated: status?.last_updated || project.updated_at
                     });
-                } catch (error) {
+                } catch (error: any) {
                     this.error(`Failed to enrich project ${project.id}:`, error.message);
                     // Include project without enrichment
                     enrichedProjects.push(project);
@@ -117,7 +170,7 @@ class AdoProjectConfigurationService {
 
             this.log(`Retrieved ${enrichedProjects.length} configured projects`);
             return enrichedProjects;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get configured projects:', error.message);
             throw error;
         }
@@ -126,10 +179,10 @@ class AdoProjectConfigurationService {
     /**
      * Get specific project configuration
      */
-    async getProjectConfiguration(projectId) {
+    async getProjectConfiguration(projectId: string): Promise<any> {
         try {
             const projects = await this.db.getProjectConfigurations();
-            const project = projects.find(p => p.id === projectId);
+            const project = projects.find((p: any) => p.id === projectId);
             
             if (!project) {
                 throw new Error(`Project configuration not found: ${projectId}`);
@@ -146,7 +199,7 @@ class AdoProjectConfigurationService {
                 recentBuilds,
                 statistics: buildStats
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get project configuration ${projectId}:`, error.message);
             throw error;
         }
@@ -155,7 +208,7 @@ class AdoProjectConfigurationService {
     /**
      * Update project configuration
      */
-    async updateProjectConfiguration(projectId, updates) {
+    async updateProjectConfiguration(projectId: string, updates: Partial<ProjectData>): Promise<any> {
         try {
             const existing = await this.getProjectConfiguration(projectId);
             
@@ -175,7 +228,7 @@ class AdoProjectConfigurationService {
             
             this.log(`Project configuration updated: ${projectId}`);
             return updated;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to update project configuration ${projectId}:`, error.message);
             throw error;
         }
@@ -184,7 +237,7 @@ class AdoProjectConfigurationService {
     /**
      * Delete project configuration
      */
-    async deleteProjectConfiguration(projectId) {
+    async deleteProjectConfiguration(projectId: string): Promise<any> {
         try {
             const result = await this.db.deleteProjectConfiguration(projectId);
             
@@ -195,7 +248,7 @@ class AdoProjectConfigurationService {
             }
             
             return result;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to delete project configuration ${projectId}:`, error.message);
             throw error;
         }
@@ -204,12 +257,12 @@ class AdoProjectConfigurationService {
     /**
      * Enable or disable a project
      */
-    async toggleProjectStatus(projectId, enabled) {
+    async toggleProjectStatus(projectId: string, enabled: boolean): Promise<any> {
         try {
             const updated = await this.updateProjectConfiguration(projectId, { enabled });
             this.log(`Project ${projectId} ${enabled ? 'enabled' : 'disabled'}`);
             return updated;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to toggle project status ${projectId}:`, error.message);
             throw error;
         }
@@ -218,11 +271,11 @@ class AdoProjectConfigurationService {
     /**
      * Get configured build definition IDs
      */
-    async getConfiguredBuildDefinitionIds() {
+    async getConfiguredBuildDefinitionIds(): Promise<number[]> {
         try {
             const projects = await this.db.getProjectConfigurations();
-            return projects.map(p => p.build_definition_id);
-        } catch (error) {
+            return projects.map((p: any) => p.build_definition_id);
+        } catch (error: any) {
             this.error('Failed to get configured build definition IDs:', error.message);
             throw error;
         }
@@ -231,8 +284,8 @@ class AdoProjectConfigurationService {
     /**
      * Validate project configuration
      */
-    async validateProjectConfiguration(buildDefinitionId, projectConfig) {
-        const errors = [];
+    async validateProjectConfiguration(buildDefinitionId: number, projectConfig: Partial<ProjectData> & { configuration?: Partial<ProjectConfigurationOptions> }): Promise<{ isValid: boolean, errors: string[] }> {
+        const errors: string[] = [];
 
         // Check if build definition exists
         try {
@@ -256,14 +309,14 @@ class AdoProjectConfigurationService {
             errors.push('Project name is required');
         }
 
-        if (projectConfig.healthThresholds) {
-            const { healthy, warning, critical } = projectConfig.healthThresholds;
+        if (projectConfig.configuration?.healthThresholds) {
+            const { healthy, warning, critical } = projectConfig.configuration.healthThresholds;
             if (healthy <= warning || warning <= critical || critical < 0) {
                 errors.push('Health thresholds must be in descending order (healthy > warning > critical >= 0)');
             }
         }
 
-        if (projectConfig.trackBranches && (!Array.isArray(projectConfig.trackBranches) || projectConfig.trackBranches.length === 0)) {
+        if (projectConfig.configuration?.trackBranches && (!Array.isArray(projectConfig.configuration.trackBranches) || projectConfig.configuration.trackBranches.length === 0)) {
             errors.push('At least one branch must be tracked');
         }
 
@@ -276,7 +329,7 @@ class AdoProjectConfigurationService {
     /**
      * Get project health summary
      */
-    async getProjectHealthSummary() {
+    async getProjectHealthSummary(): Promise<any> {
         try {
             const projects = await this.getConfiguredProjects();
             
@@ -323,7 +376,7 @@ class AdoProjectConfigurationService {
 
             this.log('Generated project health summary');
             return summary;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get project health summary:', error.message);
             throw error;
         }
@@ -334,7 +387,7 @@ class AdoProjectConfigurationService {
     /**
      * Generate unique project ID
      */
-    generateProjectId(buildDefinitionId, definitionName) {
+    private generateProjectId(buildDefinitionId: number, definitionName: string): string {
         const cleanName = definitionName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
         const hash = crypto.createHash('md5')
             .update(`${buildDefinitionId}-${definitionName}`)
@@ -347,9 +400,9 @@ class AdoProjectConfigurationService {
     /**
      * Initialize project status in database
      */
-    async initializeProjectStatus(projectData) {
+    private async initializeProjectStatus(projectData: ProjectData): Promise<void> {
         try {
-            const statusData = {
+            const statusData: ProjectStatus = {
                 projectName: projectData.name,
                 buildDefinitionId: projectData.buildDefinitionId,
                 lastBuildId: null,
@@ -360,7 +413,7 @@ class AdoProjectConfigurationService {
 
             await this.db.updateProjectStatus(projectData.id, statusData);
             this.log(`Initialized status for project ${projectData.id}`);
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to initialize project status for ${projectData.id}:`, error.message);
             // Don't throw as this is not critical for project creation
         }
@@ -369,18 +422,17 @@ class AdoProjectConfigurationService {
     /**
      * Sync initial historical data for a new project
      */
-    async syncInitialData(buildDefinitionId, projectId) {
+    private async syncInitialData(buildDefinitionId: number, projectId: string): Promise<void> {
         try {
             this.log(`Starting initial data sync for project ${projectId}`);
             
-            const AdoBuildConsumer = require('./ado-build-consumer');
             const consumer = new AdoBuildConsumer(this.client, this.db);
             
             // Sync last 7 days of builds
             const result = await consumer.syncHistoricalBuilds(buildDefinitionId, null, 7);
             
             this.log(`Initial sync completed for project ${projectId}: ${result.results.length} builds processed`);
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to sync initial data for project ${projectId}:`, error.message);
             // Don't throw as this runs async
         }
@@ -389,26 +441,26 @@ class AdoProjectConfigurationService {
     /**
      * Clean up project-related data when deleting a project
      */
-    async cleanupProjectData(projectId) {
+    private async cleanupProjectData(projectId: string): Promise<void> {
         try {
             // Remove project status
             // Note: This would need additional database methods for complete cleanup
             this.log(`Cleaned up data for project ${projectId}`);
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to cleanup data for project ${projectId}:`, error.message);
             // Don't throw as the main deletion already succeeded
         }
     }
 
-    log(...args) {
+    private log(...args: any[]): void {
         if (this.debug) {
             console.log('[ADO-PROJECT-CONFIGURATION]', ...args);
         }
     }
 
-    error(...args) {
+    private error(...args: any[]): void {
         console.error('[ADO-PROJECT-CONFIGURATION ERROR]', ...args);
     }
 }
 
-module.exports = AdoProjectConfigurationService;
+export default AdoProjectConfigurationService;

@@ -3,7 +3,8 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import { EventEmitter } from 'events';
-import Database from '../database/database';
+import db from '../database';
+import { Database } from '../database';
 
 interface RepositoryConfig {
   name: string;
@@ -19,6 +20,11 @@ interface RepositoryInfo {
   defaultBranch: string;
   webhookSecret?: string;
   lastSync: Date;
+}
+
+interface CommitAuthor {
+    name: string;
+    email: string;
 }
 
 interface WebhookPayload {
@@ -40,10 +46,7 @@ interface CommitInfo {
   id: string;
   message: string;
   timestamp: string;
-  author: {
-    name: string;
-    email: string;
-  };
+  author: CommitAuthor;
   added: string[];
   removed: string[];
   modified: string[];
@@ -62,6 +65,15 @@ interface ScanResult {
   commit: string;
 }
 
+interface WebhookChange {
+    type: 'added' | 'modified' | 'removed';
+    file: string;
+    commit: string;
+    author: CommitAuthor;
+    message: string;
+    timestamp: string;
+}
+
 /**
  * Git Integration Service
  * Handles Git webhook processing, repository scanning, and change detection
@@ -71,9 +83,9 @@ class GitIntegrationService extends EventEmitter {
   private db: Database;
   private repositories: Map<string | number, RepositoryInfo>;
 
-  constructor(database: Database) {
+  constructor() {
     super();
-    this.db = database;
+    this.db = db;
     this.repositories = new Map();
   }
 
@@ -111,7 +123,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Process incoming Git webhook
    */
-  async processWebhook(headers: any, payload: any, repositoryId: string | number): Promise<any> {
+  async processWebhook(headers: any, payload: any, repositoryId: number): Promise<any> {
     try {
       const repository = await this.db.getGitRepository(repositoryId);
       if (!repository) {
@@ -153,12 +165,12 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Verify webhook signature for security
    */
-  verifyWebhookSignature(payload, signature, secret) {
+  verifyWebhookSignature(payload: any, signature: string, secret: string) {
     if (!signature || !secret) return false;
 
     const expectedSignature = crypto
       .createHmac('sha256', secret)
-      .update(payload, 'utf8')
+      .update(JSON.stringify(payload), 'utf8')
       .digest('hex');
 
     const providedSignature = signature.replace('sha256=', '');
@@ -171,7 +183,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Parse webhook payload from different Git providers
    */
-  parseWebhookPayload(payload, headers) {
+  parseWebhookPayload(payload: any, headers: any) {
     const userAgent = headers['user-agent'] || '';
     const eventType = headers['x-github-event'] || headers['x-gitlab-event'] || 'push';
 
@@ -199,7 +211,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Detect Git provider from webhook headers
    */
-  detectGitProvider(userAgent, headers) {
+  detectGitProvider(userAgent: string, headers: any) {
     if (headers['x-github-event']) return 'github';
     if (headers['x-gitlab-event']) return 'gitlab';
     if (userAgent.includes('Bitbucket')) return 'bitbucket';
@@ -209,7 +221,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Check if webhook contains test file changes
    */
-  hasTestFileChanges(webhookData) {
+  hasTestFileChanges(webhookData: any) {
     const testFilePatterns = [
       /\.spec\.(js|ts|jsx|tsx)$/,
       /\.test\.(js|ts|jsx|tsx)$/,
@@ -225,7 +237,7 @@ class GitIntegrationService extends EventEmitter {
         ...(commit.removed || [])
       ];
 
-      if (allFiles.some(file => testFilePatterns.some(pattern => pattern.test(file)))) {
+      if (allFiles.some((file: string) => testFilePatterns.some(pattern => pattern.test(file)))) {
         return true;
       }
     }
@@ -236,7 +248,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Process test file changes from webhook
    */
-  async processTestFileChanges(repositoryId, webhookData) {
+  async processTestFileChanges(repositoryId: number, webhookData: any) {
     try {
       const changes = this.extractTestFileChanges(webhookData);
       
@@ -261,8 +273,8 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Extract test file changes from webhook data
    */
-  extractTestFileChanges(webhookData) {
-    const changes = [];
+  extractTestFileChanges(webhookData: any): WebhookChange[] {
+    const changes: WebhookChange[] = [];
     const testFilePatterns = [
       /\.spec\.(js|ts|jsx|tsx)$/,
       /\.test\.(js|ts|jsx|tsx)$/,
@@ -321,7 +333,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Process individual test file change
    */
-  async processTestFileChange(repositoryId, change) {
+  async processTestFileChange(repositoryId: number, change: WebhookChange) {
     try {
       switch (change.type) {
         case 'added':
@@ -342,7 +354,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Handle new test file addition
    */
-  async handleTestFileAdded(repositoryId, change) {
+  async handleTestFileAdded(repositoryId: number, change: WebhookChange) {
     console.log(`➕ Test file added: ${change.file}`);
     
     // Emit event for test discovery service to scan the new file
@@ -358,7 +370,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Handle test file modification
    */
-  async handleTestFileModified(repositoryId, change) {
+  async handleTestFileModified(repositoryId: number, change: WebhookChange) {
     console.log(`📝 Test file modified: ${change.file}`);
     
     // Emit event for test discovery service to rescan the file
@@ -374,7 +386,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Handle test file removal
    */
-  async handleTestFileRemoved(repositoryId, change) {
+  async handleTestFileRemoved(repositoryId: number, change: WebhookChange) {
     console.log(`🗑️ Test file removed: ${change.file}`);
     
     // Mark associated test metadata as inactive
@@ -392,7 +404,7 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Get repository information
    */
-  async getRepository(repositoryId) {
+  async getRepository(repositoryId: number) {
     return await this.db.getGitRepository(repositoryId);
   }
 
@@ -406,14 +418,14 @@ class GitIntegrationService extends EventEmitter {
   /**
    * Update repository configuration
    */
-  async updateRepository(repositoryId, updates) {
+  async updateRepository(repositoryId: number, updates: any) {
     return await this.db.updateGitRepository(repositoryId, updates);
   }
 
   /**
    * Remove repository registration
    */
-  async removeRepository(repositoryId) {
+  async removeRepository(repositoryId: number) {
     // Remove from memory
     this.repositories.delete(repositoryId);
     
@@ -422,4 +434,4 @@ class GitIntegrationService extends EventEmitter {
   }
 }
 
-module.exports = GitIntegrationService;
+export default GitIntegrationService;

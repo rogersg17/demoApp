@@ -16,7 +16,7 @@ test('Debug React App', async ({ page }) => {
   console.log('Page content length:', content.length);
   
   // Check if there are any errors in console
-  const logs = [];
+  const logs: string[] = [];
   page.on('console', msg => logs.push(msg.text()));
   await page.reload();
   await page.waitForLoadState('networkidle');

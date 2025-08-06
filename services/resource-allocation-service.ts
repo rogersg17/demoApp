@@ -1,4 +1,5 @@
-import Database from '../database/database';
+import { Database } from '../database';
+import db from '../database';
 import { EventEmitter } from 'events';
 
 interface ResourceRequirements {
@@ -7,6 +8,10 @@ interface ResourceRequirements {
   storage?: number;
   networkBandwidth?: number;
   concurrency?: number;
+  test_suite?: string;
+  cpu_allocation?: number;
+  memory_allocation?: number;
+  parallel_jobs?: number;
 }
 
 interface Runner {
@@ -18,18 +23,25 @@ interface Runner {
   memory_gb: number;
   storage_gb: number;
   network_mbps: number;
+  capabilities?: string;
+  health_status?: string;
+  max_concurrent_jobs?: number;
+  current_jobs?: number;
 }
 
 interface ResourceAllocation {
   id: string | number;
   execution_id: string | number;
   runner_id: string | number;
-  cpu_cores: number;
-  memory_gb: number;
-  storage_gb: number;
-  network_mbps: number;
-  allocated_at: string;
+  cpu_allocation: number;
+  memory_allocation: number;
+  storage_gb?: number;
+  network_mbps?: number;
+  allocated_at?: string;
   status: string;
+  runner_name?: string;
+  health_check_url?: string;
+  capabilities?: string;
 }
 
 interface AvailableResources {
@@ -46,9 +58,9 @@ class ResourceAllocationService extends EventEmitter {
   private resourceLimits: Map<string | number, any>;
   private monitoringInterval: NodeJS.Timeout | null;
 
-  constructor() {
+  constructor(database: Database | null = null) {
     super();
-    this.db = new Database();
+    this.db = database || db;
     this.activeAllocations = new Map(); // Track active resource allocations
     this.resourceLimits = new Map(); // Cache resource limits for runners
     this.monitoringInterval = null;
@@ -61,7 +73,7 @@ class ResourceAllocationService extends EventEmitter {
 
   // ==================== RESOURCE ALLOCATION ====================
 
-  async allocateResources(executionId, runnerId, requirements = {}) {
+  async allocateResources(executionId: string | number, runnerId: string | number, requirements: ResourceRequirements = {}): Promise<ResourceAllocation> {
     try {
       // Get runner capacity and current allocations
       const runner = await this.getRunner(runnerId);
@@ -95,13 +107,13 @@ class ResourceAllocationService extends EventEmitter {
       
       return allocation;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to allocate resources for execution ${executionId}:`, error);
       throw error;
     }
   }
 
-  async releaseResources(executionId) {
+  async releaseResources(executionId: string | number): Promise<void> {
     try {
       const allocation = await this.getAllocationByExecution(executionId);
       if (!allocation) {
@@ -118,13 +130,13 @@ class ResourceAllocationService extends EventEmitter {
       console.log(`✅ Released resources for execution ${executionId}`);
       this.emit('resourcesReleased', { executionId, allocation });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to release resources for execution ${executionId}:`, error);
       throw error;
     }
   }
 
-  determineResourceRequirements(requirements, runner) {
+  determineResourceRequirements(requirements: ResourceRequirements, runner: Runner): any {
     // Default resource allocation based on runner capabilities
     const runnerCapabilities = runner.capabilities ? JSON.parse(runner.capabilities) : {};
     
@@ -163,8 +175,8 @@ class ResourceAllocationService extends EventEmitter {
     return resourceRequirements;
   }
 
-  adjustCpuForTestSuite(testSuite, baseCpu) {
-    const adjustments = {
+  adjustCpuForTestSuite(testSuite: string, baseCpu: number): number {
+    const adjustments: {[key: string]: number} = {
       'smoke': 0.8,      // Light tests, reduce CPU
       'regression': 1.2, // Heavy tests, increase CPU
       'api': 0.9,        // Moderate CPU usage
@@ -176,8 +188,8 @@ class ResourceAllocationService extends EventEmitter {
     return Math.round(baseCpu * multiplier);
   }
 
-  adjustMemoryForTestSuite(testSuite, baseMemory) {
-    const adjustments = {
+  adjustMemoryForTestSuite(testSuite: string, baseMemory: number): number {
+    const adjustments: {[key: string]: number} = {
       'smoke': 0.7,      // Light tests, reduce memory
       'regression': 1.3, // Heavy tests, increase memory
       'api': 0.8,        // API tests are lightweight
@@ -189,7 +201,7 @@ class ResourceAllocationService extends EventEmitter {
     return Math.round(baseMemory * multiplier);
   }
 
-  calculateAvailableResources(runner, currentAllocations) {
+  calculateAvailableResources(runner: Runner, currentAllocations: ResourceAllocation[]): any {
     const runnerCapabilities = runner.capabilities ? JSON.parse(runner.capabilities) : {};
     
     // Total capacity
@@ -212,7 +224,7 @@ class ResourceAllocationService extends EventEmitter {
     };
   }
 
-  canAllocateResources(available, required) {
+  canAllocateResources(available: any, required: any): boolean {
     return (
       available.availableCpu >= required.cpu_allocation &&
       available.availableMemory >= required.memory_allocation &&
@@ -222,87 +234,61 @@ class ResourceAllocationService extends EventEmitter {
 
   // ==================== DATABASE OPERATIONS ====================
 
-  async createResourceAllocation(executionId, runnerId, requirements) {
-    return new Promise((resolve, reject) => {
-      this.db.db.run(`
-        INSERT INTO resource_allocations (
-          runner_id, execution_id, cpu_allocation, memory_allocation, status
-        ) VALUES (?, ?, ?, ?, ?)
-      `, [
-        runnerId, 
-        executionId, 
-        requirements.cpu_allocation, 
-        requirements.memory_allocation,
-        'allocated'
-      ], function(err) {
-        if (err) reject(err);
-        else {
-          resolve({
-            id: this.lastID,
-            runner_id: runnerId,
-            execution_id: executionId,
-            cpu_allocation: requirements.cpu_allocation,
-            memory_allocation: requirements.memory_allocation,
-            status: 'allocated'
-          });
-        }
-      });
-    });
+  async createResourceAllocation(executionId: string | number, runnerId: string | number, requirements: any): Promise<ResourceAllocation> {
+    const result = await this.db.run(`
+      INSERT INTO resource_allocations (
+        runner_id, execution_id, cpu_allocation, memory_allocation, status
+      ) VALUES (?, ?, ?, ?, ?)
+    `, [
+      runnerId, 
+      executionId, 
+      requirements.cpu_allocation, 
+      requirements.memory_allocation,
+      'allocated'
+    ]);
+
+    return {
+      id: result.lastID,
+      runner_id: runnerId,
+      execution_id: executionId,
+      cpu_allocation: requirements.cpu_allocation,
+      memory_allocation: requirements.memory_allocation,
+      status: 'allocated'
+    };
   }
 
-  async markAllocationReleased(allocationId) {
+  async markAllocationReleased(allocationId: string | number): Promise<void> {
     const now = new Date().toISOString();
-    
-    return new Promise((resolve, reject) => {
-      this.db.db.run(`
-        UPDATE resource_allocations 
-        SET status = 'released', released_at = ?
-        WHERE id = ?
-      `, [now, allocationId], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    await this.db.run(`
+      UPDATE resource_allocations 
+      SET status = 'released', released_at = ?
+      WHERE id = ?
+    `, [now, allocationId]);
   }
 
-  async getAllocationByExecution(executionId) {
-    return new Promise((resolve, reject) => {
-      this.db.db.get(`
-        SELECT * FROM resource_allocations 
-        WHERE execution_id = ? AND status = 'allocated'
-      `, [executionId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
+  async getAllocationByExecution(executionId: string | number): Promise<ResourceAllocation | undefined> {
+    return await this.db.get(`
+      SELECT * FROM resource_allocations 
+      WHERE execution_id = ? AND status = 'allocated'
+    `, [executionId]) as ResourceAllocation | undefined;
   }
 
-  async getCurrentAllocations(runnerId) {
-    return new Promise((resolve, reject) => {
-      this.db.db.all(`
-        SELECT * FROM resource_allocations 
-        WHERE runner_id = ? AND status = 'allocated'
-      `, [runnerId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
-    });
+  async getCurrentAllocations(runnerId: string | number): Promise<ResourceAllocation[]> {
+    return await this.db.all(`
+      SELECT * FROM resource_allocations 
+      WHERE runner_id = ? AND status = 'allocated'
+    `, [runnerId]) as ResourceAllocation[] || [];
   }
 
-  async getRunner(runnerId) {
-    return new Promise((resolve, reject) => {
-      this.db.db.get(`
-        SELECT * FROM test_runners WHERE id = ?
-      `, [runnerId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
+  async getRunner(runnerId: string | number): Promise<Runner | undefined> {
+    return await this.db.get(`
+      SELECT * FROM test_runners WHERE id = ?
+    `, [runnerId]) as Runner | undefined;
   }
 
   // ==================== RESOURCE MONITORING ====================
 
-  startResourceMonitoring() {
+  startResourceMonitoring(): void {
     // Monitor resource usage every 30 seconds
     this.monitoringInterval = setInterval(() => {
       this.monitorResourceUsage();
@@ -311,7 +297,7 @@ class ResourceAllocationService extends EventEmitter {
     console.log('✅ Resource monitoring started');
   }
 
-  stopResourceMonitoring() {
+  stopResourceMonitoring(): void {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
@@ -319,7 +305,7 @@ class ResourceAllocationService extends EventEmitter {
     }
   }
 
-  async monitorResourceUsage() {
+  async monitorResourceUsage(): Promise<void> {
     try {
       // Get all active allocations
       const activeAllocations = await this.getAllActiveAllocations();
@@ -327,7 +313,7 @@ class ResourceAllocationService extends EventEmitter {
       for (const allocation of activeAllocations) {
         try {
           await this.checkAllocationHealth(allocation);
-        } catch (error) {
+        } catch (error: any) {
           console.error(`❌ Error monitoring allocation ${allocation.id}:`, error);
         }
       }
@@ -335,27 +321,22 @@ class ResourceAllocationService extends EventEmitter {
       // Check for resource limit violations
       await this.checkResourceLimitViolations();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error in resource monitoring:', error);
     }
   }
 
-  async getAllActiveAllocations() {
-    return new Promise((resolve, reject) => {
-      this.db.db.all(`
-        SELECT ra.*, tr.name as runner_name, tr.health_check_url, tr.capabilities
-        FROM resource_allocations ra
-        JOIN test_runners tr ON ra.runner_id = tr.id
-        WHERE ra.status = 'allocated'
-        AND tr.status = 'active'
-      `, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
-    });
+  async getAllActiveAllocations(): Promise<ResourceAllocation[]> {
+    return await this.db.all(`
+      SELECT ra.*, tr.name as runner_name, tr.health_check_url, tr.capabilities
+      FROM resource_allocations ra
+      JOIN test_runners tr ON ra.runner_id = tr.id
+      WHERE ra.status = 'allocated'
+      AND tr.status = 'active'
+    `) as ResourceAllocation[] || [];
   }
 
-  async checkAllocationHealth(allocation) {
+  async checkAllocationHealth(allocation: ResourceAllocation): Promise<void> {
     // This would typically query runner metrics via health check endpoint
     // For now, we'll simulate basic health checking
     
@@ -366,7 +347,7 @@ class ResourceAllocationService extends EventEmitter {
     }
   }
 
-  async handleUnhealthyAllocation(allocation) {
+  async handleUnhealthyAllocation(allocation: ResourceAllocation): Promise<void> {
     // Mark allocation as potentially problematic
     // In a real implementation, this might trigger alerts or reallocation
     console.warn(`⚠️ Handling unhealthy allocation ${allocation.id} for execution ${allocation.execution_id}`);
@@ -374,7 +355,7 @@ class ResourceAllocationService extends EventEmitter {
     this.emit('allocationUnhealthy', allocation);
   }
 
-  async checkResourceLimitViolations() {
+  async checkResourceLimitViolations(): Promise<void> {
     // Check if any runners are exceeding their resource limits
     const runners = await this.getAllActiveRunners();
     
@@ -399,19 +380,14 @@ class ResourceAllocationService extends EventEmitter {
     }
   }
 
-  async getAllActiveRunners() {
-    return new Promise((resolve, reject) => {
-      this.db.db.all(`
-        SELECT * FROM test_runners 
-        WHERE status = 'active'
-      `, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
-    });
+  async getAllActiveRunners(): Promise<Runner[]> {
+    return await this.db.all(`
+      SELECT * FROM test_runners 
+      WHERE status = 'active'
+    `) as Runner[] || [];
   }
 
-  async handleResourceViolation(runnerId, resourceType, current, limit) {
+  async handleResourceViolation(runnerId: string | number, resourceType: string, current: number, limit: number): Promise<void> {
     // Log resource violation and potentially take corrective action
     console.error(`❌ Resource violation on runner ${runnerId}: ${resourceType} usage ${current} exceeds limit ${limit}`);
     
@@ -421,24 +397,22 @@ class ResourceAllocationService extends EventEmitter {
     this.emit('resourceViolation', { runnerId, resourceType, current, limit });
   }
 
-  async markAllocationsExceeded(runnerId) {
-    return new Promise((resolve, reject) => {
-      this.db.db.run(`
-        UPDATE resource_allocations 
-        SET status = 'exceeded'
-        WHERE runner_id = ? AND status = 'allocated'
-      `, [runnerId], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+  async markAllocationsExceeded(runnerId: string | number): Promise<void> {
+    await this.db.run(`
+      UPDATE resource_allocations 
+      SET status = 'exceeded'
+      WHERE runner_id = ? AND status = 'allocated'
+    `, [runnerId]);
   }
 
   // ==================== RESOURCE OPTIMIZATION ====================
 
-  async optimizeResourceAllocation(runnerId) {
+  async optimizeResourceAllocation(runnerId: string | number): Promise<any> {
     try {
       const runner = await this.getRunner(runnerId);
+      if (!runner) {
+        throw new Error(`Runner not found: ${runnerId}`);
+      }
       const currentAllocations = await this.getCurrentAllocations(runnerId);
       
       if (currentAllocations.length === 0) {
@@ -455,13 +429,13 @@ class ResourceAllocationService extends EventEmitter {
       
       return { message: 'Current allocation is already optimal' };
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to optimize resources for runner ${runnerId}:`, error);
       throw error;
     }
   }
 
-  calculateOptimalAllocation(runner, allocations) {
+  calculateOptimalAllocation(runner: Runner, allocations: ResourceAllocation[]): any {
     const capabilities = runner.capabilities ? JSON.parse(runner.capabilities) : {};
     const maxCpu = capabilities.max_cpu_percent || 80;
     const maxMemory = capabilities.max_memory_mb || 8192;
@@ -487,8 +461,8 @@ class ResourceAllocationService extends EventEmitter {
     };
   }
 
-  generateOptimizationSuggestions(allocations, maxCpu, maxMemory) {
-    const suggestions = [];
+  generateOptimizationSuggestions(allocations: ResourceAllocation[], maxCpu: number, maxMemory: number): any[] {
+    const suggestions: any[] = [];
     
     // Find allocations that could be reduced
     allocations.forEach(allocation => {
@@ -514,18 +488,18 @@ class ResourceAllocationService extends EventEmitter {
     return suggestions;
   }
 
-  async applyOptimization(runnerId, optimization) {
+  async applyOptimization(runnerId: string | number, optimization: any): Promise<void> {
     // Apply suggested optimizations
     for (const suggestion of optimization.suggestions) {
       try {
         await this.applySuggestion(suggestion);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`❌ Failed to apply optimization suggestion:`, error);
       }
     }
   }
 
-  async applySuggestion(suggestion) {
+  async applySuggestion(suggestion: any): Promise<void> {
     if (suggestion.type === 'reduce_cpu') {
       await this.updateAllocationCpu(suggestion.allocation_id, suggestion.suggested);
     } else if (suggestion.type === 'reduce_memory') {
@@ -533,81 +507,61 @@ class ResourceAllocationService extends EventEmitter {
     }
   }
 
-  async updateAllocationCpu(allocationId, newCpuAllocation) {
-    return new Promise((resolve, reject) => {
-      this.db.db.run(`
-        UPDATE resource_allocations 
-        SET cpu_allocation = ?
-        WHERE id = ?
-      `, [newCpuAllocation, allocationId], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+  async updateAllocationCpu(allocationId: string | number, newCpuAllocation: number): Promise<void> {
+    await this.db.run(`
+      UPDATE resource_allocations 
+      SET cpu_allocation = ?
+      WHERE id = ?
+    `, [newCpuAllocation, allocationId]);
   }
 
-  async updateAllocationMemory(allocationId, newMemoryAllocation) {
-    return new Promise((resolve, reject) => {
-      this.db.db.run(`
-        UPDATE resource_allocations 
-        SET memory_allocation = ?
-        WHERE id = ?
-      `, [newMemoryAllocation, allocationId], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+  async updateAllocationMemory(allocationId: string | number, newMemoryAllocation: number): Promise<void> {
+    await this.db.run(`
+      UPDATE resource_allocations 
+      SET memory_allocation = ?
+      WHERE id = ?
+    `, [newMemoryAllocation, allocationId]);
   }
 
   // ==================== REPORTING AND ANALYTICS ====================
 
-  async getResourceUtilizationReport(runnerId, hours = 24) {
-    return new Promise((resolve, reject) => {
-      this.db.db.all(`
-        SELECT 
-          AVG(cpu_allocation) as avg_cpu_allocation,
-          MAX(cpu_allocation) as max_cpu_allocation,
-          AVG(memory_allocation) as avg_memory_allocation,
-          MAX(memory_allocation) as max_memory_allocation,
-          COUNT(*) as total_allocations,
-          COUNT(CASE WHEN status = 'exceeded' THEN 1 END) as exceeded_allocations
-        FROM resource_allocations 
-        WHERE runner_id = ? 
-        AND allocated_at > datetime('now', '-${hours} hours')
-      `, [runnerId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows[0] || {});
-      });
-    });
+  async getResourceUtilizationReport(runnerId: string | number, hours = 24): Promise<any> {
+    return await this.db.get(`
+      SELECT 
+        AVG(cpu_allocation) as avg_cpu_allocation,
+        MAX(cpu_allocation) as max_cpu_allocation,
+        AVG(memory_allocation) as avg_memory_allocation,
+        MAX(memory_allocation) as max_memory_allocation,
+        COUNT(*) as total_allocations,
+        COUNT(CASE WHEN status = 'exceeded' THEN 1 END) as exceeded_allocations
+      FROM resource_allocations 
+      WHERE runner_id = ? 
+      AND allocated_at > datetime('now', '-${hours} hours')
+    `, [runnerId]) as any || {};
   }
 
-  async getSystemResourceSummary() {
-    return new Promise((resolve, reject) => {
-      this.db.db.all(`
-        SELECT 
-          tr.name as runner_name,
-          tr.type as runner_type,
-          tr.status as runner_status,
-          tr.max_concurrent_jobs,
-          tr.current_jobs,
-          COUNT(ra.id) as active_allocations,
-          SUM(ra.cpu_allocation) as total_cpu_allocated,
-          SUM(ra.memory_allocation) as total_memory_allocated
-        FROM test_runners tr
-        LEFT JOIN resource_allocations ra ON tr.id = ra.runner_id AND ra.status = 'allocated'
-        WHERE tr.status = 'active'
-        GROUP BY tr.id, tr.name, tr.type, tr.status, tr.max_concurrent_jobs, tr.current_jobs
-        ORDER BY tr.name
-      `, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
-    });
+  async getSystemResourceSummary(): Promise<any[]> {
+    return await this.db.all(`
+      SELECT 
+        tr.name as runner_name,
+        tr.type as runner_type,
+        tr.status as runner_status,
+        tr.max_concurrent_jobs,
+        tr.current_jobs,
+        COUNT(ra.id) as active_allocations,
+        SUM(ra.cpu_allocation) as total_cpu_allocated,
+        SUM(ra.memory_allocation) as total_memory_allocated
+      FROM test_runners tr
+      LEFT JOIN resource_allocations ra ON tr.id = ra.runner_id AND ra.status = 'allocated'
+      WHERE tr.status = 'active'
+      GROUP BY tr.id, tr.name, tr.type, tr.status, tr.max_concurrent_jobs, tr.current_jobs
+      ORDER BY tr.name
+    `) as any[] || [];
   }
 
   // ==================== CLEANUP ====================
 
-  async cleanup() {
+  async cleanup(): Promise<void> {
     console.log('🧹 Cleaning up Resource Allocation Service...');
     
     this.stopResourceMonitoring();
@@ -622,25 +576,20 @@ class ResourceAllocationService extends EventEmitter {
     console.log('✅ Resource Allocation Service cleanup complete');
   }
 
-  async releaseOrphanedAllocations() {
+  async releaseOrphanedAllocations(): Promise<void> {
     const now = new Date().toISOString();
     
-    return new Promise((resolve, reject) => {
-      // Find allocations for executions that are no longer running
-      this.db.db.run(`
-        UPDATE resource_allocations 
-        SET status = 'released', released_at = ?
-        WHERE status = 'allocated' 
-        AND execution_id NOT IN (
-          SELECT execution_id FROM execution_queue 
-          WHERE status IN ('queued', 'assigned', 'running')
-        )
-      `, [now], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    // Find allocations for executions that are no longer running
+    await this.db.run(`
+      UPDATE resource_allocations 
+      SET status = 'released', released_at = ?
+      WHERE status = 'allocated' 
+      AND execution_id NOT IN (
+        SELECT execution_id FROM execution_queue 
+        WHERE status IN ('queued', 'assigned', 'running')
+      )
+    `, [now]);
   }
 }
 
-module.exports = ResourceAllocationService;
+export default ResourceAllocationService;

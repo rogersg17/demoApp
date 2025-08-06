@@ -249,7 +249,7 @@ class PerformanceMonitoringService extends EventEmitter {
 
     cpus.forEach(cpu => {
       for (const type in cpu.times) {
-        totalTick += cpu.times[type as keyof os.CpuTimes];
+        totalTick += (cpu.times as any)[type];
       }
       totalIdle += cpu.times.idle;
     });

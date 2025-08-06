@@ -9,7 +9,7 @@
  * - Real-time status updates
  */
 
-import { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientOptions } from 'redis';
 import { EventEmitter } from 'events';
 
 interface TestResult {
@@ -29,20 +29,26 @@ interface CacheOptions {
 }
 
 class RedisCacheService extends EventEmitter {
-  private client: RedisClientType;
+  private client: any;
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
 
   constructor() {
     super();
-    this.client = createClient({
+    const redisOptions: RedisClientOptions = {
       url: process.env.REDIS_URL || 'redis://localhost:6379',
-      retry_delay_on_failure: 5000,
-      retry_delay_on_cluster_down: 5000,
-      retry_delay_on_failover: 5000,
-      max_attempts: 3
-    });
+      socket: {
+        reconnectStrategy: (retries: number) => {
+          if (retries > this.maxReconnectAttempts) {
+            return new Error('Max reconnect attempts reached');
+          }
+          return Math.min(retries * 50, 5000);
+        }
+      }
+    };
+
+    this.client = createClient(redisOptions);
 
     this.setupEventHandlers();
   }
@@ -55,13 +61,13 @@ class RedisCacheService extends EventEmitter {
       this.emit('connected');
     });
 
-    this.client.on('error', (error) => {
+    this.client.on('error', (error: Error) => {
       console.error('❌ Redis client error:', error);
       this.isConnected = false;
       this.emit('error', error);
     });
 
-    this.client.on('disconnect', () => {
+    this.client.on('end', () => {
       console.log('⚠️ Redis client disconnected');
       this.isConnected = false;
       this.emit('disconnected');
@@ -244,7 +250,7 @@ class RedisCacheService extends EventEmitter {
 
     try {
       // Get recent execution IDs from sorted set
-      const executionIds = await this.client.zRevRange('test_results_timeline', 0, limit - 1);
+      const executionIds = await this.client.zRange('test_results_timeline', 0, limit - 1, { REV: true });
       
       if (executionIds.length === 0) {
         return [];
@@ -311,7 +317,7 @@ class RedisCacheService extends EventEmitter {
       const subscriber = this.client.duplicate();
       await subscriber.connect();
       
-      await subscriber.subscribe('status_updates', (message) => {
+      await subscriber.subscribe('status_updates', (message: string) => {
         try {
           const update = JSON.parse(message);
           callback(update);

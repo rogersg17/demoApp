@@ -5,7 +5,7 @@ import AdoClient from '../lib/ado-client';
 
 const AdoBuildDefinitionService = require('../services/ado-build-definition');
 const AdoProjectConfigurationService = require('../services/ado-project-configuration');
-const Database = require('../database/database');
+import Database from '../database/database';
 
 const router = express.Router();
 

@@ -1,7 +1,8 @@
 // @ts-nocheck - Temporarily suppress TypeScript errors for service migration
 import AdoClient from '../lib/ado-client';
 // @ts-ignore - Database module doesn't have type definitions
-import Database from '../database/database';
+import db from '../database';
+import { Database } from '../database';
 
 interface BuildData {
     buildId: string | number;
@@ -77,9 +78,9 @@ class AdoBuildConsumer {
     private client: AdoClient;
     private db: Database;
     private debug: boolean;
-    constructor(client = null, database = null) {
+    constructor(client: AdoClient | null = null, database: Database | null = null) {
         this.client = client || new AdoClient();
-        this.db = database || new Database();
+        this.db = database || db;
         this.debug = process.env.ADO_DEBUG === 'true';
     }
 
@@ -469,4 +470,4 @@ class AdoBuildConsumer {
     }
 }
 
-module.exports = AdoBuildConsumer;
+export default AdoBuildConsumer;

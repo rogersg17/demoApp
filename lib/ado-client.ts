@@ -131,6 +131,13 @@ class AdoClient {
     }
 
     /**
+     * Get Project ID
+     */
+    getProjectId(): string {
+        return this.projectId;
+    }
+
+    /**
      * Get Work Item Tracking API client
      */
     async getWorkItemTrackingApi() {

@@ -1,7 +1,12 @@
-const AdoClient = require('../lib/ado-client');
+import AdoClient from '../lib/ado-client';
+import { BuildApi } from 'azure-devops-node-api/BuildApi';
+import { Build, BuildDefinition, BuildDefinitionReference, DefinitionQueryOrder } from 'azure-devops-node-api/interfaces/BuildInterfaces';
 
 class AdoBuildDefinitionService {
-    constructor(client = null) {
+    private client: AdoClient;
+    private debug: boolean;
+
+    constructor(client: AdoClient | null = null) {
         this.client = client || new AdoClient();
         this.debug = process.env.ADO_DEBUG === 'true';
     }
@@ -9,72 +14,75 @@ class AdoBuildDefinitionService {
     /**
      * Get all build definitions from Azure DevOps
      */
-    async getBuildDefinitions(projectId = null) {
+    async getBuildDefinitions(projectId: string | null = null): Promise<any[]> {
         try {
-            const project = projectId || this.client.projectId;
-            const buildApi = await this.client.getBuildApi();
+            const project = projectId || this.client.getProjectId();
+            const buildApi: BuildApi = await this.client.getBuildApi();
             
-            const definitions = await buildApi.getDefinitions(
+            const definitions: BuildDefinitionReference[] = await buildApi.getDefinitions(
                 project,
-                null, // name filter
-                null, // repositoryId
-                null, // repositoryType
-                null, // queryOrder
-                null, // top
-                null, // continuationToken
-                null, // minMetricsTime
-                null, // definitionIds
-                null, // path
-                null, // builtAfter
-                null, // notBuiltAfter
+                undefined, // name filter
+                undefined, // repositoryId
+                undefined, // repositoryType
+                DefinitionQueryOrder.None, // queryOrder
+                undefined, // top
+                undefined, // continuationToken
+                undefined, // minMetricsTime
+                undefined, // definitionIds
+                undefined, // path
+                undefined, // builtAfter
+                undefined, // notBuiltAfter
                 true  // includeAllProperties
             );
 
             this.log(`Found ${definitions.length} build definitions in project ${project}`);
 
-            return definitions.map(def => ({
-                id: def.id,
-                name: def.name,
-                path: def.path,
-                repository: {
-                    id: def.repository?.id,
-                    name: def.repository?.name,
-                    type: def.repository?.type,
-                    url: def.repository?.url
-                },
-                project: {
-                    id: def.project?.id,
-                    name: def.project?.name
-                },
-                process: {
-                    type: def.process?.type,
-                    yamlFilename: def.process?.yamlFilename
-                },
-                queue: def.queue,
-                triggers: def.triggers,
-                lastBuild: def.latestBuild ? {
-                    id: def.latestBuild.id,
-                    buildNumber: def.latestBuild.buildNumber,
-                    status: def.latestBuild.status,
-                    result: def.latestBuild.result,
-                    startTime: def.latestBuild.startTime,
-                    finishTime: def.latestBuild.finishTime
-                } : null,
-                lastCompletedBuild: def.latestCompletedBuild ? {
-                    id: def.latestCompletedBuild.id,
-                    buildNumber: def.latestCompletedBuild.buildNumber,
-                    status: def.latestCompletedBuild.status,
-                    result: def.latestCompletedBuild.result,
-                    startTime: def.latestCompletedBuild.startTime,
-                    finishTime: def.latestCompletedBuild.finishTime
-                } : null,
-                createdDate: def.createdDate,
-                authoredBy: def.authoredBy ? {
-                    displayName: def.authoredBy.displayName,
-                    uniqueName: def.authoredBy.uniqueName
-                } : null
-            }));
-        } catch (error) {
+            return definitions.map(def => {
+                const buildDef = def as BuildDefinition;
+                return {
+                    id: def.id,
+                    name: def.name,
+                    path: def.path,
+                    repository: {
+                        id: buildDef.repository?.id,
+                        name: buildDef.repository?.name,
+                        type: buildDef.repository?.type,
+                        url: buildDef.repository?.url
+                    },
+                    project: {
+                        id: def.project?.id,
+                        name: def.project?.name
+                    },
+                    process: {
+                        type: (def as BuildDefinition).process?.type,
+                        yamlFilename: ((def as BuildDefinition).process as any)?.yamlFilename
+                    },
+                    queue: (def as BuildDefinition).queue,
+                    triggers: (def as BuildDefinition).triggers,
+                    lastBuild: (def as BuildDefinition).latestBuild ? {
+                        id: (def as BuildDefinition).latestBuild?.id,
+                        buildNumber: (def as BuildDefinition).latestBuild?.buildNumber,
+                        status: (def as BuildDefinition).latestBuild?.status,
+                        result: (def as BuildDefinition).latestBuild?.result,
+                        startTime: (def as BuildDefinition).latestBuild?.startTime,
+                        finishTime: (def as BuildDefinition).latestBuild?.finishTime
+                    } : null,
+                    lastCompletedBuild: (def as BuildDefinition).latestCompletedBuild ? {
+                        id: (def as BuildDefinition).latestCompletedBuild?.id,
+                        buildNumber: (def as BuildDefinition).latestCompletedBuild?.buildNumber,
+                        status: (def as BuildDefinition).latestCompletedBuild?.status,
+                        result: (def as BuildDefinition).latestCompletedBuild?.result,
+                        startTime: (def as BuildDefinition).latestCompletedBuild?.startTime,
+                        finishTime: (def as BuildDefinition).latestCompletedBuild?.finishTime
+                    } : null,
+                    createdDate: def.createdDate,
+                    authoredBy: def.authoredBy ? {
+                        displayName: def.authoredBy.displayName,
+                        uniqueName: def.authoredBy.uniqueName
+                    } : null
+                }
+            });
+        } catch (error: any) {
             this.error('Failed to get build definitions:', error.message);
             throw error;
         }
@@ -83,12 +91,12 @@ class AdoBuildDefinitionService {
     /**
      * Get detailed information about a specific build definition
      */
-    async getBuildDefinitionDetails(definitionId, projectId = null) {
+    async getBuildDefinitionDetails(definitionId: number, projectId: string | null = null): Promise<any> {
         try {
-            const project = projectId || this.client.projectId;
-            const buildApi = await this.client.getBuildApi();
+            const project = projectId || this.client.getProjectId();
+            const buildApi: BuildApi = await this.client.getBuildApi();
             
-            const definition = await buildApi.getDefinition(project, definitionId);
+            const definition: BuildDefinition = await buildApi.getDefinition(project, definitionId);
             
             this.log(`Retrieved details for build definition ${definitionId}`);
             
@@ -114,7 +122,7 @@ class AdoBuildDefinitionService {
                 uri: definition.uri,
                 url: definition.url
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build definition details for ${definitionId}:`, error.message);
             throw error;
         }
@@ -123,7 +131,7 @@ class AdoBuildDefinitionService {
     /**
      * Search build definitions by name or path
      */
-    async searchBuildDefinitions(searchTerm, projectId = null) {
+    async searchBuildDefinitions(searchTerm: string, projectId: string | null = null): Promise<any[]> {
         try {
             const allDefinitions = await this.getBuildDefinitions(projectId);
             
@@ -140,7 +148,7 @@ class AdoBuildDefinitionService {
 
             this.log(`Search for "${searchTerm}" returned ${filtered.length} results`);
             return filtered;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to search build definitions:', error.message);
             throw error;
         }
@@ -149,7 +157,7 @@ class AdoBuildDefinitionService {
     /**
      * Get build definitions grouped by repository
      */
-    async getBuildDefinitionsByRepository(projectId = null) {
+    async getBuildDefinitionsByRepository(projectId: string | null = null): Promise<{[key: string]: any[]}> {
         try {
             const definitions = await this.getBuildDefinitions(projectId);
             
@@ -160,11 +168,11 @@ class AdoBuildDefinitionService {
                 }
                 acc[repoName].push(def);
                 return acc;
-            }, {});
+            }, {} as {[key: string]: any[]});
 
             this.log(`Grouped ${definitions.length} definitions by repository`);
             return grouped;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to group build definitions by repository:', error.message);
             throw error;
         }
@@ -173,7 +181,7 @@ class AdoBuildDefinitionService {
     /**
      * Get build definitions grouped by path/folder
      */
-    async getBuildDefinitionsByPath(projectId = null) {
+    async getBuildDefinitionsByPath(projectId: string | null = null): Promise<{[key: string]: any[]}> {
         try {
             const definitions = await this.getBuildDefinitions(projectId);
             
@@ -184,11 +192,11 @@ class AdoBuildDefinitionService {
                 }
                 acc[path].push(def);
                 return acc;
-            }, {});
+            }, {} as {[key: string]: any[]});
 
             this.log(`Grouped ${definitions.length} definitions by path`);
             return grouped;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to group build definitions by path:', error.message);
             throw error;
         }
@@ -197,17 +205,17 @@ class AdoBuildDefinitionService {
     /**
      * Get build definition statistics and metrics
      */
-    async getBuildDefinitionMetrics(definitionId, projectId = null, days = 30) {
+    async getBuildDefinitionMetrics(definitionId: number, projectId: string | null = null, days = 30): Promise<any> {
         try {
-            const project = projectId || this.client.projectId;
-            const buildApi = await this.client.getBuildApi();
+            const project = projectId || this.client.getProjectId();
+            const buildApi: BuildApi = await this.client.getBuildApi();
             
             // Get recent builds for this definition
             const endDate = new Date();
             const startDate = new Date();
             startDate.setDate(endDate.getDate() - days);
             
-            const builds = await buildApi.getBuilds(
+            const builds: Build[] = await buildApi.getBuilds(
                 project,
                 [definitionId], // definitions
                 undefined, // queues
@@ -227,12 +235,12 @@ class AdoBuildDefinitionService {
             const metrics = {
                 definitionId,
                 totalBuilds: builds.length,
-                successfulBuilds: builds.filter(b => b.result === 'succeeded').length,
-                failedBuilds: builds.filter(b => b.result === 'failed').length,
-                partiallySucceededBuilds: builds.filter(b => b.result === 'partiallySucceeded').length,
-                canceledBuilds: builds.filter(b => b.result === 'canceled').length,
+                successfulBuilds: builds.filter(b => b.result === 4 /* succeeded */).length,
+                failedBuilds: builds.filter(b => b.result === 8 /* failed */).length,
+                partiallySucceededBuilds: builds.filter(b => b.result === 2 /* partiallySucceeded */).length,
+                canceledBuilds: builds.filter(b => b.result === 32 /* canceled */).length,
                 successRate: builds.length > 0 ? 
-                    Math.round((builds.filter(b => b.result === 'succeeded').length / builds.length) * 100) : 0,
+                    Math.round((builds.filter(b => b.result === 4).length / builds.length) * 100) : 0,
                 averageDuration: this.calculateAverageDuration(builds),
                 lastBuild: builds.length > 0 ? builds[0] : null,
                 buildFrequency: this.calculateBuildFrequency(builds, days),
@@ -245,7 +253,7 @@ class AdoBuildDefinitionService {
 
             this.log(`Calculated metrics for definition ${definitionId}: ${metrics.successRate}% success rate`);
             return metrics;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get metrics for definition ${definitionId}:`, error.message);
             throw error;
         }
@@ -254,10 +262,10 @@ class AdoBuildDefinitionService {
     /**
      * Get build history for a definition with pagination
      */
-    async getBuildHistory(definitionId, projectId = null, options = {}) {
+    async getBuildHistory(definitionId: number, projectId: string | null = null, options: any = {}): Promise<any[]> {
         try {
-            const project = projectId || this.client.projectId;
-            const buildApi = await this.client.getBuildApi();
+            const project = projectId || this.client.getProjectId();
+            const buildApi: BuildApi = await this.client.getBuildApi();
             
             const {
                 top = 50,
@@ -268,7 +276,7 @@ class AdoBuildDefinitionService {
                 maxTime = undefined
             } = options;
 
-            const builds = await buildApi.getBuilds(
+            const builds: Build[] = await buildApi.getBuilds(
                 project,
                 [definitionId],
                 undefined, // queues
@@ -309,7 +317,7 @@ class AdoBuildDefinitionService {
                 uri: build.uri,
                 url: build.url
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build history for definition ${definitionId}:`, error.message);
             throw error;
         }
@@ -318,13 +326,13 @@ class AdoBuildDefinitionService {
     /**
      * Check if build definitions are actively used
      */
-    async getActiveDefinitions(projectId = null, days = 30) {
+    async getActiveDefinitions(projectId: string | null = null, days = 30): Promise<any[]> {
         try {
             const definitions = await this.getBuildDefinitions(projectId);
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - days);
 
-            const activeDefinitions = [];
+            const activeDefinitions: any[] = [];
             
             for (const def of definitions) {
                 if (def.lastBuild && new Date(def.lastBuild.startTime) > cutoffDate) {
@@ -338,19 +346,19 @@ class AdoBuildDefinitionService {
 
             this.log(`Found ${activeDefinitions.length} active definitions out of ${definitions.length} total`);
             return activeDefinitions;
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get active definitions:', error.message);
             throw error;
         }
     }
 
     // Helper methods
-    calculateDuration(startTime, finishTime) {
+    private calculateDuration(startTime: Date | undefined, finishTime: Date | undefined): number {
         if (!startTime || !finishTime) return 0;
-        return Math.round((new Date(finishTime) - new Date(startTime)) / 1000);
+        return Math.round((new Date(finishTime).getTime() - new Date(startTime).getTime()) / 1000);
     }
 
-    calculateAverageDuration(builds) {
+    private calculateAverageDuration(builds: Build[]): number {
         if (!builds || builds.length === 0) return 0;
         
         const completedBuilds = builds.filter(b => b.finishTime && b.startTime);
@@ -363,20 +371,20 @@ class AdoBuildDefinitionService {
         return Math.round(totalDuration / completedBuilds.length);
     }
 
-    calculateBuildFrequency(builds, days) {
+    private calculateBuildFrequency(builds: Build[], days: number): number {
         if (!builds || builds.length === 0) return 0;
         return Math.round((builds.length / days) * 10) / 10; // builds per day, rounded to 1 decimal
     }
 
-    log(...args) {
+    private log(...args: any[]): void {
         if (this.debug) {
             console.log('[ADO-BUILD-DEFINITION-SERVICE]', ...args);
         }
     }
 
-    error(...args) {
+    private error(...args: any[]): void {
         console.error('[ADO-BUILD-DEFINITION-SERVICE ERROR]', ...args);
     }
 }
 
-module.exports = AdoBuildDefinitionService;
+export default AdoBuildDefinitionService;

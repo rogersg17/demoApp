@@ -1,6 +1,41 @@
 import * as crypto from 'crypto';
 import * as path from 'path';
 
+interface ExecutionData {
+    filePath: string;
+    testName: string;
+    suite?: string;
+    parameters?: any;
+}
+
+interface TestMetadata {
+    file_path: string;
+    test_name: string;
+    suite_name?: string;
+    test_parameters?: any;
+    framework?: string;
+}
+
+interface TestData {
+    file_path: string;
+    test_name: string;
+    context?: string;
+    parameters?: any;
+}
+
+interface TestResult {
+    filePath: string;
+    testName: string;
+    suite?: string;
+}
+
+interface KnownTest {
+    test_id: string;
+    file_path: string;
+    test_name: string;
+    description?: string;
+}
+
 /**
  * Test Identifier Service
  * Generates unique test identifiers and manages test identification
@@ -66,7 +101,7 @@ class TestIdentifierService {
   /**
    * Generate test identifier from test execution data
    */
-  generateIdFromExecution(executionData) {
+  generateIdFromExecution(executionData: ExecutionData) {
     const { filePath, testName, suite, parameters } = executionData;
     return this.generateTestId(filePath, testName, suite, parameters);
   }
@@ -74,7 +109,7 @@ class TestIdentifierService {
   /**
    * Create a deterministic test identifier that works across platforms
    */
-  createCrossPlatformId(testMetadata) {
+  createCrossPlatformId(testMetadata: TestMetadata) {
     const {
       file_path,
       test_name,
@@ -105,7 +140,7 @@ class TestIdentifierService {
   /**
    * Normalize file path for cross-platform compatibility
    */
-  normalizePath(filePath) {
+  normalizePath(filePath: string) {
     if (!filePath) return '';
     
     return filePath
@@ -117,7 +152,7 @@ class TestIdentifierService {
   /**
    * Normalize test parameters for consistent identification
    */
-  normalizeParameters(parameters) {
+  normalizeParameters(parameters: any) {
     if (!parameters || typeof parameters !== 'object') {
       return '';
     }
@@ -131,7 +166,7 @@ class TestIdentifierService {
   /**
    * Extract test identifier from Playwright test title
    */
-  extractPlaywrightId(testTitle, testFile) {
+  extractPlaywrightId(testTitle: string, testFile: string) {
     // Playwright test format: "file.spec.ts:line:test title"
     const match = testTitle.match(/^(.+):(\d+):(.+)$/);
     
@@ -147,7 +182,7 @@ class TestIdentifierService {
   /**
    * Create test identifier from Jest test
    */
-  extractJestId(testPath, testName, ancestorTitles = []) {
+  extractJestId(testPath: string, testName: string, ancestorTitles: string[] = []) {
     const context = ancestorTitles.length > 0 ? ancestorTitles.join(' > ') : null;
     return this.generateTestId(testPath, testName, context);
   }
@@ -155,14 +190,14 @@ class TestIdentifierService {
   /**
    * Create test identifier from Cypress test
    */
-  extractCypressId(specFile, testTitle, suiteTitle = null) {
+  extractCypressId(specFile: string, testTitle: string, suiteTitle: string | null = null) {
     return this.generateTestId(specFile, testTitle, suiteTitle);
   }
 
   /**
    * Parse test identifier to extract components
    */
-  parseTestId(testId) {
+  parseTestId(testId: string) {
     // For hash-based IDs, we need to look up in cache or database
     if (this.identifierCache.has(testId)) {
       return this.identifierCache.get(testId);
@@ -179,7 +214,7 @@ class TestIdentifierService {
   /**
    * Validate test identifier format
    */
-  validateTestId(testId) {
+  validateTestId(testId: string) {
     if (!testId || typeof testId !== 'string') {
       return { valid: false, error: 'Test ID must be a non-empty string' };
     }
@@ -202,8 +237,8 @@ class TestIdentifierService {
   /**
    * Generate batch of test identifiers
    */
-  generateBatchIds(testDataArray) {
-    return testDataArray.map(testData => ({
+  generateBatchIds(testDataArray: TestData[]) {
+    return testDataArray.map((testData: TestData) => ({
       ...testData,
       test_id: this.generateTestId(
         testData.file_path,
@@ -217,7 +252,7 @@ class TestIdentifierService {
   /**
    * Create unique execution identifier
    */
-  generateExecutionId(testId, platformType, timestamp = new Date()) {
+  generateExecutionId(testId: string, platformType: string, timestamp = new Date()) {
     const executionSignature = [
       testId,
       platformType,
@@ -234,7 +269,7 @@ class TestIdentifierService {
   /**
    * Correlate test results with stored test metadata
    */
-  correlateTestResult(testResult, knownTests) {
+  correlateTestResult(testResult: TestResult, knownTests: KnownTest[]) {
     const resultId = this.generateIdFromExecution(testResult);
     
     // Direct match

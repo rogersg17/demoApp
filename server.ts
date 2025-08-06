@@ -34,7 +34,7 @@ import {
 } from './types';
 
 // Import services
-const Database = require('./database/database');
+import Database from './database/database';
 import { prismaDb } from './database/prisma-database';
 
 // Configure environment

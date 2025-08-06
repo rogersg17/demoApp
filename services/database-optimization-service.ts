@@ -176,10 +176,10 @@ class DatabaseOptimizationService extends EventEmitter {
           this.db.run("BEGIN TRANSACTION");
           
           paramsList.forEach((params, index) => {
-            stmt.run(params, function(err) {
+            stmt.run(params, function(this: any, err: Error | null) {
               if (err && !hasError) {
                 hasError = true;
-                this.db.run("ROLLBACK");
+                (this as any).db.run("ROLLBACK");
                 reject(err);
                 return;
               }
@@ -188,7 +188,7 @@ class DatabaseOptimizationService extends EventEmitter {
               completed++;
               
               if (completed === paramsList.length) {
-                this.db.run("COMMIT", () => {
+                (this as any).db.run("COMMIT", () => {
                   finalize();
                 });
               }

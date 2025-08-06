@@ -177,7 +177,7 @@ describe('EnhancedOrchestrationService', () => {
 
   describe('getOrchestrationMetrics', () => {
     it('should return orchestration metrics', async () => {
-      mockPrisma.testExecution.count.mockImplementation(({ where }) => {
+      mockPrisma.testExecution.count.mockImplementation(({ where }: { where: { status: string } }) => {
         const statusCounts: { [key: string]: number } = {
           queued: 5,
           running: 3,

@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express';
-import { requireAuth } from '../middleware/auth';
-import { db } from '../database/database';
+import { requireAuth } from './auth';
+import db from '../database';
 
 const router: Router = express.Router();
 
@@ -47,7 +47,7 @@ interface RunTestRequest {
 }
 
 // Get all test executions
-router.get('/executions', requireAuth, (req: any, res: Response) => {
+router.get('/executions', requireAuth, async (req: any, res: Response) => {
   try {
     const { page = '1', limit = '20', status }: PaginationQuery = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -78,55 +78,29 @@ router.get('/executions', requireAuth, (req: any, res: Response) => {
       return;
     }
 
-    db.all(query, params, (err, executions: TestExecution[]) => {
-      if (err) {
-        console.error('Database error fetching test executions:', err);
-        res.status(500).json({
-          error: 'Database error',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const executions: TestExecution[] = await db.all(query, params);
 
-      // Get total count for pagination
-      let countQuery = 'SELECT COUNT(*) as total FROM test_executions';
-      const countParams: string[] = [];
-      
-      if (status) {
-        countQuery += ' WHERE status = ?';
-        countParams.push(status);
-      }
+    // Get total count for pagination
+    let countQuery = 'SELECT COUNT(*) as total FROM test_executions';
+    const countParams: string[] = [];
+    
+    if (status) {
+      countQuery += ' WHERE status = ?';
+      countParams.push(status);
+    }
 
-      if (!db) {
-        res.status(500).json({
-          error: 'Database not initialized',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const countResult: { total: number } = await db.get(countQuery, countParams);
 
-      db.get(countQuery, countParams, (countErr, countResult: { total: number }) => {
-        if (countErr) {
-          console.error('Database error getting execution count:', countErr);
-          res.status(500).json({
-            error: 'Database error',
-            code: 'DATABASE_ERROR'
-          });
-          return;
-        }
+    const paginationInfo: PaginationInfo = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: countResult ? countResult.total : 0,
+      totalPages: Math.ceil((countResult ? countResult.total : 0) / parseInt(limit))
+    };
 
-        const paginationInfo: PaginationInfo = {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: countResult ? countResult.total : 0,
-          totalPages: Math.ceil((countResult ? countResult.total : 0) / parseInt(limit))
-        };
-
-        res.json({
-          executions: executions || [],
-          pagination: paginationInfo
-        });
-      });
+    res.json({
+      executions: executions || [],
+      pagination: paginationInfo
     });
 
   } catch (error) {
@@ -139,7 +113,7 @@ router.get('/executions', requireAuth, (req: any, res: Response) => {
 });
 
 // Get specific test execution
-router.get('/executions/:id', requireAuth, (req: any, res: Response) => {
+router.get('/executions/:id', requireAuth, async (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -160,26 +134,17 @@ router.get('/executions/:id', requireAuth, (req: any, res: Response) => {
       return;
     }
 
-    db.get(query, [id], (err, execution: TestExecution) => {
-      if (err) {
-        console.error('Database error fetching test execution:', err);
-        res.status(500).json({
-          error: 'Database error',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const execution: TestExecution = await db.get(query, [id]);
 
-      if (!execution) {
-        res.status(404).json({
-          error: 'Test execution not found',
-          code: 'EXECUTION_NOT_FOUND'
-        });
-        return;
-      }
+    if (!execution) {
+      res.status(404).json({
+        error: 'Test execution not found',
+        code: 'EXECUTION_NOT_FOUND'
+      });
+      return;
+    }
 
-      res.json({ execution });
-    });
+    res.json({ execution });
 
   } catch (error) {
     console.error('Error fetching test execution:', error);
@@ -250,38 +215,28 @@ router.post('/run', requireAuth, async (req: any, res: Response) => {
       return;
     }
 
-    db.run(insertQuery, values, function(err) {
-      if (err) {
-        console.error('Database error creating test execution:', err);
-        res.status(500).json({
-          error: 'Failed to create test execution',
-          code: 'DATABASE_ERROR'
-        });
-        return;
+    const result = await db.run(insertQuery, values);
+    const executionId = result.lastID;
+
+    // In a real implementation, you would start the test execution here
+    // For now, we'll just return the created execution
+    res.status(201).json({
+      message: 'Test execution created successfully',
+      execution: {
+        id: executionId,
+        name,
+        description,
+        command,
+        environment,
+        status: 'pending',
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        metadata: JSON.stringify({
+          tags,
+          timeout,
+          ...metadata
+        })
       }
-
-      const executionId = this.lastID;
-
-      // In a real implementation, you would start the test execution here
-      // For now, we'll just return the created execution
-      res.status(201).json({
-        message: 'Test execution created successfully',
-        execution: {
-          id: executionId,
-          name,
-          description,
-          command,
-          environment,
-          status: 'pending',
-          created_by: userId,
-          created_at: new Date().toISOString(),
-          metadata: JSON.stringify({
-            tags,
-            timeout,
-            ...metadata
-          })
-        }
-      });
     });
 
   } catch (error) {
@@ -294,7 +249,7 @@ router.post('/run', requireAuth, async (req: any, res: Response) => {
 });
 
 // Cancel test execution
-router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => {
+router.post('/executions/:id/cancel', requireAuth, async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -311,71 +266,53 @@ router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => 
       return;
     }
 
-    db.get(checkQuery, [id], (err, execution: TestExecution) => {
-      if (err) {
-        console.error('Database error checking test execution:', err);
-        res.status(500).json({
-          error: 'Database error',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const execution: TestExecution = await db.get(checkQuery, [id]);
 
-      if (!execution) {
-        res.status(404).json({
-          error: 'Test execution not found',
-          code: 'EXECUTION_NOT_FOUND'
-        });
-        return;
-      }
-
-      // Check if user can cancel this execution
-      if (execution.created_by !== userId) {
-        res.status(403).json({
-          error: 'Not authorized to cancel this execution',
-          code: 'AUTHORIZATION_ERROR'
-        });
-        return;
-      }
-
-      // Check if execution can be cancelled
-      if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
-        res.status(400).json({
-          error: 'Cannot cancel execution in current status',
-          code: 'INVALID_STATUS'
-        });
-        return;
-      }
-
-      // Update execution status to cancelled
-      const updateQuery = `
-        UPDATE test_executions 
-        SET status = 'cancelled', completed_at = datetime('now')
-        WHERE id = ?
-      `;
-
-      if (!db) {
-        res.status(500).json({
-          error: 'Database not initialized',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
-
-      db.run(updateQuery, [id], (updateErr) => {
-        if (updateErr) {
-          console.error('Database error cancelling test execution:', updateErr);
-          res.status(500).json({
-            error: 'Failed to cancel execution',
-            code: 'DATABASE_ERROR'
-          });
-          return;
-        }
-
-        res.json({
-          message: 'Test execution cancelled successfully'
-        });
+    if (!execution) {
+      res.status(404).json({
+        error: 'Test execution not found',
+        code: 'EXECUTION_NOT_FOUND'
       });
+      return;
+    }
+
+    // Check if user can cancel this execution
+    if (execution.created_by !== userId) {
+      res.status(403).json({
+        error: 'Not authorized to cancel this execution',
+        code: 'AUTHORIZATION_ERROR'
+      });
+      return;
+    }
+
+    // Check if execution can be cancelled
+    if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
+      res.status(400).json({
+        error: 'Cannot cancel execution in current status',
+        code: 'INVALID_STATUS'
+      });
+      return;
+    }
+
+    // Update execution status to cancelled
+    const updateQuery = `
+      UPDATE test_executions 
+      SET status = 'cancelled', completed_at = datetime('now')
+      WHERE id = ?
+    `;
+
+    if (!db) {
+      res.status(500).json({
+        error: 'Database not initialized',
+        code: 'DATABASE_ERROR'
+      });
+      return;
+    }
+
+    await db.run(updateQuery, [id]);
+
+    res.json({
+      message: 'Test execution cancelled successfully'
     });
 
   } catch (error) {
@@ -388,7 +325,7 @@ router.post('/executions/:id/cancel', requireAuth, (req: any, res: Response) => 
 });
 
 // Get test execution results
-router.get('/executions/:id/results', requireAuth, (req: any, res: Response) => {
+router.get('/executions/:id/results', requireAuth, async (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -408,40 +345,31 @@ router.get('/executions/:id/results', requireAuth, (req: any, res: Response) => 
       return;
     }
 
-    db.get(query, [id], (err, execution: TestExecution) => {
-      if (err) {
-        console.error('Database error fetching test results:', err);
-        res.status(500).json({
-          error: 'Database error',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const execution: TestExecution = await db.get(query, [id]);
 
-      if (!execution) {
-        res.status(404).json({
-          error: 'Test execution not found',
-          code: 'EXECUTION_NOT_FOUND'
-        });
-        return;
-      }
-
-      // Parse metadata if it exists
-      let parsedMetadata = {};
-      if (execution.metadata) {
-        try {
-          parsedMetadata = JSON.parse(execution.metadata);
-        } catch (parseError) {
-          console.warn('Failed to parse execution metadata:', parseError);
-        }
-      }
-
-      res.json({
-        execution: {
-          ...execution,
-          metadata: parsedMetadata
-        }
+    if (!execution) {
+      res.status(404).json({
+        error: 'Test execution not found',
+        code: 'EXECUTION_NOT_FOUND'
       });
+      return;
+    }
+
+    // Parse metadata if it exists
+    let parsedMetadata = {};
+    if (execution.metadata) {
+      try {
+        parsedMetadata = JSON.parse(execution.metadata);
+      } catch (parseError) {
+        console.warn('Failed to parse execution metadata:', parseError);
+      }
+    }
+
+    res.json({
+      execution: {
+        ...execution,
+        metadata: parsedMetadata
+      }
     });
 
   } catch (error) {
@@ -454,7 +382,7 @@ router.get('/executions/:id/results', requireAuth, (req: any, res: Response) => 
 });
 
 // Get test execution logs
-router.get('/executions/:id/logs', requireAuth, (req: any, res: Response) => {
+router.get('/executions/:id/logs', requireAuth, async (req: any, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -468,19 +396,10 @@ router.get('/executions/:id/logs', requireAuth, (req: any, res: Response) => {
       return;
     }
 
-    db.get(query, [id], (err, result: { logs?: string }) => {
-      if (err) {
-        console.error('Database error fetching test logs:', err);
-        res.status(500).json({
-          error: 'Database error',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
+    const result: { logs?: string } = await db.get(query, [id]);
 
-      res.json({
-        logs: result?.logs || 'No logs available'
-      });
+    res.json({
+      logs: result?.logs || 'No logs available'
     });
 
   } catch (error) {

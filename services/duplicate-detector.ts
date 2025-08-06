@@ -5,7 +5,8 @@
  * and consolidate related test failures.
  */
 
-import Database from '../database/database';
+import db from '../database';
+import { Database } from '../database';
 
 interface DetectionThresholds {
     exact_match: number;
@@ -120,8 +121,8 @@ class DuplicateDetector {
     private debug: boolean;
     private thresholds: DetectionThresholds;
     private detectionRules: DetectionRules;
-    constructor(database: Database) {
-        this.db = database;
+    constructor() {
+        this.db = db;
         this.debug = process.env.DUPLICATE_DETECTOR_DEBUG === 'true';
         
         // Similarity thresholds

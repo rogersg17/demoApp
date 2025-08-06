@@ -7,12 +7,20 @@ interface NotificationAction {
   testName?: string;
 }
 
+type NotificationSeverity = 'low' | 'medium' | 'high' | 'critical' | 'info' | 'success' | 'warning' | 'error';
+
+interface AnalysisResult {
+    flakyTests: number;
+    potentiallyFlakyTests: number;
+    totalTests: number;
+}
+
 interface Notification {
   id?: string;
   timestamp?: string;
   read?: boolean;
   type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical' | 'info' | 'success' | 'warning' | 'error';
+  severity: NotificationSeverity;
   title: string;
   message: string;
   testName?: string;
@@ -26,6 +34,11 @@ interface Notification {
   pattern?: string;
   impactedTests?: string[];
   recommendedAction?: string;
+  previousScore?: number;
+  newScore?: number;
+  metric?: string;
+  currentValue?: number;
+  analysisResult?: AnalysisResult;
 }
 
 interface NotificationWithId extends Notification {
@@ -37,7 +50,7 @@ interface NotificationWithId extends Notification {
 class FlakyTestNotificationService extends EventEmitter {
   private notifications: NotificationWithId[];
   private maxNotifications: number;
-  private notificationListeners: Set<any>;
+  private notificationListeners: Set<(notification: NotificationWithId) => void>;
 
   constructor() {
     super();
@@ -66,6 +79,7 @@ class FlakyTestNotificationService extends EventEmitter {
 
     // Emit notification event
     this.emit('notification', notificationWithId);
+    this.notificationListeners.forEach(listener => listener(notificationWithId));
 
     console.log(`📢 Flaky test notification: ${notification.title}`);
     return notificationWithId;
@@ -74,7 +88,7 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Create notification for newly detected flaky test
    */
-  notifyFlakyTestDetected(testName, flakyScore, classification) {
+  notifyFlakyTestDetected(testName: string, flakyScore: number, classification: string) {
     const severity = this.getSeverityFromScore(flakyScore);
     
     return this.addNotification({
@@ -103,7 +117,7 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Create notification for test that has become stable
    */
-  notifyTestStabilized(testName, previousScore, newScore) {
+  notifyTestStabilized(testName: string, previousScore: number, newScore: number) {
     return this.addNotification({
       type: 'test_stabilized',
       severity: 'success',
@@ -125,12 +139,12 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Create notification for analysis completion
    */
-  notifyAnalysisCompleted(analysisResult) {
+  notifyAnalysisCompleted(analysisResult: AnalysisResult) {
     const flakyCount = analysisResult.flakyTests;
     const potentiallyFlakyCount = analysisResult.potentiallyFlakyTests;
     const totalIssues = flakyCount + potentiallyFlakyCount;
 
-    let severity = 'info';
+    let severity: NotificationSeverity = 'info';
     if (flakyCount > 5) severity = 'error';
     else if (totalIssues > 10) severity = 'warning';
     else if (totalIssues > 5) severity = 'warning';
@@ -158,7 +172,7 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Create notification for threshold breaches
    */
-  notifyThresholdBreach(metric, currentValue, threshold, description) {
+  notifyThresholdBreach(metric: string, currentValue: number, threshold: number, description: string) {
     return this.addNotification({
       type: 'threshold_breach',
       severity: 'error',
@@ -197,7 +211,7 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Mark notification as read
    */
-  markAsRead(notificationId) {
+  markAsRead(notificationId: string) {
     const notification = this.notifications.find(n => n.id === notificationId);
     if (notification) {
       notification.read = true;
@@ -257,7 +271,7 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Get severity from flaky score
    */
-  getSeverityFromScore(flakyScore) {
+  getSeverityFromScore(flakyScore: number): NotificationSeverity {
     if (flakyScore >= 0.7) return 'error';
     if (flakyScore >= 0.4) return 'warning';
     if (flakyScore >= 0.2) return 'info';
@@ -267,21 +281,19 @@ class FlakyTestNotificationService extends EventEmitter {
   /**
    * Subscribe to notifications
    */
-  subscribe(callback) {
-    this.listeners.add(callback);
-    this.on('notification', callback);
+  subscribe(callback: (notification: NotificationWithId) => void) {
+    this.notificationListeners.add(callback);
     
     return () => {
-      this.listeners.delete(callback);
-      this.off('notification', callback);
+      this.notificationListeners.delete(callback);
     };
   }
 
   /**
    * Check for notification triggers based on analysis results
    */
-  checkNotificationTriggers(analysisResults) {
-    const triggers = [];
+  checkNotificationTriggers(analysisResults: AnalysisResult) {
+    const triggers: { type: string; severity: NotificationSeverity; message: string }[] = [];
 
     // Check for high flaky test count
     const flakyCount = analysisResults.flakyTests;
@@ -327,4 +339,4 @@ class FlakyTestNotificationService extends EventEmitter {
   }
 }
 
-module.exports = FlakyTestNotificationService;
+export default FlakyTestNotificationService;
