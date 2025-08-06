@@ -340,6 +340,7 @@ export const useMVPData = () => {
       });
       return response.success || false;
     } catch (error) {
+      console.error('Connection test failed:', error)
       return false;
     }
   }, [apiCall]);

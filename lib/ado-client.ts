@@ -1,7 +1,122 @@
-const { WebApi, getPersonalAccessTokenHandler } = require('azure-devops-node-api');
+import { WebApi, getPersonalAccessTokenHandler } from 'azure-devops-node-api';
+
+interface AdoClientOptions {
+    orgUrl?: string;
+    pat?: string;
+    projectId?: string;
+}
+
+interface ProjectInfo {
+    id: string;
+    name: string;
+}
+
+interface TestConnectionResult {
+    success: boolean;
+    projects?: ProjectInfo[];
+    error?: string;
+}
+
+interface ValidationResult {
+    scope: string;
+    status: 'success' | 'failed';
+    error?: string;
+}
+
+interface BuildDefinitionInfo {
+    id: number;
+    name: string;
+    path: string;
+    type: any;
+    quality: any;
+    project: {
+        id: string;
+        name: string;
+    };
+    repository?: {
+        id: string;
+        name: string;
+        type: string;
+        url: string;
+        defaultBranch?: string;
+    } | null;
+    queue?: {
+        id: number;
+        name: string;
+    } | null;
+    createdDate: Date;
+    revision: number;
+    _links: any;
+    process?: any;
+    variables?: any;
+    triggers?: any;
+}
+
+interface BuildInfo {
+    id: number;
+    buildNumber: string;
+    status: any;
+    result: any;
+    queueTime: Date;
+    startTime: Date;
+    finishTime: Date;
+    url: string;
+    definition: {
+        id: number;
+        name: string;
+    };
+    project: {
+        id: string;
+        name: string;
+    };
+    requestedFor: any;
+    requestedBy: any;
+    sourceBranch: string;
+    sourceVersion: string;
+    priority: any;
+    reason: any;
+    tags: string[];
+    _links: any;
+}
+
+interface TestResultInfo {
+    id: number;
+    testCaseTitle: string;
+    automatedTestName: string;
+    testCaseReferenceId: number;
+    outcome: string;
+    state: string;
+    priority: number;
+    failureType: string;
+    errorMessage: string;
+    stackTrace: string;
+    startedDate: Date;
+    completedDate: Date;
+    durationInMs: number;
+    runBy: any;
+    testRun: {
+        id: number;
+        name: string;
+        url: string;
+        buildConfiguration: any;
+    };
+    build: {
+        id: number;
+    };
+    project: {
+        id: string;
+    };
+}
 
 class AdoClient {
-    constructor(options = {}) {
+    private orgUrl: string;
+    private pat: string;
+    private projectId: string;
+    private authHandler: any;
+    private connection: WebApi;
+    private debug: boolean;
+
+    constructor(options: AdoClientOptions = {}) {
         this.orgUrl = options.orgUrl || process.env.ADO_ORGANIZATION || '';
         this.pat = options.pat || process.env.ADO_PAT || '';
         this.projectId = options.projectId || process.env.ADO_PROJECT || '';
@@ -53,7 +168,7 @@ class AdoClient {
     /**
      * Test the connection to Azure DevOps
      */
-    async testConnection() {
+    async testConnection(): Promise<TestConnectionResult> {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
@@ -67,7 +182,7 @@ class AdoClient {
                 success: true,
                 projects: projects.map(p => ({ id: p.id || '', name: p.name || '' }))
             };
-        } catch (error) {
+        } catch (error: any) {
             if (this.debug) {
                 console.error('❌ ADO Connection failed:', error.message);
             }
@@ -82,7 +197,7 @@ class AdoClient {
     /**
      * Get project information
      */
-    async getProject(projectName = null) {
+    async getProject(projectName: string | null = null) {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
@@ -92,7 +207,7 @@ class AdoClient {
             }
             
             return projects.find(p => p.name === this.projectId || p.id === this.projectId);
-        } catch (error) {
+        } catch (error: any) {
             throw new Error(`Failed to get project: ${error.message}`);
         }
     }
@@ -100,15 +215,15 @@ class AdoClient {
     /**
      * Validate required scopes/permissions
      */
-    async validatePermissions() {
-        const validations = [];
+    async validatePermissions(): Promise<ValidationResult[]> {
+        const validations: ValidationResult[] = [];
 
         try {
             // Test Work Item access
             const workItemApi = await this.getWorkItemTrackingApi();
             await workItemApi.getWorkItemTypes(this.projectId);
             validations.push({ scope: 'Work Items', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Work Items', status: 'failed', error: error.message });
         }
 
@@ -117,7 +232,7 @@ class AdoClient {
             const testApi = await this.getTestApi();
             await testApi.getTestRuns(this.projectId);
             validations.push({ scope: 'Test Management', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Test Management', status: 'failed', error: error.message });
         }
 
@@ -126,7 +241,7 @@ class AdoClient {
             const buildApi = await this.getBuildApi();
             await buildApi.getBuilds(this.projectId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 1);
             validations.push({ scope: 'Build', status: 'success' });
-        } catch (error) {
+        } catch (error: any) {
             validations.push({ scope: 'Build', status: 'failed', error: error.message });
         }
 
@@ -136,7 +251,7 @@ class AdoClient {
     /**
      * Get all build definitions for a project
      */
-    async getBuildDefinitions(projectId = null) {
+    async getBuildDefinitions(projectId: string | null = null): Promise<BuildDefinitionInfo[]> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -162,7 +277,7 @@ class AdoClient {
                 revision: def.revision || 0,
                 _links: def._links
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get build definitions:', error.message);
             throw new Error(`Failed to get build definitions: ${error.message}`);
         }
@@ -171,7 +286,7 @@ class AdoClient {
     /**
      * Get a specific build definition by ID
      */
-    async getBuildDefinition(definitionId, projectId = null) {
+    async getBuildDefinition(definitionId: number, projectId: string | null = null): Promise<BuildDefinitionInfo> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -206,7 +321,7 @@ class AdoClient {
                 revision: definition.revision || 0,
                 _links: definition._links
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build definition ${definitionId}:`, error.message);
             throw new Error(`Failed to get build definition: ${error.message}`);
         }
@@ -215,7 +330,7 @@ class AdoClient {
     /**
      * Get builds for a specific definition
      */
-    async getBuildsForDefinition(definitionId, options = {}) {
+    async getBuildsForDefinition(definitionId: number, options: any = {}): Promise<BuildInfo[]> {
         try {
             const buildApi = await this.getBuildApi();
             const project = options.projectId || this.projectId;
@@ -276,7 +391,7 @@ class AdoClient {
                 tags: build.tags || [],
                 _links: build._links
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get builds for definition ${definitionId}:`, error.message);
             throw new Error(`Failed to get builds for definition: ${error.message}`);
         }
@@ -285,7 +400,7 @@ class AdoClient {
     /**
      * Get a specific build by ID
      */
-    async getBuild(buildId, projectId = null) {
+    async getBuild(buildId: number, projectId: string | null = null): Promise<any> {
         try {
             const buildApi = await this.getBuildApi();
             const project = projectId || this.projectId;
@@ -319,7 +434,7 @@ class AdoClient {
                 tags: build.tags || [],
                 _links: build._links
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get build ${buildId}:`, error.message);
             throw new Error(`Failed to get build: ${error.message}`);
         }
@@ -328,7 +443,7 @@ class AdoClient {
     /**
      * Get test results for a build
      */
-    async getTestResultsForBuild(buildId, projectId = null) {
+    async getTestResultsForBuild(buildId: number, projectId: string | null = null): Promise<TestResultInfo[]> {
         try {
             const testApi = await this.getTestApi();
             const project = projectId || this.projectId;
@@ -336,7 +451,7 @@ class AdoClient {
             // First get test runs for the build
             const testRuns = await testApi.getTestRuns(project, buildId.toString());
             
-            const allResults = [];
+            const allResults: TestResultInfo[] = [];
             
             for (const run of testRuns) {
                 const results = await testApi.getTestResults(project, run.id);
@@ -374,7 +489,7 @@ class AdoClient {
             }
             
             return allResults;
-        } catch (error) {
+        } catch (error: any) {
             this.error(`Failed to get test results for build ${buildId}:`, error.message);
             throw new Error(`Failed to get test results: ${error.message}`);
         }
@@ -383,7 +498,7 @@ class AdoClient {
     /**
      * Test connection to ADO and validate build definition access
      */
-    async validateBuildDefinitionAccess(definitionId, projectId = null) {
+    async validateBuildDefinitionAccess(definitionId: number, projectId: string | null = null): Promise<any> {
         try {
             const project = projectId || this.projectId;
             
@@ -405,7 +520,7 @@ class AdoClient {
                 canAccessBuilds: true,
                 canAccessTestResults: true // We'll validate this separately if needed
             };
-        } catch (error) {
+        } catch (error: any) {
             this.error(`❌ Build definition access validation failed:`, error.message);
             
             return {
@@ -420,13 +535,13 @@ class AdoClient {
     /**
      * Get organizations accessible to the current user
      */
-    async getOrganizations() {
+    async getOrganizations(): Promise<{ name: string; url: string }[]> {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
             
             // Extract unique organizations from project URLs
-            const organizations = new Set();
+            const organizations = new Set<string>();
             
             for (const project of projects) {
                 if (project.url) {
@@ -441,7 +556,7 @@ class AdoClient {
                 name: org,
                 url: `https://dev.azure.com/${org}`
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get organizations:', error.message);
             throw new Error(`Failed to get organizations: ${error.message}`);
         }
@@ -450,7 +565,7 @@ class AdoClient {
     /**
      * Get projects for the current organization
      */
-    async getProjects() {
+    async getProjects(): Promise<any[]> {
         try {
             const coreApi = await this.connection.getCoreApi();
             const projects = await coreApi.getProjects();
@@ -465,7 +580,7 @@ class AdoClient {
                 visibility: project.visibility,
                 lastUpdateTime: project.lastUpdateTime
             }));
-        } catch (error) {
+        } catch (error: any) {
             this.error('Failed to get projects:', error.message);
             throw new Error(`Failed to get projects: ${error.message}`);
         }
@@ -474,7 +589,7 @@ class AdoClient {
     /**
      * Log debug information
      */
-    log(...args) {
+    log(...args: any[]): void {
         if (this.debug) {
             console.log('[ADO-CLIENT]', ...args);
         }
@@ -483,9 +598,9 @@ class AdoClient {
     /**
      * Log error information
      */
-    error(...args) {
+    error(...args: any[]): void {
         console.error('[ADO-CLIENT ERROR]', ...args);
     }
 }
 
-module.exports = AdoClient;
+export default AdoClient;

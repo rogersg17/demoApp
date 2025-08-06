@@ -369,7 +369,8 @@ function setupRoutes(): void {
     // Load route modules
     const authModule = require('./routes/auth');
     const authRoutes = authModule.default;
-    const testRoutes = require('./routes/tests');
+    const testModule = require('./routes/tests');
+    const testRoutes = testModule.default;
     const gitRoutes = require('./routes/git');
     const usersModule = require('./routes/users');
     const usersRoutes = usersModule.default;
@@ -381,7 +382,7 @@ function setupRoutes(): void {
     usersModule.setDatabase(db.db);
     
     // Initialize test routes with database
-    testRoutes.setDatabase(db);
+    testModule.setDatabase(db);
     
     // Initialize git routes with database
     gitRoutes.setDatabase(db);
@@ -410,24 +411,21 @@ function setupRoutes(): void {
     // Azure DevOps routes
     try {
       const adoWebhooksRouter = require('./routes/ado-webhooks');
-      const adoProjectConfigRouter = require('./routes/ado-project-config.ts').default;
       const adoDashboardRouter = require('./routes/ado-dashboard');
       const adoTestRouter = require('./routes/ado-test.ts').default;
-      
-      // GitHub Actions routes
-      const githubActionsRouter = require('./routes/github-actions.ts').default;
 
       // Store io instance for webhook access
       app.set('io', io);
 
       app.use('/api/ado/webhooks', adoWebhooksRouter);
-      app.use('/api/ado', adoProjectConfigRouter);
       app.use('/api/ado', adoTestRouter);
       app.use('/api/ado/dashboard', adoDashboardRouter);
       
-      // GitHub Actions routes
-      app.use('/api/github', githubActionsRouter);
-    } catch (e) { console.warn('Azure DevOps routes not available'); }
+      console.log('✅ Azure DevOps routes loaded successfully');
+    } catch (e) { 
+      console.error('Azure DevOps routes error:', e); 
+      console.warn('Azure DevOps routes not available'); 
+    }
 
     // Week 9+ orchestration routes
     try {
@@ -452,7 +450,8 @@ function setupRoutes(): void {
     
     // Settings routes
     try {
-      const settingsRoutes = require('./routes/settings');
+      const settingsModule = require('./routes/settings');
+      const settingsRoutes = settingsModule.default;
       app.use('/api/settings', settingsRoutes);
     } catch (e) { console.warn('Settings routes not available'); }
     

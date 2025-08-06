@@ -78,7 +78,7 @@ export const checkAuth = createAsyncThunk('auth/checkAuth', async () => {
     }
 
     throw new Error('Not authenticated')
-  } catch (error) {
+  } catch {
     // If backend is not available, treat as not authenticated
     throw new Error('Backend not available')
   }

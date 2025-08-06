@@ -106,13 +106,13 @@ const UserManagementPage: React.FC = () => {
       
       setUsers(transformedUsers)
       setError(null)
-    } catch (err) {
+    } catch (error) {
       setError('Failed to load users. Please refresh the page.')
-      console.error('Error loading users:', err)
+      console.error('Error loading users:', error)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [navigate])
 
   const filterUsers = useCallback(() => {
     let filtered = users
@@ -243,6 +243,7 @@ const UserManagementPage: React.FC = () => {
         }
       }
     } catch (err) {
+      console.error('Failed to create user:', err)
       setAddUserError('Failed to create user')
     } finally {
       setAddingUser(false)
@@ -283,6 +284,7 @@ const UserManagementPage: React.FC = () => {
         alert(`Failed to delete user: ${errorData.error || 'Unknown error'}`)
       }
     } catch (err) {
+      console.error('Failed to delete user:', err)
       alert('Failed to delete user. Please try again.')
     }
   }

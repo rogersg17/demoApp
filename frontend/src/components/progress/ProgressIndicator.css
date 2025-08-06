@@ -1,0 +1,285 @@
+/* Progress Indicator Styles */
+
+.progress-linear {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-circular {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+.circular-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.circular-status {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-steps {
+  width: 100%;
+  padding: 16px 0;
+}
+
+.steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 24px;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: 2px solid #e0e0e0;
+  background: white;
+}
+
+.step-idle .step-number,
+.step-pending .step-number {
+  border-color: #e0e0e0;
+  color: #757575;
+}
+
+.step-running .step-number {
+  border-color: #1976d2;
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.step-completed .step-number {
+  border-color: #2e7d32;
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.step-failed .step-number {
+  border-color: #d32f2f;
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.step-warning .step-number {
+  border-color: #ed6c02;
+  background: #fff3e0;
+  color: #ed6c02;
+}
+
+.step-connector {
+  width: 2px;
+  height: 20px;
+  background: #e0e0e0;
+  margin-top: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.step-connector.completed {
+  background: #2e7d32;
+}
+
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.progress-dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+.dots-container {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  animation: none;
+}
+
+.dot.active {
+  animation: dotPulse 1.4s infinite ease-in-out both;
+}
+
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Animated variations */
+.progress-linear.animated {
+  animation: slideIn 0.3s ease-out;
+}
+
+.progress-circular.animated {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.progress-steps.animated .step-item {
+  animation: slideInFromLeft 0.4s ease-out;
+}
+
+.progress-dots.animated {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Real-time pulse effect for active states */
+.step-running .step-number,
+.circular-container .MuiCircularProgress-root[aria-valuenow] {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+  }
+}
+
+/* Status-specific color themes */
+.status-success {
+  --status-color: #2e7d32;
+  --status-bg: #e8f5e8;
+}
+
+.status-error {
+  --status-color: #d32f2f;
+  --status-bg: #ffebee;
+}
+
+.status-warning {
+  --status-color: #ed6c02;
+  --status-bg: #fff3e0;
+}
+
+.status-info {
+  --status-color: #0288d1;
+  --status-bg: #e1f5fe;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .progress-indicators {
+    align-self: flex-end;
+  }
+  
+  .step-item {
+    gap: 8px;
+  }
+  
+  .circular-container {
+    scale: 0.8;
+  }
+}

@@ -1,17 +1,9 @@
-import React, { createContext, useState } from 'react';
+import React, { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { FieldValidation, ValidationResult } from '../utils/validation';
+import { ValidationContext } from './validation';
 
-interface ValidationContextType {
-  validation: FieldValidation;
-  setFieldValidation: (fieldName: string, result: ValidationResult) => void;
-  clearValidation: () => void;
-  getFieldError: (fieldName: string) => string | null;
-  isFieldValid: (fieldName: string) => boolean;
-  hasErrors: boolean;
-}
-
-export const ValidationContext = createContext<ValidationContextType | null>(null);
+export { ValidationContext };
 
 interface ValidationProviderProps {
   children: ReactNode;

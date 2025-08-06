@@ -42,7 +42,7 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({
         return () => clearTimeout(timer);
       }
     }
-  }, [error, autoHide, autoHideDelay, onDismiss]);
+  }, [error, autoHide, autoHideDelay, handleDismiss]);
 
   if (!error) return null;
 

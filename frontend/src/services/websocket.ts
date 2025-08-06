@@ -17,7 +17,11 @@ export interface TestUpdate {
   progress?: {
     completed: number
     total: number
-    currentTest?: any
+    currentTest?: {
+      name: string
+      file: string
+      startTime: string
+    }
   }
   results?: {
     total: number
@@ -50,7 +54,11 @@ export interface LogUpdate {
   source: 'stdout' | 'stderr'
   content: string
   level?: 'info' | 'error' | 'warn'
-  currentTest?: any
+  currentTest?: {
+    name: string
+    file: string
+    startTime: string
+  }
 }
 
 export interface ExecutionHistory {
@@ -58,7 +66,13 @@ export interface ExecutionHistory {
   status: string
   startTime: Date
   endTime?: Date
-  results?: any
+  results?: {
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    duration: string
+  }
 }
 
 class WebSocketService {
@@ -110,7 +124,7 @@ class WebSocketService {
       this.executionHistoryCallbacks.forEach(callback => callback(history))
     })
 
-    this.socket.on('logsHistory', (data: { testId: string; logs: any[] }) => {
+    this.socket.on('logsHistory', (data: { testId: string; logs: Array<{ timestamp: string; source: string; content: string; level?: string }> }) => {
       console.log('📝 Received logs history:', data)
       // Process historical logs
       const callback = this.logUpdateCallbacks.get(data.testId)
@@ -119,9 +133,9 @@ class WebSocketService {
           callback({
             testId: data.testId,
             timestamp: log.timestamp,
-            source: log.source,
+            source: log.source as 'stdout' | 'stderr',
             content: log.content,
-            level: log.level || 'info'
+            level: (log.level as 'info' | 'error' | 'warn') || 'info'
           })
         })
       }
