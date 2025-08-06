@@ -58,6 +58,13 @@ sessions/
 *.session
 .env.production.local
 
+# Database files
+database/app.db
+database/*.db
+*.db
+*.sqlite
+*.sqlite3
+
 # Temporary folders
 tmp/
 temp/
