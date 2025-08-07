@@ -32,6 +32,7 @@ A comprehensive test management platform that bridges CI/CD systems with issue t
 - **[Strategic Plan 2025](docs/planning/STRATEGIC_PLAN_2025.md)** - Overall vision and roadmap
 - **[MVP Implementation Plan](docs/architecture/ADR-001-MVP-IMPLEMENTATION-PLAN.md)** - Current MVP development focus
 - **[Architecture Overview](docs/architecture/README.md)** - Core design and technical decisions
+- **[Development Guide](docs/DEVELOPMENT_GUIDE.md)** - Cross-platform development setup and workflows
 
 ## 🎯 Current Status: MVP Development (Phase 2)
 
@@ -269,12 +270,30 @@ npm run test:webhooks
 # Install development dependencies
 npm install --include=dev
 
-# Run in development mode with hot reload
-npm run dev
+# Start full development environment (cross-platform)
+npm run dev:full        # Both backend + frontend with hot reload
+
+# Stop development servers
+npm run dev:stop         # Cross-platform stop command
+
+# Platform-specific alternatives
+npm run dev:full:windows # Windows batch script with emoji support
+npm run dev:full:linux   # Linux/macOS bash script
+
+# Individual services
+npm run dev             # Backend only (nodemon + TypeScript)
+npm run dev:frontend    # Frontend only (Vite + React)
 
 # Run tests during development
 npm run test:watch
 ```
+
+**Access Points:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- API Documentation: http://localhost:3000/api-docs
+
+**For detailed development setup, see [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md)**
 
 ### Code Quality
 ```bash
@@ -390,7 +409,7 @@ npm run test:performance
 ### Getting Help
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Issue Tracking**: Use GitHub Issues for bug reports and feature requests
-- **Development**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+- **Development**: See [Development Guide](docs/DEVELOPMENT_GUIDE.md) for development setup and workflows
 
 ---
 

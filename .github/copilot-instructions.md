@@ -52,8 +52,19 @@ class MyService extends EventEmitter {
 
 ### Key NPM Scripts
 ```bash
-# Development (both backend + frontend)
-npm run dev:full     # Starts backend + frontend with hot reload
+# Development (cross-platform - backend + frontend)
+npm run dev:full     # Starts backend + frontend with hot reload (concurrently)
+npm run dev:stop     # Stops all development servers (cross-platform)
+
+# Platform-specific development
+npm run dev:full:windows   # Windows batch script (separate command windows)
+npm run dev:stop:windows   # Windows stop script with emoji support
+npm run dev:full:linux     # Linux/macOS bash script  
+npm run dev:stop:linux     # Unix stop script
+
+# Individual services
+npm run dev              # Backend only (nodemon + TypeScript)
+npm run dev:frontend     # Frontend only (Vite + React)
 
 # Testing patterns  
 npm run test:jira:headed    # JIRA integration tests with browser visible
@@ -69,6 +80,12 @@ npm run setup:ado          # Interactive ADO setup
 - Frontend development server runs on port 5173
 - All API endpoints are at `http://localhost:3000/api/*`
 - Frontend connects to backend WebSocket on port 3000
+
+**Cross-Platform Development:**
+- **Universal**: `npm run dev:full` works on Windows, Linux, macOS using concurrently
+- **Windows**: Batch scripts with UTF-8 emoji support, separate command windows
+- **Linux/macOS**: Bash scripts with native emoji support and signal handling
+- **Automatic Environment**: `VITE_API_BASE_URL` set automatically for frontend
 
 ### Configuration Management
 - **Environment:** Multiple `.env.*` files for different integrations (`.env.jira`, `.env.ado`)
