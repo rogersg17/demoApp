@@ -1,18 +1,39 @@
 /**
- * GitHub API Service for TMS Integration
- * Handles GitHub Actions workflow monitoring and AP  async getWorkflowRuns(options: {
-    branch?: string;
-    event?: string;
-    status?: 'completed' | 'queued' | 'in_progress' | 'cancelled' | 'success' | 'failure' | 'neutral' | 'skipped' | 'timed_out' | 'action_required' | 'stale' | 'requested' | 'waiting' | 'pending';
-    per_page?: number;
-    page?: number;
-  } = {}): Promise<any[]> {
-    try {
-      const response = await this.octokit.rest.actions.listWorkflowRunsForRepo({
-        owner: this.config.owner,
-        repo: this.config.repo,
-        ...options,
-      });s
+ * GitHub API Service
+ * -------------------------------------------------------------
+ * Purpose:
+ *   Provides a thin, typed wrapper around the official Octokit REST client
+ *   for retrieving GitHub Actions workflow information that the Test
+ *   Management Platform (TMP) observes (never executes) for orchestration
+ *   insights and historical analytics.
+ *
+ * Core Responsibilities:
+ *   - List workflow runs with optional filtering (branch, event, status)
+ *   - Fetch a single workflow run's metadata
+ *   - Retrieve jobs and their step-level details for a run
+ *   - Aggregate high-level execution stats (durations, conclusions)
+ *   - Produce lightweight monitoring snapshots for real-time dashboards
+ *
+ * Design Notes:
+ *   - Read-only: strictly observational; no mutation of GitHub state
+ *   - Resilient: wraps Octokit calls with error handling & normalized errors
+ *   - Typed: exposes strongly-typed domain interfaces (WorkflowRun, WorkflowJob)
+ *   - Extensible: easy to add artifact/log enrichment stages later
+ *
+ * Configuration Contract (GitHubConfig):
+ *   token : Personal Access Token (with repo + actions:read scope)
+ *   owner : Repository owner / organization
+ *   repo  : Repository name
+ *
+ * Error Handling Strategy:
+ *   - Catches and logs underlying API failures with contextual messages
+ *   - Throws enriched Error objects for upstream services to classify
+ *
+ * Future Enhancements (not yet implemented):
+ *   - Caching layer (Redis) to reduce API quota usage
+ *   - Webhook-driven delta updates vs polling
+ *   - Artifact introspection (e.g., parsing test result archives)
+ *   - Rate limit telemetry + backoff strategy
  */
 
 import { Octokit } from '@octokit/rest';

@@ -22,14 +22,14 @@ interface JiraConfig {
 }
 
 interface TestResult {
-    status: string;
-    duration: number;
-    errors: { message?: string }[];
-    retry: number;
-    startTime: Date;
-    stdout: string[];
-    stderr: string[];
-    attachments: { name: string; path: string }[];
+  status: string;
+  duration: number;
+  errors: { message?: string }[];
+  retry: number;
+  startTime: Date;
+  stdout: (string | Buffer)[]; // Accept raw Playwright output entries
+  stderr: (string | Buffer)[];
+  attachments: { name: string; path?: string; contentType?: string; body?: Buffer }[];
 }
 
 interface TestCase {
@@ -39,9 +39,9 @@ interface TestCase {
         line: number;
         column: number;
     };
-    parent?: {
-        project: () => { name: string };
-    };
+  parent?: {
+    project: () => { name: string } | undefined;
+  };
     tags: string[];
     annotations: { type: string; description?: string }[];
 }
@@ -204,15 +204,18 @@ class JiraIntegration {
   extractFailureDetails(testResult: TestResult): FailureDetails {
     const errors = testResult.errors || [];
     const failureMessages = errors.map(error => error.message || (error as any).toString());
-    
+
+    const stringify = (arr: (string | Buffer)[] | undefined) =>
+      (arr || []).map(e => typeof e === 'string' ? e : e.toString('utf-8'));
+
     return {
       status: testResult.status,
       duration: testResult.duration,
       errors: failureMessages,
       retry: testResult.retry || 0,
       startTime: testResult.startTime.toISOString(),
-      stdout: testResult.stdout || [],
-      stderr: testResult.stderr || []
+      stdout: stringify(testResult.stdout),
+      stderr: stringify(testResult.stderr)
     };
   }
 
@@ -325,8 +328,9 @@ class JiraIntegration {
     const labels = ['automated-test', 'test-failure'];
     
     // Add project-specific label
-    if (testCase.parent?.project()?.name) {
-      labels.push(`browser-${testCase.parent.project().name.toLowerCase()}`);
+    const projectName = testCase.parent?.project()?.name;
+    if (projectName) {
+      labels.push(`browser-${projectName.toLowerCase()}`);
     }
 
     // Add file-based label
@@ -419,15 +423,14 @@ class JiraIntegration {
   /**
    * Attaches files to a Jira issue
    */
-  async attachFilesToIssue(issueKey: string, attachments: { name: string; path: string }[]): Promise<void> {
-    if (!attachments || attachments.length === 0) {
-      return;
-    }
-
+  async attachFilesToIssue(issueKey: string, attachments: { name: string; path?: string }[]): Promise<void> {
+    if (!attachments || attachments.length === 0) return;
     for (const attachment of attachments) {
+      const filePath = attachment.path;
+      if (!filePath) continue; // Skip in-memory attachments
       try {
-        if (attachment.path && fs.existsSync(attachment.path)) {
-          await this.attachFileToIssue(issueKey, attachment.path, attachment.name);
+        if (fs.existsSync(filePath)) {
+          await this.attachFileToIssue(issueKey, filePath, attachment.name);
         }
       } catch (error: any) {
         console.warn(`Failed to attach file ${attachment.name}:`, error.message);

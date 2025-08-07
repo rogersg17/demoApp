@@ -16,7 +16,7 @@ Successfully implemented comprehensive API documentation using OpenAPI 3.0 speci
 - **Security definitions** for session-based authentication
 - **Examples and descriptions** for all endpoints
 
-### 🔧 **Swagger UI Integration** (`lib/swagger.js`)
+### 🔧 **Swagger UI Integration** (`lib/swagger.ts`)
 - **Interactive API documentation** at `/api-docs`
 - **Custom styling** and branding for the platform
 - **Session-based authentication** support in the UI
