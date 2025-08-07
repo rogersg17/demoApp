@@ -152,7 +152,13 @@ try {
   
   console.log('✅ MVP services initialized successfully');
 } catch (error) {
-  console.warn('⚠️ Some MVP services may not be available:', error);
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  if (errorMessage.includes('Azure DevOps')) {
+    console.warn('⚠️  Azure DevOps integration not configured (optional for development)');
+    console.warn('   To enable: Add ADO_ORG_URL and ADO_PAT to your .env file');
+  } else {
+    console.warn('⚠️ Some MVP services may not be available:', errorMessage);
+  }
 }
 
 // Initialize Enhanced Orchestration services (Week 11)
