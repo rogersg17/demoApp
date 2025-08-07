@@ -465,6 +465,13 @@ function setupRoutes(): void {
       app.use('/api/enhanced-orchestration', enhancedOrchestrationRoutes);
       app.use('/enhanced-orchestration', enhancedOrchestrationDashboard);
     } catch (e) { console.warn('Enhanced orchestration routes not available'); }
+
+    // Week 18 multi-platform dashboard
+    try {
+      const multiPlatformDashboardRoutes = require('./routes/multi-platform-dashboard').default;
+      app.use('/api/dashboard/multi-platform', multiPlatformDashboardRoutes);
+      console.log('✅ Multi-Platform dashboard routes loaded successfully');
+    } catch (e) { console.warn('Multi-Platform dashboard routes not available'); }
     
     // Core routes
     app.use('/api/auth', authRoutes);
