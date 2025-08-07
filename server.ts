@@ -472,6 +472,13 @@ function setupRoutes(): void {
       app.use('/api/dashboard/multi-platform', multiPlatformDashboardRoutes);
       console.log('✅ Multi-Platform dashboard routes loaded successfully');
     } catch (e) { console.warn('Multi-Platform dashboard routes not available'); }
+
+    // Week 19-20 analytics & intelligence routes
+    try {
+      const analyticsIntelligenceRoutes = require('./routes/analytics-intelligence').default;
+      app.use('/api/analytics', analyticsIntelligenceRoutes(io));
+      console.log('✅ Analytics intelligence routes loaded successfully');
+    } catch (e) { console.warn('Analytics intelligence routes not available'); }
     
     // Core routes
     app.use('/api/auth', authRoutes);
