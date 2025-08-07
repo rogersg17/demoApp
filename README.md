@@ -126,28 +126,42 @@ npm run setup
 
 ### Running the Platform
 
-#### Core Platform
+#### Full Development Environment (Cross-Platform)
 ```bash
-# Start the main TMP server
-npm start
+# Start both backend and frontend in development mode
+# ✅ Works on Windows, Linux, and macOS
+npm run dev:full
 
-# Development mode with hot reload
-npm run dev
+# Stop both backend and frontend servers
+# ✅ Works on Windows, Linux, and macOS
+npm run dev:stop
 ```
 
-#### Frontend Development  
+This command uses `concurrently` to start:
+- **Backend server** on port 3000 (with hot reload via nodemon)
+- **Frontend server** on port 5173 (React with Vite)
+
+**Platform-specific alternatives:**
 ```bash
-# Navigate to frontend directory
-cd frontend
+# Windows (opens servers in separate command windows with emoji support)
+npm run dev:full:windows
+npm run dev:stop:windows
 
-# Install frontend dependencies
-npm install
+# Linux/macOS (uses bash script with emoji support)  
+npm run dev:full:linux
+npm run dev:stop:linux
+```
 
-# Start React development server
+#### Individual Services
+```bash
+# Backend only - Development mode with hot reload
 npm run dev
 
-# Build for production
-npm run build
+# Frontend only - React development server
+npm run dev:frontend
+
+# Production mode
+npm start
 ```
 
 ### Access Points
