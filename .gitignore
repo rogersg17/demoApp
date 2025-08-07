@@ -1,19 +1,65 @@
-# Node.js dependencies
+############################################################
+# Root .gitignore (Deduplicated & Organized)
+############################################################
+
+## Node / Package Managers
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Playwright
+## Build / Distribution
+dist/
+coverage/
+*.lcov
+
+## Playwright Artifacts
 test-results/
 playwright-report/
 playwright/.cache/
 
-# Jira integration secrets
-.env.jira
-jira-test-report.json
+## Logs & Runtime
+logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# OS generated files
+## Environment / Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.jira
+.env.ado
+
+## Session Storage
+sessions/
+*.session
+
+## Database (local dev only – keep out of VCS)
+database/app.db
+database/*.db
+prisma/database/app.db
+*.db
+*.sqlite
+*.sqlite3
+
+## Temporary / Generated
+tmp/
+temp/
+*.png
+
+## IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+## OS Files
 .DS_Store
 .DS_Store?
 ._*
@@ -22,54 +68,9 @@ jira-test-report.json
 ehthumbs.db
 Thumbs.db
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+## Jira Integration Artifacts
+jira-test-report.json
 
-# Logs
-logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# Distribution folder
-dist/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Session storage
-sessions/
-*.session
-.env.production.local
-
-# Database files
-database/app.db
-database/*.db
-*.db
-*.sqlite
-*.sqlite3
-
-# Temporary folders
-tmp/
-temp/
-*.png
-.env.ado
-database/app.db
-prisma/database/app.db
-database/app.db
+############################################################
+# End
+############################################################
