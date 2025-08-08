@@ -3,9 +3,21 @@ import type {
 } from '../types/analytics'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+const TIMEOUT_MS = 10000
+
+async function fetchWithTimeout(resource: string, options: RequestInit = {}, timeout = TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+  try {
+    const res = await fetch(resource, { ...options, signal: controller.signal })
+    return res
+  } finally {
+    clearTimeout(id)
+  }
+}
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/analytics${path}`, { credentials: 'include' })
+  const res = await fetchWithTimeout(`${API_BASE}/api/analytics${path}`, { credentials: 'include' })
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return res.json() as Promise<T>
 }
