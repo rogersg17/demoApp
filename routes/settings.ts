@@ -406,26 +406,25 @@ router.post('/test-connection/jira', requireAuth, async (req: AuthenticatedReque
  */
 router.post('/test-connection/ado', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-        // Delegate to existing ADO test connection endpoint
-        const AdoClient = require('../lib/ado-client');
-        const { organization, project, pat }: AdoTestRequest = req.body;
-        
-        if (!organization || !project || !pat) {
+        // Use default export correctly and support env fallbacks
+        const AdoClient = require('../lib/ado-client').default;
+        const body = (req.body || {}) as Partial<AdoTestRequest>;
+
+        const organization = body.organization || process.env.ADO_ORGANIZATION || '';
+        const project = body.project || process.env.ADO_PROJECT || '';
+        const pat = body.pat || process.env.ADO_PAT || '';
+
+        if (!organization || !pat) {
             res.status(400).json({
                 success: false,
-                error: 'Organization, project, and PAT are required'
+                error: 'Missing Azure DevOps credentials',
+                details: 'Provide organization and PAT in request body or set ADO_ORGANIZATION and ADO_PAT in environment.'
             });
             return;
         }
-        
-        const testClient = new AdoClient({
-            orgUrl: organization,
-            projectId: project,
-            pat: pat
-        });
-        
+
+        const testClient = new AdoClient({ orgUrl: organization, projectId: project, pat });
         const result = await testClient.testConnection();
-        
         res.json(result);
         
     } catch (error: any) {

@@ -39,7 +39,24 @@ import Database from './database/database';
 import { prismaDb } from './database/prisma-database';
 
 // Configure environment
+// 1) Load default .env
 config(); // Force restart after .env creation
+// 2) Also load optional .env.ado to support ADO-specific configuration without overriding existing vars
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const adoEnvPath = path.resolve(process.cwd(), '.env.ado');
+  if (fs.existsSync(adoEnvPath)) {
+    // Only set variables that aren't already defined
+    const dotenv = require('dotenv');
+    dotenv.config({ path: adoEnvPath, override: false });
+    if (process.env.ADO_DEBUG === 'true') {
+      console.log(`🔧 Loaded Azure DevOps env from ${adoEnvPath}`);
+    }
+  }
+} catch (e) {
+  console.warn('⚠️ Unable to load .env.ado (optional):', e instanceof Error ? e.message : String(e));
+}
 
 // Create Express app and HTTP server
 const app = express();
