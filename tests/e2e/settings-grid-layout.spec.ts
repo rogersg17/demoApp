@@ -2,19 +2,10 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Settings Page Grid Layout', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the login page first
-    await page.goto('http://localhost:5174/login')
-    
-    // Login as admin
-    await page.fill('input[name="username"]', 'admin')
-    await page.fill('input[name="password"]', 'password')
-    await page.click('button[type="submit"]')
-    
-    // Wait for navigation to dashboard
-    await page.waitForURL('**/dashboard')
-    
-    // Navigate to settings page
-    await page.goto('http://localhost:5174/settings')
+    // Navigate to root first, then to settings page - authentication handled by storageState
+    await page.goto('/')
+    await expect(page.getByText(/welcome,\s*admin!?/i)).toBeVisible({ timeout: 15000 })
+    await page.goto('/settings')
   })
 
   test('should display settings in a grid layout', async ({ page }) => {

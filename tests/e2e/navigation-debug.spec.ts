@@ -12,16 +12,9 @@ test.describe('Navigation Debug Test', () => {
       console.log('Page error:', error.message)
     })
 
-    // Go to login page and authenticate
+    // Navigate to root first - authentication handled by storageState
     await page.goto('/')
-    
-    // Fill login form
-    await page.fill('#username', 'admin')
-    await page.fill('#password', 'admin123')
-    await page.click('button[type="submit"]')
-    
-    // Wait for successful login and navigation to dashboard
-    await expect(page).toHaveURL(/.*\/dashboard/)
+    await expect(page.getByText(/welcome,\s*admin!?/i)).toBeVisible({ timeout: 15000 })
     
     // Take a screenshot before navigation
     await page.screenshot({ path: 'before-navigation.png' })

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Jira Integration Demo Tests', () => {
   test.beforeEach(async ({ page }) => {
+    // Navigate to login page - authentication state handled by storageState for other tests
     await page.goto('/login/');
   });
 
