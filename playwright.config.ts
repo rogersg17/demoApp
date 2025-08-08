@@ -7,6 +7,9 @@ const useServer = process.env.USE_SERVER !== 'false'; // Default to server unles
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
+// Allow overriding baseURL via environment variable to handle dynamic dev server ports
+const BASE_URL = process.env.PW_BASE_URL || 'http://localhost:5173';
+
 export default defineConfig({
   testDir: './tests',
   /* Exclude demo tests from regular test runs */
@@ -27,7 +30,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:5173', // React app on Vite dev server
+  baseURL: BASE_URL, // React app on Vite dev server; override with PW_BASE_URL if needed
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },

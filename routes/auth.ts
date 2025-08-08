@@ -42,10 +42,13 @@ interface RegisterRequestBody {
   role?: string;
 }
 
+// Determine if we are in a test environment (Playwright/Jest)
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.PW_TEST === '1';
+
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  max: isTestEnv ? 1000 : 5, // relax limits in tests
   message: {
     error: 'Too many authentication attempts, please try again later.',
     code: 'RATE_LIMIT_EXCEEDED'
@@ -56,7 +59,7 @@ const authLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 login attempts per window
+  max: isTestEnv ? 1000 : 10, // relax limits in tests
   message: {
     error: 'Too many login attempts, please try again later.',
     code: 'LOGIN_RATE_LIMIT_EXCEEDED'
