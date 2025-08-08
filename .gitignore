@@ -9,7 +9,7 @@ yarn-debug.log*
 yarn-error.log*
 
 ## Build / Distribution
-dist/
+dist/*
 coverage/
 *.lcov
 
@@ -74,3 +74,4 @@ jira-test-report.json
 ############################################################
 # End
 ############################################################
+database/app.db
