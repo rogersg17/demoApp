@@ -112,3 +112,30 @@ router.post('/test-connection', [
 });
 
 export default router;
+
+// List Azure DevOps pipelines (build definitions) using env-configured credentials
+router.get('/pipelines', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const organization = process.env.ADO_ORGANIZATION || '';
+        const project = process.env.ADO_PROJECT || '';
+        const pat = process.env.ADO_PAT || '';
+
+        if (!organization || !project || !pat) {
+            res.status(400).json({
+                success: false,
+                error: 'Missing Azure DevOps configuration',
+                details: 'Ensure ADO_ORGANIZATION, ADO_PROJECT, and ADO_PAT are set.'
+            });
+            return;
+        }
+
+        const client = new AdoClient({ orgUrl: organization, projectId: project, pat });
+        const defs = await client.getBuildDefinitions(project);
+        const pipelines = (defs || []).map(d => ({ id: d.id, name: d.name, path: d.path }));
+
+        res.json({ success: true, count: pipelines.length, pipelines });
+    } catch (error: any) {
+        console.error('❌ Error listing ADO pipelines:', error?.message || error);
+        res.status(500).json({ success: false, error: 'Failed to list pipelines', message: error?.message });
+    }
+});

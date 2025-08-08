@@ -106,6 +106,9 @@ interface TestResultInfo {
     project: {
         id: string;
     };
+    // Optional helpers for better UI mapping
+    pipelineName?: string;
+    buildId?: number;
 }
 
 class AdoClient {
@@ -448,22 +451,122 @@ class AdoClient {
     }
 
     /**
+     * Get recent builds across all definitions for a project
+     */
+    async getRecentBuilds(projectId: string | null = null, options: any = {}): Promise<BuildInfo[]> {
+        try {
+            const buildApi = await this.getBuildApi();
+            const project = projectId || this.projectId;
+            const {
+                top = 10,
+                minTime = undefined,
+                maxTime = undefined,
+                statusFilter = undefined,
+                resultFilter = undefined,
+                branchName = undefined
+            } = options;
+
+            const builds = await buildApi.getBuilds(
+                project,
+                undefined, // definitions
+                undefined, // queues
+                undefined, // buildNumber
+                minTime,
+                maxTime,
+                undefined, // requestedFor
+                undefined, // reasonFilter
+                statusFilter,
+                resultFilter,
+                undefined, // tagFilters
+                undefined, // properties
+                top,
+                undefined, // continuationToken
+                undefined, // maxBuildsPerDefinition
+                undefined, // deletedFilter
+                undefined, // queryOrder
+                branchName
+            );
+
+            return builds.map(build => ({
+                id: build.id || 0,
+                buildNumber: build.buildNumber || '',
+                status: build.status,
+                result: build.result,
+                queueTime: build.queueTime || new Date(),
+                startTime: build.startTime || new Date(),
+                finishTime: build.finishTime || new Date(),
+                url: build.url || '',
+                definition: {
+                    id: build.definition?.id || 0,
+                    name: build.definition?.name || ''
+                },
+                project: {
+                    id: build.project?.id || '',
+                    name: build.project?.name || ''
+                },
+                requestedFor: build.requestedFor,
+                requestedBy: build.requestedBy,
+                sourceBranch: build.sourceBranch || '',
+                sourceVersion: build.sourceVersion || '',
+                priority: build.priority,
+                reason: build.reason,
+                tags: build.tags || [],
+                _links: build._links
+            }));
+        } catch (error: any) {
+            this.error('Failed to get recent builds:', error.message);
+            return [];
+        }
+    }
+
+    /**
      * Get test results for a build
+     * Tries getTestResultsByBuild if available, otherwise falls back to fetching runs by buildId
      */
     async getTestResultsForBuild(buildId: number, projectId: string | null = null): Promise<TestResultInfo[]> {
         try {
-            const testApi = await this.getTestApi();
+            const testApi: any = await this.getTestApi();
             const project = projectId || this.projectId;
-            
-            // First get test runs for the build
-            const testRuns = await testApi.getTestRuns(project, buildId.toString());
-            
+
+            // Prefer direct API if available
+            if (typeof testApi.getTestResultsByBuild === 'function') {
+                if (this.debug) this.log(`Fetching test results by build via getTestResultsByBuild for build ${buildId}`);
+                const results = await testApi.getTestResultsByBuild(project, buildId);
+                return (results || []).map((result: any) => ({
+                    id: result.id || 0,
+                    testCaseTitle: result.testCaseTitle || '',
+                    automatedTestName: result.automatedTestName || '',
+                    testCaseReferenceId: result.testCaseReferenceId || 0,
+                    outcome: result.outcome || '',
+                    state: result.state || '',
+                    priority: result.priority || 0,
+                    failureType: result.failureType || '',
+                    errorMessage: result.errorMessage || '',
+                    stackTrace: result.stackTrace || '',
+                    startedDate: result.startedDate || new Date(),
+                    completedDate: result.completedDate || new Date(),
+                    durationInMs: result.durationInMs || 0,
+                    runBy: result.runBy,
+                    testRun: {
+                        id: result.runId || 0,
+                        name: result.testRun?.name || '',
+                        url: result.testRun?.url || '',
+                        buildConfiguration: result.testRun?.buildConfiguration
+                    },
+                    build: { id: buildId },
+                    project: { id: project }
+                }));
+            }
+
+            // Fallback: fetch recent runs and filter by buildId locally
+            if (this.debug) this.log(`Fetching recent test runs and filtering by build ${buildId}`);
+            const runs = await testApi.getTestRuns(project, undefined, undefined, undefined, undefined, undefined, 50);
             const allResults: TestResultInfo[] = [];
-            
-            for (const run of testRuns) {
+            for (const run of runs || []) {
+                const runBuildId = (run?.build?.id) || (run?.buildConfiguration?.buildId) || (run?.buildReference?.id) || 0;
+                if (runBuildId !== buildId) continue;
                 const results = await testApi.getTestResults(project, run.id);
-                
-                for (const result of results) {
+                for (const result of results || []) {
                     allResults.push({
                         id: result.id || 0,
                         testCaseTitle: result.testCaseTitle || '',
@@ -485,20 +588,66 @@ class AdoClient {
                             url: run.url || '',
                             buildConfiguration: run.buildConfiguration
                         },
-                        build: {
-                            id: buildId
-                        },
-                        project: {
-                            id: project
-                        }
+                        build: { id: buildId },
+                        project: { id: project }
                     });
                 }
             }
-            
             return allResults;
         } catch (error: any) {
             this.error(`Failed to get test results for build ${buildId}:`, error.message);
             throw new Error(`Failed to get test results: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get recent test results across the project by enumerating recent test runs
+     */
+    async getRecentTestResults(projectId: string | null = null, topRuns: number = 5): Promise<TestResultInfo[]> {
+        const testApi: any = await this.getTestApi();
+        const project = projectId || this.projectId;
+        try {
+            if (this.debug) this.log(`Fetching recent ${topRuns} test runs for project ${project}`);
+            const runs = await testApi.getTestRuns(project, undefined, undefined, undefined, undefined, undefined, topRuns);
+            const out: TestResultInfo[] = [];
+            for (const run of runs || []) {
+                // Attempt to resolve pipeline/build info from the run if present
+                const runBuildId = (run?.build?.id) || (run?.buildConfiguration?.buildId) || (run?.buildReference?.id) || 0;
+                const runPipelineName = (run?.build?.definition?.name) || '';
+                const results = await testApi.getTestResults(project, run.id);
+                for (const r of results || []) {
+                    out.push({
+                        id: r.id || 0,
+                        testCaseTitle: r.testCaseTitle || '',
+                        automatedTestName: r.automatedTestName || '',
+                        testCaseReferenceId: r.testCaseReferenceId || 0,
+                        outcome: r.outcome || '',
+                        state: r.state || '',
+                        priority: r.priority || 0,
+                        failureType: r.failureType || '',
+                        errorMessage: r.errorMessage || '',
+                        stackTrace: r.stackTrace || '',
+                        startedDate: r.startedDate || new Date(),
+                        completedDate: r.completedDate || new Date(),
+                        durationInMs: r.durationInMs || 0,
+                        runBy: r.runBy,
+                        testRun: {
+                            id: run.id || 0,
+                            name: run.name || '',
+                            url: run.url || '',
+                            buildConfiguration: run.buildConfiguration
+                        },
+                        build: { id: runBuildId || 0 },
+                        project: { id: project },
+                        pipelineName: runPipelineName || undefined,
+                        buildId: runBuildId || undefined
+                    });
+                }
+            }
+            return out;
+        } catch (error: any) {
+            this.error('Failed to fetch recent test results:', error.message);
+            return [];
         }
     }
 

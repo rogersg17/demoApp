@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import { requireAuth } from './auth';
 import { Database } from 'sqlite3';
+import AdoClient from '../lib/ado-client';
 
 const router: Router = express.Router();
 
@@ -50,57 +51,172 @@ interface RunTestRequest {
 }
 
 // Get tests summary for test management page
-router.get('/', requireAuth, (req: any, res: Response) => {
+router.get('/', requireAuth, async (req: any, res: Response) => {
   try {
-    if (!db) {
-      res.status(500).json({
-        error: 'Database not initialized',
-        code: 'DATABASE_ERROR'
-      });
-      return;
+  // Do not include local DB tests in the Test Management page
+  const localTests: any[] = [];
+
+    // Optionally augment with Azure DevOps test results when enabled
+    let adoTests: any[] = [];
+    const adoEnabled = (process.env.ADO_ENABLED || 'false').toLowerCase() === 'true';
+    if (adoEnabled) {
+      try {
+        const client = new AdoClient();
+        const projectId = client.getProjectId();
+
+  // Fetch a broader set of build definitions and their recent builds
+  const definitions = await client.getBuildDefinitions(projectId);
+  const topDefs = (definitions || []).slice(0, 10);
+  const days = parseInt(process.env.ADO_HISTORICAL_DATA_DAYS || '30', 10);
+  const minTime = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  for (const def of topDefs) {
+          try {
+            const builds = await client.getBuildsForDefinition(def.id, { projectId, top: 5, minTime });
+            for (const build of builds) {
+              try {
+    const results = await client.getTestResultsForBuild(build.id, projectId);
+                const mapped = results.map(r => ({
+                  id: `ado-${build.id}-${r.id}`,
+                  title: r.testCaseTitle || r.automatedTestName || 'ADO Test',
+                  status: (r.outcome || '').toLowerCase() === 'passed' ? 'passed' :
+                          (r.outcome || '').toLowerCase() === 'failed' ? 'failed' :
+                          (r.outcome || '').toLowerCase() === 'notexecuted' ? 'skipped' : 'not-run',
+                  duration: r.durationInMs || undefined,
+                  lastRun: r.completedDate ? new Date(r.completedDate).toISOString() : undefined,
+      suite: def.name || 'ADO',
+      pipeline: def.name || 'ADO',
+                  file: r.automatedTestName || undefined,
+                  environment: 'azure-devops'
+                }));
+                adoTests.push(...mapped);
+              } catch (innerErr: any) {
+                console.warn('⚠️ Failed to fetch ADO test results for build', build.id, innerErr?.message || innerErr);
+              }
+            }
+          } catch (defErr: any) {
+            console.warn('⚠️ Failed to fetch builds for definition', def.id, defErr?.message || defErr);
+          }
+        }
+
+  // Absolute fallback: if still empty, try recent project results directly
+  if (adoTests.length === 0) {
+          try {
+            const buildNameCache = new Map<number, string>();
+      const recent = await client.getRecentTestResults(projectId, 20);
+            const mapped = [] as any[];
+            for (const r of recent) {
+              let pipelineName = r.pipelineName || r.testRun?.name || '';
+              const buildId = (r.buildId) || (r as any)?.build?.id || (r as any)?.testRun?.buildConfiguration?.buildId || 0;
+              if (buildId && !buildNameCache.has(buildId)) {
+                try {
+                  const b = await client.getBuild(buildId, projectId);
+                  if (b?.definition?.name) buildNameCache.set(buildId, b.definition.name);
+                } catch (e:any) {
+                  // ignore, fall back to run name
+                }
+              }
+              if (buildId && buildNameCache.has(buildId)) {
+                pipelineName = buildNameCache.get(buildId) as string;
+              }
+              if (!pipelineName) {
+                // Fallback to first known definition name if available
+                pipelineName = (definitions && definitions[0] && (definitions[0] as any).name) || 'ADO';
+              }
+              mapped.push({
+                id: `ado-recent-${r.testRun?.id}-${r.id}`,
+                title: r.testCaseTitle || r.automatedTestName || 'ADO Test',
+                status: (r.outcome || '').toLowerCase() === 'passed' ? 'passed' :
+                        (r.outcome || '').toLowerCase() === 'failed' ? 'failed' :
+                        (r.outcome || '').toLowerCase() === 'notexecuted' ? 'skipped' : 'not-run',
+                duration: r.durationInMs || undefined,
+                lastRun: r.completedDate ? new Date(r.completedDate).toISOString() : undefined,
+                suite: pipelineName || r.testRun?.name || 'ADO',
+                pipeline: pipelineName,
+                file: r.automatedTestName || undefined,
+                environment: 'azure-devops'
+              });
+            }
+            adoTests.push(...mapped);
+          } catch (recentErr) {
+            console.warn('⚠️ Failed to fetch recent ADO test results:', (recentErr as any)?.message || recentErr);
+          }
+        }
+
+        // If still empty, enumerate recent builds across all definitions and pull test results
+        if (adoTests.length === 0) {
+          try {
+            const recentBuilds = await client.getRecentBuilds(projectId, { top: 10, minTime });
+            for (const build of recentBuilds) {
+              try {
+                const results = await client.getTestResultsForBuild(build.id, projectId);
+                const pipelineName = build.definition?.name || 'ADO';
+                const mapped = results.map(r => ({
+                  id: `ado-buildscan-${build.id}-${r.id}`,
+                  title: r.testCaseTitle || r.automatedTestName || 'ADO Test',
+                  status: (r.outcome || '').toLowerCase() === 'passed' ? 'passed' :
+                          (r.outcome || '').toLowerCase() === 'failed' ? 'failed' :
+                          (r.outcome || '').toLowerCase() === 'notexecuted' ? 'skipped' : 'not-run',
+                  duration: r.durationInMs || undefined,
+                  lastRun: r.completedDate ? new Date(r.completedDate).toISOString() : undefined,
+                  suite: pipelineName,
+                  pipeline: pipelineName,
+                  file: r.automatedTestName || undefined,
+                  environment: 'azure-devops'
+                }));
+                adoTests.push(...mapped);
+              } catch (innerErr:any) {
+                console.warn('⚠️ Failed to fetch results for recent build', build.id, innerErr?.message || innerErr);
+              }
+            }
+          } catch (buildScanErr) {
+            console.warn('⚠️ Failed to enumerate recent builds for ADO tests:', (buildScanErr as any)?.message || buildScanErr);
+          }
+        }
+
+        // Final fallback: if still empty, synthesize pseudo-tests from build status so UI isn't blank
+        if (adoTests.length === 0) {
+          try {
+            const recentBuilds = await client.getRecentBuilds(projectId, { top: 10, minTime });
+            const synth = recentBuilds.map(b => {
+              const pipelineName = b.definition?.name || 'ADO';
+              const status = (b.result || '').toString().toLowerCase();
+              const mappedStatus = status.includes('succeeded') ? 'passed'
+                                   : status.includes('failed') ? 'failed'
+                                   : 'not-run';
+              const start = b.startTime ? new Date(b.startTime).getTime() : 0;
+              const finish = b.finishTime ? new Date(b.finishTime).getTime() : 0;
+              const duration = start && finish && finish > start ? (finish - start) : undefined;
+              return {
+                id: `ado-build-${b.id}`,
+                title: `${pipelineName} • Build ${b.buildNumber}`,
+                status: mappedStatus as 'passed' | 'failed' | 'not-run',
+                duration,
+                lastRun: b.finishTime ? new Date(b.finishTime).toISOString() : undefined,
+                suite: pipelineName,
+                pipeline: pipelineName,
+                environment: 'azure-devops',
+                source: 'ado-build'
+              } as any;
+            });
+            adoTests.push(...synth);
+          } catch (synthErr) {
+            console.warn('⚠️ Failed to synthesize tests from builds:', (synthErr as any)?.message || synthErr);
+          }
+        }
+      } catch (adoErr: any) {
+        console.warn('⚠️ Azure DevOps not configured or unreachable:', adoErr?.message || adoErr);
+      }
     }
 
-    // Get recent test executions for the tests summary
-    const query = `
-      SELECT 
-        te.*
-      FROM test_executions te
-      ORDER BY te.created_at DESC 
-      LIMIT 50
-    `;
-
-    db.all(query, [], (err: any, rows: any[]) => {
-      if (err) {
-        console.error('Database error:', err);
-        res.status(500).json({
-          error: 'Failed to fetch tests',
-          code: 'DATABASE_ERROR'
-        });
-        return;
-      }
-
-      // Transform executions into test format expected by frontend
-      const tests = rows.map((row: any) => ({
-        id: row.id.toString(),
-        title: row.test_id || 'Test Execution',
-        status: row.status === 'completed' ? 'passed' : 
-                row.status === 'failed' ? 'failed' : 
-                row.status === 'running' ? 'running' : 'pending',
-        duration: row.end_time && row.start_time ? 
-          new Date(row.end_time).getTime() - new Date(row.start_time).getTime() : 
-          row.duration_ms || null,
-        lastRun: row.created_at,
-        suite: 'Test Execution',
-        environment: row.platform_type || 'default'
-      }));
-
-      res.json({
-        success: true,
-        tests: tests,
-        total: tests.length,
-        page: 1,
-        limit: 50
-      });
+  // Only return ADO tests for the Test Management page
+  const combined = [...adoTests];
+    res.json({
+      success: true,
+      tests: combined,
+      total: combined.length,
+      page: 1,
+      limit: 50
     });
 
   } catch (error) {

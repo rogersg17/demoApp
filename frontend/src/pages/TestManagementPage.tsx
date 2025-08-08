@@ -13,8 +13,11 @@ interface TestResult {
   lastRun?: string
   suite: string
   file?: string  // Added based on API response
+  pipeline?: string  // ADO pipeline/definition name when available
   retries?: number
 }
+
+// Pipeline options are derived from test data; no dedicated types needed here
 
 interface TestExecutionSummary {
   passed: number
@@ -43,10 +46,12 @@ const TestManagementPage: React.FC = () => {
   const [selectedTests, setSelectedTests] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSuite, setFilterSuite] = useState('')
+  const [filterPipeline, setFilterPipeline] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [executionSummary, setExecutionSummary] = useState<TestExecutionSummary | null>(null)
   const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null)
   const [showMonitor, setShowMonitor] = useState(false)
+  // Derive pipeline options from loaded tests; backend fetching is optional
 
   const loadTests = useCallback(async () => {
     try {
@@ -84,6 +89,8 @@ const TestManagementPage: React.FC = () => {
       console.log('✅ Finished loading tests')
     }
   }, [navigate])
+
+  // (Optional) We previously fetched pipelines from backend; now options are derived from tests for reliability
 
   const loadMockTests = () => {
     console.log('📝 Loading mock test data...')
@@ -163,8 +170,16 @@ const TestManagementPage: React.FC = () => {
       filtered = filtered.filter(test => test.suite === filterSuite)
     }
 
+    if (filterPipeline) {
+      const sel = filterPipeline.toLowerCase()
+      filtered = filtered.filter(test => {
+        const candidate = (test.pipeline ?? test.suite ?? '').toLowerCase()
+        return candidate === sel
+      })
+    }
+
     setFilteredTests(filtered)
-  }, [tests, searchTerm, filterStatus, filterSuite])
+  }, [tests, searchTerm, filterStatus, filterSuite, filterPipeline])
 
   useEffect(() => {
     loadTests()
@@ -458,7 +473,7 @@ const TestManagementPage: React.FC = () => {
             />
           </div>
           <div className="filter-group">
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="Filter by status" title="Filter by status">
               <option value="">All Status</option>
               <option value="passed">Passed</option>
               <option value="failed">Failed</option>
@@ -466,11 +481,18 @@ const TestManagementPage: React.FC = () => {
               <option value="running">Running</option>
               <option value="skipped">Skipped</option>
             </select>
-            <select value={filterSuite} onChange={(e) => setFilterSuite(e.target.value)}>
+            <select value={filterSuite} onChange={(e) => setFilterSuite(e.target.value)} aria-label="Filter by suite" title="Filter by suite">
               <option value="">All Suites</option>
               {suites.map(suite => (
                 <option key={suite} value={suite}>{suite}</option>
               ))}
+            </select>
+            <select value={filterPipeline} onChange={(e) => setFilterPipeline(e.target.value)} aria-label="Filter by pipeline" title="Filter by pipeline">
+              <option value="">All Pipelines</option>
+              {Array.from(new Set(tests.map(t => t.pipeline ?? t.suite).filter(Boolean) as string[]))
+                .map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
             </select>
           </div>
         </div>
@@ -489,10 +511,13 @@ const TestManagementPage: React.FC = () => {
                         ? clearSelection() 
                         : selectAllFiltered()
                     }
+                    aria-label="Select all filtered tests"
+                    title="Select all filtered tests"
                   />
                 </th>
                 <th>Test</th>
                 <th>Suite</th>
+                <th>Pipeline</th>
                 <th>Status</th>
                 <th>Duration</th>
                 <th>Last Run</th>
@@ -507,17 +532,24 @@ const TestManagementPage: React.FC = () => {
                       type="checkbox" 
                       checked={selectedTests.includes(test.id)}
                       onChange={() => toggleTestSelection(test.id)}
+                      aria-label={`Select test ${test.name || test.title}`}
+                      title={`Select test ${test.name || test.title}`}
                     />
                   </td>
                   <td>
                     <div className="test-info">
                       <div className="test-title">{test.name || test.title}</div>
+                      {/* Show pipeline as a subtitle for quick context */}
+                      <div className="test-subtitle">
+                        {test.pipeline ? `Pipeline: ${test.pipeline}` : (test.suite ? `Suite: ${test.suite}` : '')}
+                      </div>
                       {test.error && (
                         <div className="test-error">{test.error}</div>
                       )}
                     </div>
                   </td>
                   <td>{test.suite}</td>
+                  <td>{test.pipeline || '-'}</td>
                   <td>
                     <span className={`status-badge ${getStatusBadgeClass(test.status)}`}>
                       {test.status === 'not-run' ? 'Not Run' : test.status.charAt(0).toUpperCase() + test.status.slice(1)}
