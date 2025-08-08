@@ -5,16 +5,8 @@ import {
   Card, 
   CardContent, 
   Chip, 
-  Grid, 
   IconButton,
   Collapse,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  Tooltip,
-  LinearProgress,
   Alert,
   Button
 } from '@mui/material';
@@ -27,16 +19,15 @@ import {
   Schedule,
   ExpandMore,
   ExpandLess,
-  Refresh,
   Launch,
   PlayArrow,
   Stop,
   History,
-  Speed,
   Storage
 } from '@mui/icons-material';
-import ProgressIndicator, { ProgressStep, ProgressStatus } from './ProgressIndicator';
-import { BuildProgressUpdate, DeploymentProgressUpdate } from '../../services/realTimeUpdates';
+import ProgressIndicator from './ProgressIndicator';
+import type { ProgressStep, ProgressStatus } from './ProgressIndicator';
+import type { BuildProgressUpdate, DeploymentProgressUpdate } from '../../services/realTimeUpdates';
 import realTimeUpdates from '../../services/realTimeUpdates';
 import './BuildDeploymentProgress.css';
 
@@ -105,24 +96,7 @@ const BuildDeploymentProgress: React.FC<BuildDeploymentProgressProps> = ({
   const [expandedDeployments, setExpandedDeployments] = useState<Set<string>>(new Set());
   const [selectedTab, setSelectedTab] = useState<'builds' | 'deployments'>('builds');
 
-  // Real-time update subscriptions
-  useEffect(() => {
-    const unsubscribeBuildStarted = realTimeUpdates.on('build:started', handleBuildStarted);
-    const unsubscribeBuildProgress = realTimeUpdates.on('build:progress', handleBuildProgress);
-    const unsubscribeBuildCompleted = realTimeUpdates.on('build:completed', handleBuildCompleted);
-    const unsubscribeDeploymentStarted = realTimeUpdates.on('deployment:started', handleDeploymentStarted);
-    const unsubscribeDeploymentProgress = realTimeUpdates.on('deployment:progress', handleDeploymentProgress);
-    const unsubscribeDeploymentCompleted = realTimeUpdates.on('deployment:completed', handleDeploymentCompleted);
-
-    return () => {
-      unsubscribeBuildStarted();
-      unsubscribeBuildProgress();
-      unsubscribeBuildCompleted();
-      unsubscribeDeploymentStarted();
-      unsubscribeDeploymentProgress();
-      unsubscribeDeploymentCompleted();
-    };
-  }, []);
+  // Handlers are declared before subscription effect to avoid use-before-declaration errors
 
   const handleBuildStarted = useCallback((data: BuildProgressUpdate) => {
     const newBuild: Build = {
@@ -274,6 +248,32 @@ const BuildDeploymentProgress: React.FC<BuildDeploymentProgressProps> = ({
     }));
   }, []);
 
+  // Real-time update subscriptions (after handlers are declared)
+  useEffect(() => {
+    const unsubscribeBuildStarted = realTimeUpdates.on('build:started', handleBuildStarted);
+    const unsubscribeBuildProgress = realTimeUpdates.on('build:progress', handleBuildProgress);
+    const unsubscribeBuildCompleted = realTimeUpdates.on('build:completed', handleBuildCompleted);
+    const unsubscribeDeploymentStarted = realTimeUpdates.on('deployment:started', handleDeploymentStarted);
+    const unsubscribeDeploymentProgress = realTimeUpdates.on('deployment:progress', handleDeploymentProgress);
+    const unsubscribeDeploymentCompleted = realTimeUpdates.on('deployment:completed', handleDeploymentCompleted);
+
+    return () => {
+      unsubscribeBuildStarted();
+      unsubscribeBuildProgress();
+      unsubscribeBuildCompleted();
+      unsubscribeDeploymentStarted();
+      unsubscribeDeploymentProgress();
+      unsubscribeDeploymentCompleted();
+    };
+  }, [
+    handleBuildStarted,
+    handleBuildProgress,
+    handleBuildCompleted,
+    handleDeploymentStarted,
+    handleDeploymentProgress,
+    handleDeploymentCompleted
+  ]);
+
   const toggleBuildExpansion = (buildId: string) => {
     setExpandedBuilds(prev => {
       const updated = new Set(prev);
@@ -311,7 +311,7 @@ const BuildDeploymentProgress: React.FC<BuildDeploymentProgressProps> = ({
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
   };
 
-  const getStatusColor = (status: ProgressStatus) => {
+  const getStatusColor = (status: ProgressStatus): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'completed': return 'success';
       case 'failed': return 'error';
@@ -524,7 +524,7 @@ const BuildDeploymentProgress: React.FC<BuildDeploymentProgressProps> = ({
                         <Chip
                           label={build.status}
                           size="small"
-                          color={getStatusColor(build.status) as any}
+                          color={getStatusColor(build.status)}
                         />
                         {build.duration && (
                           <Chip
@@ -640,7 +640,7 @@ const BuildDeploymentProgress: React.FC<BuildDeploymentProgressProps> = ({
                         <Chip
                           label={deployment.status}
                           size="small"
-                          color={getStatusColor(deployment.status) as any}
+                          color={getStatusColor(deployment.status)}
                         />
                         {deployment.duration && (
                           <Chip

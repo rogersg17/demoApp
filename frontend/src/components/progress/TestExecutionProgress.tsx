@@ -1,20 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  CardContent, 
-  Chip, 
-  Grid, 
-  IconButton,
-  Collapse,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  Tooltip
-} from '@mui/material';
+import { Box, Typography, Card, CardContent, Chip, IconButton, Collapse, List, ListItem, ListItemText, ListItemIcon, Divider, Tooltip } from '@mui/material';
 import { 
   PlayArrow, 
   Pause, 
@@ -29,8 +14,9 @@ import {
   Timer,
   Assessment
 } from '@mui/icons-material';
-import ProgressIndicator, { ProgressStep, ProgressStatus } from './ProgressIndicator';
-import { TestProgressUpdate } from '../../services/realTimeUpdates';
+import ProgressIndicator from './ProgressIndicator';
+import type { ProgressStatus } from './ProgressIndicator';
+import type { TestProgressUpdate } from '../../services/realTimeUpdates';
 import realTimeUpdates from '../../services/realTimeUpdates';
 import './TestExecutionProgress.css';
 
@@ -70,7 +56,6 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
   onPause,
   onStop,
   onRetry,
-  showDetailedLogs = true,
   showPerformanceMetrics = true,
   autoExpand = false
 }) => {
@@ -90,18 +75,7 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
     fastestTest: { name: '', duration: Infinity }
   });
 
-  // Real-time update subscriptions
-  useEffect(() => {
-    const unsubscribeTestStarted = realTimeUpdates.on('test:started', handleTestStarted);
-    const unsubscribeTestProgress = realTimeUpdates.on('test:progress', handleTestProgress);
-    const unsubscribeTestCompleted = realTimeUpdates.on('test:completed', handleTestCompleted);
-
-    return () => {
-      unsubscribeTestStarted();
-      unsubscribeTestProgress();
-      unsubscribeTestCompleted();
-    };
-  }, []);
+  // Handlers are defined first, subscription effect is placed later to avoid use-before-define
 
   const handleTestStarted = useCallback((data: TestProgressUpdate) => {
     if (!executionStartTime) {
@@ -186,61 +160,6 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
     }
   }, [testSuites]);
 
-  const handleTestCompleted = useCallback((data: TestProgressUpdate) => {
-    setTestSuites(prev => {
-      return prev.map(suite => {
-        const testIndex = suite.tests.findIndex(test => test.id === data.testId);
-        if (testIndex !== -1) {
-          const updatedTests = [...suite.tests];
-          updatedTests[testIndex] = {
-            ...updatedTests[testIndex],
-            status: data.status,
-            duration: data.duration,
-            error: data.status === 'failed' ? data.message : undefined
-          };
-
-          const completedTests = updatedTests.filter(test => 
-            test.status === 'completed' || test.status === 'failed'
-          ).length;
-          const suiteProgress = (completedTests / updatedTests.length) * 100;
-
-          const updatedSuite = {
-            ...suite,
-            tests: updatedTests,
-            progress: suiteProgress,
-          };
-
-          if (suiteProgress === 100) {
-            updatedSuite.status = updatedTests.some(test => test.status === 'failed') ? 'failed' : 'completed';
-            updatedSuite.endTime = new Date();
-            if (updatedSuite.startTime) {
-              updatedSuite.duration = updatedSuite.endTime.getTime() - updatedSuite.startTime.getTime();
-            }
-          }
-
-          return updatedSuite;
-        }
-        return suite;
-      });
-    });
-
-    // Update execution stats
-    updateExecutionStats();
-
-    // Check if all tests are completed
-    const allCompleted = testSuites.every(suite => 
-      suite.tests.every(test => test.status === 'completed' || test.status === 'failed')
-    );
-
-    if (allCompleted) {
-      const hasFailures = testSuites.some(suite => 
-        suite.tests.some(test => test.status === 'failed')
-      );
-      setOverallStatus(hasFailures ? 'failed' : 'completed');
-      setOverallProgress(100);
-    }
-  }, [testSuites]);
-
   const updateExecutionStats = useCallback(() => {
     let total = 0;
     let passed = 0;
@@ -280,6 +199,76 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
       fastestTest: fastest.duration === Infinity ? { name: '', duration: 0 } : fastest
     });
   }, [testSuites]);
+
+  const handleTestCompleted = useCallback((data: TestProgressUpdate) => {
+    setTestSuites(prev => {
+      return prev.map(suite => {
+        const testIndex = suite.tests.findIndex(test => test.id === data.testId);
+        if (testIndex !== -1) {
+          const updatedTests = [...suite.tests];
+          updatedTests[testIndex] = {
+            ...updatedTests[testIndex],
+            status: data.status,
+            duration: data.duration,
+            error: data.status === 'failed' ? data.message : undefined
+          };
+
+          const completedTests = updatedTests.filter(test => 
+            test.status === 'completed' || test.status === 'failed'
+          ).length;
+          const suiteProgress = (completedTests / updatedTests.length) * 100;
+
+          const updatedSuite = {
+            ...suite,
+            tests: updatedTests,
+            progress: suiteProgress,
+          };
+
+          if (suiteProgress === 100) {
+            updatedSuite.status = updatedTests.some(test => test.status === 'failed') ? 'failed' : 'completed';
+            updatedSuite.endTime = new Date();
+            if (updatedSuite.startTime) {
+              updatedSuite.duration = updatedSuite.endTime.getTime() - updatedSuite.startTime.getTime();
+            }
+          }
+
+          return updatedSuite;
+        }
+        return suite;
+      });
+    });
+
+    // Update execution stats
+  updateExecutionStats();
+
+    // Check if all tests are completed
+    const allCompleted = testSuites.every(suite => 
+      suite.tests.every(test => test.status === 'completed' || test.status === 'failed')
+    );
+
+    if (allCompleted) {
+      const hasFailures = testSuites.some(suite => 
+        suite.tests.some(test => test.status === 'failed')
+      );
+      setOverallStatus(hasFailures ? 'failed' : 'completed');
+      setOverallProgress(100);
+    }
+  }, [testSuites, updateExecutionStats]);
+
+  
+
+  // Real-time update subscriptions (after handlers are declared)
+  useEffect(() => {
+    const unsubscribeTestStarted = realTimeUpdates.on('test:started', handleTestStarted);
+    const unsubscribeTestProgress = realTimeUpdates.on('test:progress', handleTestProgress);
+    const unsubscribeTestCompleted = realTimeUpdates.on('test:completed', handleTestCompleted);
+
+    return () => {
+      unsubscribeTestStarted();
+      unsubscribeTestProgress();
+      unsubscribeTestCompleted();
+    };
+  }, [handleTestStarted, handleTestProgress, handleTestCompleted]);
 
   const toggleSuiteExpansion = (suiteId: string) => {
     setExpandedSuites(prev => {
@@ -362,9 +351,8 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
             />
 
             {/* Execution Stats */}
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={3}>
-                <Box className="stat-item">
+            <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
+              <Box className="stat-item">
                   <Typography variant="h4" color="primary.main">
                     {executionStats.total}
                   </Typography>
@@ -372,9 +360,7 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
                     Total Tests
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box className="stat-item">
+              <Box className="stat-item">
                   <Typography variant="h4" color="success.main">
                     {executionStats.passed}
                   </Typography>
@@ -382,9 +368,7 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
                     Passed
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box className="stat-item">
+              <Box className="stat-item">
                   <Typography variant="h4" color="error.main">
                     {executionStats.failed}
                   </Typography>
@@ -392,9 +376,7 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
                     Failed
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box className="stat-item">
+              <Box className="stat-item">
                   <Typography variant="h4" color="warning.main">
                     {executionStats.skipped}
                   </Typography>
@@ -402,38 +384,31 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
                     Skipped
                   </Typography>
                 </Box>
-              </Grid>
-            </Grid>
+            </Box>
 
             {/* Performance Metrics */}
             {showPerformanceMetrics && executionStats.total > 0 && (
               <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={4}>
-                    <Box className="perf-metric">
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
+                  <Box className="perf-metric">
                       <Timer fontSize="small" color="primary" />
                       <Typography variant="body2">
                         Avg: {formatDuration(executionStats.avgTestTime)}
                       </Typography>
                     </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box className="perf-metric">
+                  <Box className="perf-metric">
                       <Speed fontSize="small" color="error" />
                       <Typography variant="body2">
                         Slowest: {formatDuration(executionStats.slowestTest.duration)}
                       </Typography>
                     </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box className="perf-metric">
+                  <Box className="perf-metric">
                       <Assessment fontSize="small" color="success" />
                       <Typography variant="body2">
                         Fastest: {formatDuration(executionStats.fastestTest.duration)}
                       </Typography>
                     </Box>
-                  </Grid>
-                </Grid>
+                </Box>
               </Box>
             )}
           </Box>
@@ -460,7 +435,7 @@ const TestExecutionProgress: React.FC<TestExecutionProgressProps> = ({
                   <Chip
                     label={`${suite.tests.length} tests`}
                     size="small"
-                    color={getStatusColor(suite.status) as any}
+                    color={getStatusColor(suite.status)}
                     variant="outlined"
                     sx={{ ml: 2 }}
                   />

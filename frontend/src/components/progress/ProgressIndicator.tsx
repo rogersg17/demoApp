@@ -1,6 +1,7 @@
 import React from 'react';
 import { CircularProgress, LinearProgress, Box, Typography, Fade, Chip } from '@mui/material';
-import { CheckCircle, Error as ErrorIcon, Warning, Schedule, PlayArrow } from '@mui/icons-material';
+import type { ChipProps } from '@mui/material/Chip';
+import { CheckCircle, Error as ErrorIcon, Warning, Schedule } from '@mui/icons-material';
 import './ProgressIndicator.css';
 
 export type ProgressStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'warning' | 'cancelled';
@@ -53,7 +54,7 @@ const getStatusIcon = (status: ProgressStatus, size: 'small' | 'medium' | 'large
   }
 };
 
-const getStatusColor = (status: ProgressStatus) => {
+const getStatusColor = (status: ProgressStatus): NonNullable<ChipProps['color']> => {
   switch (status) {
     case 'completed': return 'success';
     case 'failed': return 'error';
@@ -250,7 +251,7 @@ const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               icon={getStatusIcon(status, 'small')}
               label={status.charAt(0).toUpperCase() + status.slice(1)}
               size="small"
-              color={getStatusColor(status) as any}
+              color={getStatusColor(status)}
               variant="outlined"
             />
           )}

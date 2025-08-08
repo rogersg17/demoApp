@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { StatusUpdate } from '../components/notifications/StatusNotification';
-import { ProgressStatus } from '../components/progress/ProgressIndicator';
+import type { StatusUpdate } from '../components/notifications/StatusNotification';
+import type { ProgressStatus } from '../components/progress/ProgressIndicator';
 
 export interface UseStatusUpdatesOptions {
   maxUpdates?: number;

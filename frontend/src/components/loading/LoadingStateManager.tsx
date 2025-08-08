@@ -1,6 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { Backdrop, CircularProgress, Typography, Box, Fade } from '@mui/material';
-import ProgressIndicator, { ProgressStatus } from '../progress/ProgressIndicator';
+import ProgressIndicator from '../progress/ProgressIndicator';
+import type { ProgressStatus } from '../progress/ProgressIndicator';
 
 export interface LoadingState {
   id: string;
@@ -35,16 +37,17 @@ const LoadingStateContext = createContext<LoadingStateContextType | null>(null);
 
 const loadingReducer = (state: LoadingState[], action: LoadingAction): LoadingState[] => {
   switch (action.type) {
-    case 'START_LOADING':
+    case 'START_LOADING': {
       // Replace existing loading state with same ID, or add new one
       const filtered = state.filter(item => item.id !== action.payload.id);
       return [...filtered, action.payload].sort((a, b) => {
         // Sort by priority (high > medium > low) then by start time
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const priorityOrder = { high: 3, medium: 2, low: 1 } as const;
         const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
         if (priorityDiff !== 0) return priorityDiff;
         return a.startTime.getTime() - b.startTime.getTime();
       });
+    }
     
     case 'UPDATE_LOADING':
       return state.map(item => 
@@ -59,12 +62,13 @@ const loadingReducer = (state: LoadingState[], action: LoadingAction): LoadingSt
     case 'CLEAR_ALL':
       return [];
     
-    case 'CLEANUP_EXPIRED':
+    case 'CLEANUP_EXPIRED': {
       const now = new Date();
       return state.filter(item => {
         if (!item.timeout) return true;
         return (now.getTime() - item.startTime.getTime()) < item.timeout;
       });
+    }
     
     default:
       return state;
@@ -227,7 +231,7 @@ export const withLoadingState = <P extends object>(
   WrappedComponent: React.ComponentType<P>,
   defaultMessage: string = 'Loading...'
 ) => {
-  return React.forwardRef<any, P & { loading?: boolean; loadingMessage?: string }>((props, ref) => {
+  return React.forwardRef<unknown, P & { loading?: boolean; loadingMessage?: string }>((props, ref) => {
     const { loading, loadingMessage, ...rest } = props;
     const { startLoading, stopLoading } = useLoadingState();
     const [loadingId, setLoadingId] = React.useState<string | null>(null);
@@ -262,7 +266,7 @@ export const withLoadingState = <P extends object>(
 export const useAsyncOperation = () => {
   const { startLoading, updateLoading, stopLoading } = useLoadingState();
 
-  const executeWithLoading = useCallback(async <T>(
+  const executeWithLoading = useCallback(async <T,>(
     operation: (updateProgress?: (progress: number, message?: string) => void) => Promise<T>,
     config: {
       message: string;

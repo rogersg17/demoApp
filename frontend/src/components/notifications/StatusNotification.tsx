@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { 
   Alert, 
   Snackbar, 
@@ -6,22 +6,12 @@ import {
   Typography, 
   IconButton, 
   Collapse, 
-  LinearProgress,
   Chip,
   Badge
 } from '@mui/material';
-import { 
-  CheckCircle, 
-  Error as ErrorIcon, 
-  Warning, 
-  Info, 
-  Close, 
-  ExpandMore, 
-  ExpandLess,
-  Schedule,
-  PlayArrow
-} from '@mui/icons-material';
-import ProgressIndicator, { ProgressStatus } from '../progress/ProgressIndicator';
+import { ExpandMore, ExpandLess } from '@mui/icons-material';
+import ProgressIndicator from '../progress/ProgressIndicator';
+import type { ProgressStatus } from '../progress/ProgressIndicator';
 import './StatusNotification.css';
 
 export interface StatusUpdate {
@@ -75,22 +65,7 @@ const StatusNotification: React.FC<StatusNotificationProps> = ({
     setExpandedItems(newExpanded);
   };
 
-  const getIcon = (type: StatusUpdate['type']) => {
-    switch (type) {
-      case 'success':
-        return <CheckCircle sx={{ color: 'success.main' }} />;
-      case 'error':
-        return <ErrorIcon sx={{ color: 'error.main' }} />;
-      case 'warning':
-        return <Warning sx={{ color: 'warning.main' }} />;
-      case 'info':
-        return <Info sx={{ color: 'info.main' }} />;
-      case 'progress':
-        return <PlayArrow sx={{ color: 'primary.main' }} />;
-      default:
-        return <Info sx={{ color: 'info.main' }} />;
-    }
-  };
+  // icon selection handled inline where needed
 
   const formatTimestamp = (timestamp: Date) => {
     const now = new Date();

@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
-import { StatusUpdate } from '../components/notifications/StatusNotification';
-import { ProgressStatus } from '../components/progress/ProgressIndicator';
+import type { StatusUpdate } from '../components/notifications/StatusNotification';
+import type { ProgressStatus } from '../components/progress/ProgressIndicator';
 
 export interface RealTimeUpdate {
   type: 'test_started' | 'test_completed' | 'test_failed' | 'build_started' | 'build_progress' | 'build_completed' | 'deployment_started' | 'deployment_progress' | 'deployment_completed' | 'system_status' | 'user_action';
@@ -61,7 +61,10 @@ export class RealTimeUpdateService {
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
   private statusUpdateCallbacks: Set<(update: StatusUpdate) => void> = new Set();
 
-  constructor(private url?: string) {
+  private url?: string;
+
+  constructor(url?: string) {
+    this.url = url;
     this.connect();
   }
 
