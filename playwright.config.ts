@@ -9,6 +9,7 @@ const useServer = process.env.USE_SERVER !== 'false'; // Default to server unles
  */
 // Allow overriding baseURL via environment variable to handle dynamic dev server ports
 const BASE_URL = process.env.PW_BASE_URL || 'http://localhost:5173';
+const PW_TEST = process.env.PW_TEST === '1';
 
 export default defineConfig({
   testDir: './tests',
@@ -30,7 +31,8 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-  baseURL: BASE_URL, // React app on Vite dev server; override with PW_BASE_URL if needed
+    baseURL: BASE_URL, // React app on Vite dev server; override with PW_BASE_URL if needed
+    storageState: 'tests/.auth/admin.json',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
@@ -38,14 +40,29 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'msedge',
+      name: 'chromium',
       use: { 
-        ...devices['Desktop Edge'],
-        channel: 'msedge'
+        ...devices['Desktop Chrome'],
+        channel: 'chromium'
       },
     },
   ],
+  /* Auto-start dev servers for tests unless USE_SERVER=false is set */
+  webServer: process.env.USE_SERVER === 'false' ? undefined : [
+    {
+      command: 'cross-env SESSION_SECRET=pw-test-secret npm run dev',
+      url: 'http://localhost:3000/api/health',
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'cross-env VITE_API_BASE_URL=http://localhost:3000 npm run dev:frontend',
+      url: BASE_URL,
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+  ],
 
-  /* Use existing running servers */
-  webServer: undefined,
+  /* Global setup to login and save storage state */
+  globalSetup: path.resolve(__dirname, './tests/e2e/global-setup.ts'),
 });
