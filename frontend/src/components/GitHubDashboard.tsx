@@ -90,7 +90,14 @@ interface StatisticsResponse {
   statistics: WorkflowStatistics;
 }
 
-const GitHubDashboard: React.FC = () => {
+interface GitHubDashboardProps {
+  owner?: string;
+  repo?: string;
+  token?: string;
+  embedded?: boolean; // when true, adjust UI to fit inside a panel
+}
+
+const GitHubDashboard: React.FC<GitHubDashboardProps> = ({ owner, repo, token, embedded = false }) => {
   const [config, setConfig] = useState<GitHubConfig>({
     owner: '',
     repo: '',
@@ -103,7 +110,18 @@ const GitHubDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isConfigured = config.owner && config.repo && config.token;
+  // If props are provided, treat as configured and sync into local state
+  useEffect(() => {
+    if (owner || repo || token) {
+      setConfig(prev => ({
+        owner: owner ?? prev.owner,
+        repo: repo ?? prev.repo,
+        token: token ?? prev.token,
+      }));
+    }
+  }, [owner, repo, token]);
+
+  const isConfigured = (owner && repo && token) || (config.owner && config.repo && config.token);
 
   const fetchWorkflowRuns = useCallback(async () => {
     if (!isConfigured) return;
@@ -280,7 +298,7 @@ const GitHubDashboard: React.FC = () => {
 
   if (!isConfigured) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: embedded ? 0 : 3 }}>
         <Card sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <GitHub sx={{ mr: 1 }} />
@@ -321,14 +339,14 @@ const GitHubDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: embedded ? 0 : 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <GitHub sx={{ mr: 1 }} />
           <Typography variant="h5">GitHub Actions Dashboard</Typography>
           <Chip 
-            label={`${config.owner}/${config.repo}`} 
+            label={`${owner ?? config.owner}/${repo ?? config.repo}`} 
             size="small" 
             sx={{ ml: 2 }} 
           />
@@ -350,16 +368,18 @@ const GitHubDashboard: React.FC = () => {
           >
             Trigger Test
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Settings />}
-            onClick={() => {
-              // Reset configuration to show config form
-              setConfig({ owner: '', repo: '', token: '' });
-            }}
-          >
-            Settings
-          </Button>
+          {!embedded && (
+            <Button
+              variant="outlined"
+              startIcon={<Settings />}
+              onClick={() => {
+                // Reset configuration to show config form
+                setConfig({ owner: '', repo: '', token: '' });
+              }}
+            >
+              Settings
+            </Button>
+          )}
         </Box>
       </Box>
 

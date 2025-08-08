@@ -89,14 +89,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span>Users</span>
         </Link>
         <Link 
-          to="/github-actions" 
-          className={`nav-link ${isActivePage('/github-actions') ? 'active' : ''}`}
-          title="GitHub Actions"
-        >
-          <i className="fab fa-github"></i>
-          <span>GitHub Actions</span>
-        </Link>
-        <Link 
           to="/analytics" 
           className={`nav-link ${isActivePage('/analytics') ? 'active' : ''}`}
           title="Advanced Analytics"

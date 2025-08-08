@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { Backdrop, CircularProgress, Typography, Box, Fade } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
 import ProgressIndicator from '../progress/ProgressIndicator';
 import type { ProgressStatus } from '../progress/ProgressIndicator';
 
@@ -163,10 +164,10 @@ const GlobalLoadingOverlay: React.FC = () => {
   if (!globalLoading) return null;
 
   return (
-    <Backdrop
+  <Backdrop
       sx={{ 
         color: '#fff', 
-        zIndex: (theme) => theme.zIndex.drawer + 1,
+    zIndex: (theme: Theme) => theme.zIndex.drawer + 1,
         backdropFilter: 'blur(4px)',
         backgroundColor: 'rgba(0, 0, 0, 0.7)'
       }}

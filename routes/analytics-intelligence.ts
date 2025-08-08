@@ -87,6 +87,59 @@ export function createAnalyticsIntelligenceRouter(io: Server) {
     }
   });
 
+  // Azure DevOps specific analytics endpoints
+  router.get('/ado/pipelines/health', async (req: Request, res: Response) => {
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+    try {
+      const health = await service.getAdoPipelineHealth(days);
+      res.json({ health });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load ADO pipeline health', details: err.message });
+    }
+  });
+
+  router.get('/ado/pipelines/durations', async (req: Request, res: Response) => {
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+    const buildDefinitionId = req.query.buildDefinitionId ? parseInt(String(req.query.buildDefinitionId), 10) : undefined;
+    try {
+      const durations = await service.getAdoDurations(days, buildDefinitionId);
+      res.json({ durations });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load ADO durations', details: err.message });
+    }
+  });
+
+  router.get('/ado/tasks/breakdown', async (req: Request, res: Response) => {
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+    const buildDefinitionId = req.query.buildDefinitionId ? parseInt(String(req.query.buildDefinitionId), 10) : undefined;
+    try {
+      const tasks = await service.getAdoTaskBreakdown(days, buildDefinitionId);
+      res.json({ tasks });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load ADO task breakdown', details: err.message });
+    }
+  });
+
+  router.get('/ado/failures/summary', async (req: Request, res: Response) => {
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 30;
+    try {
+      const summary = await service.getAdoFailuresSummary(days);
+      res.json({ summary });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load ADO failures summary', details: err.message });
+    }
+  });
+
+  router.get('/ado/throughput', async (req: Request, res: Response) => {
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 14;
+    try {
+      const throughput = await service.getAdoThroughput(days);
+      res.json({ throughput });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load ADO throughput', details: err.message });
+    }
+  });
+
   // Single failure categorization (Phase 4)
   router.get('/categorize', async (req: Request, res: Response) => {
     const testName = String(req.query.testName || '');

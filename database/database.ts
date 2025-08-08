@@ -253,6 +253,20 @@ class Database {
       if (err) console.error('Error creating ado_test_details table:', err);
       else console.log('✅ ADO test details table ready');
     });
+
+    // Lightweight indexes to support analytics queries
+    setTimeout(() => {
+      const idx = [
+        "CREATE INDEX IF NOT EXISTS idx_ado_builds_start_time ON ado_builds(start_time)",
+        "CREATE INDEX IF NOT EXISTS idx_ado_builds_definition ON ado_builds(build_definition_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ado_builds_result ON ado_builds(result)",
+        "CREATE INDEX IF NOT EXISTS idx_ado_build_tasks_build ON ado_build_tasks(ado_build_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ado_build_tasks_name ON ado_build_tasks(task_name)",
+        "CREATE INDEX IF NOT EXISTS idx_mvp_failures_created ON mvp_test_failures(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_mvp_failures_test_name ON mvp_test_failures(test_name)"
+      ];
+      idx.forEach(sql => this.db.run(sql, (e) => { if (e && !e.message.includes('no such table')) console.warn('Index creation warning:', e.message); }));
+    }, 200);
   }
 
   initializeFlakyTestTables(): void {

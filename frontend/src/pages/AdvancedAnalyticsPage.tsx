@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnalyticsApi } from '../services/analyticsApi'
-import type { FailurePatternSummary, PrioritizedTestSuggestion, PlatformBenchmark, PerformanceTrendPoint, ReliabilityPrediction, ReliabilityHistory, NotificationRouting, RemediationSuggestions, ReliabilityHistoryPoint } from '../types/analytics'
+import type { FailurePatternSummary, PrioritizedTestSuggestion, PlatformBenchmark, PerformanceTrendPoint, ReliabilityPrediction, ReliabilityHistory, NotificationRouting, RemediationSuggestions, ReliabilityHistoryPoint, AdoPipelineHealthItem, AdoTaskBreakdownItem, AdoFailuresSummaryItem, AdoThroughput, AdoDurationPoint } from '../types/analytics'
 import Layout from '../components/Layout'
 import './AdvancedAnalyticsPage.css'
 import Sparkline from '../components/Sparkline'
@@ -13,22 +13,45 @@ export default function AdvancedAnalyticsPage() {
   const [selectedTest, setSelectedTest] = useState<string>('')
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
+  // Azure-specific state
+  const [adoHealth, setAdoHealth] = useState<AdoPipelineHealthItem[]>([])
+  const [adoTasks, setAdoTasks] = useState<AdoTaskBreakdownItem[]>([])
+  const [adoFailures, setAdoFailures] = useState<AdoFailuresSummaryItem[]>([])
+  const [adoThroughput, setAdoThroughput] = useState<AdoThroughput | null>(null)
+  const [adoDurations, setAdoDurations] = useState<AdoDurationPoint[]>([])
+  const [selectedBuildDefId, setSelectedBuildDefId] = useState<number | 'all'>('all')
+
+  const adoHealthToShow = useMemo(() => {
+    if (selectedBuildDefId === 'all') return adoHealth
+    return adoHealth.filter(h => h.buildDefinitionId === selectedBuildDefId)
+  }, [adoHealth, selectedBuildDefId])
 
   useEffect(() => {
     let mounted = true
     setLoading(true)
-    Promise.all([
+  Promise.all([
       AnalyticsApi.getFailurePatterns(100),
       AnalyticsApi.getPrioritizedQueue(),
       AnalyticsApi.getBenchmarks(),
       AnalyticsApi.getPerformanceTrends(30),
+      // Azure-specific
+  AnalyticsApi.getAdoPipelineHealth(30),
+      AnalyticsApi.getAdoTasks(30),
+      AnalyticsApi.getAdoFailuresSummary(30),
+      AnalyticsApi.getAdoThroughput(14),
     ])
-      .then(([p, q, b, t]) => {
+  .then(([p, q, b, t, h, tasks, fs, th]) => {
         if (!mounted) return
         setPatterns(p.patterns || [])
         setQueue(q.queue || [])
         setBenchmarks(b.benchmarks || [])
         setTrends(t.trends || [])
+        setAdoHealth(h.health || [])
+        setAdoTasks(tasks.tasks || [])
+        setAdoFailures(fs.summary || [])
+        setAdoThroughput(th.throughput || null)
+    // Initialize durations after health is available
+    // Keep default selection as 'all' until user changes
       })
       .catch(e => setError(e.message || 'Failed to load analytics'))
       .finally(() => mounted && setLoading(false))
@@ -37,6 +60,30 @@ export default function AdvancedAnalyticsPage() {
 
   const topFlaky = useMemo(() => patterns.filter(p => p.pattern === 'flaky').slice(0, 10), [patterns])
   const persistent = useMemo(() => patterns.filter(p => p.pattern === 'persistent').slice(0, 10), [patterns])
+
+  // When selection changes, fetch durations and (optionally) refetch tasks with filter
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        const [durationsRes, tasksRes] = await Promise.all([
+          selectedBuildDefId === 'all'
+            ? AnalyticsApi.getAdoDurations(30)
+            : AnalyticsApi.getAdoDurations(30, selectedBuildDefId),
+          selectedBuildDefId === 'all'
+            ? AnalyticsApi.getAdoTasks(30)
+            : AnalyticsApi.getAdoTasks(30, selectedBuildDefId),
+        ])
+        if (!mounted) return
+        setAdoDurations(durationsRes.durations || [])
+        setAdoTasks(tasksRes.tasks || [])
+      } catch {
+        // Non-fatal; keep previous
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [selectedBuildDefId])
 
   return (
     <Layout>
@@ -123,6 +170,123 @@ export default function AdvancedAnalyticsPage() {
               <div className="trend-card">
                 <div className="trend-title">Persistent Failures</div>
                 <Sparkline data={trends.map(t => t.persistentFailures)} ariaLabel="Persistent failures trend" stroke="#ef4444" fill="rgba(239,68,68,0.15)" />
+              </div>
+            </div>
+          </section>
+
+          {/* Azure DevOps insights */}
+          <section className="aa-card">
+            <h2>Azure Pipelines — Health (30d)</h2>
+            {/* Filter by build definition */}
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ marginRight: 8 }}>Pipeline:</label>
+              <select
+                value={selectedBuildDefId === 'all' ? '' : String(selectedBuildDefId)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSelectedBuildDefId(v ? Number(v) : 'all')
+                }}
+              >
+                <option value="">All (combined)</option>
+                {adoHealth.map(h => (
+                  <option key={h.buildDefinitionId} value={h.buildDefinitionId}>
+                    {h.definitionName} (ID {h.buildDefinitionId})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Definition</th><th>Builds</th><th>Success %</th><th>Avg Duration</th><th>Fails</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adoHealthToShow.slice(0,10).map(h => (
+                  <tr key={h.buildDefinitionId}>
+                    <td title={`ID ${h.buildDefinitionId}`}>{h.definitionName}</td>
+                    <td>{h.totalBuilds}</td>
+                    <td>{h.successRate.toFixed(1)}%</td>
+                    <td>{Math.round(h.avgDurationMs/1000)}s</td>
+                    <td>{h.failedBuilds}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="aa-card">
+            <h2>Azure Build Durations (30d)</h2>
+            <div className="trend-grid">
+              <div className="trend-card">
+                <div className="trend-title">Avg Duration (s) per day {selectedBuildDefId !== 'all' ? `(ID ${selectedBuildDefId})` : ''}</div>
+                <Sparkline
+                  data={adoDurations.map(d => Math.round(d.avgDurationMs / 1000))}
+                  ariaLabel="Avg build duration per day"
+                  stroke="#8b5cf6"
+                  fill="rgba(139,92,246,0.15)"
+                />
+                <div className="muted">Days: {adoDurations.length}</div>
+              </div>
+            </div>
+            <div className="mini-table" style={{ marginTop: 8 }}>
+              <div className="mini-row mini-head"><span>Date</span><span>Builds</span><span>Avg (s)</span></div>
+              {adoDurations.slice(-10).map(d => (
+                <div key={d.date} className="mini-row"><span>{d.date}</span><span>{d.builds}</span><span>{Math.round(d.avgDurationMs/1000)}</span></div>
+              ))}
+            </div>
+          </section>
+
+          <section className="aa-card">
+            <h2>Azure Task Hotspots (30d)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Task</th><th>Runs</th><th>Failures</th><th>Avg Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adoTasks.slice(0,10).map(t => (
+                  <tr key={t.taskName}>
+                    <td>{t.taskName}</td>
+                    <td>{t.runs}</td>
+                    <td>{t.failures}</td>
+                    <td>{Math.round(t.avgDurationMs/1000)}s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="aa-card">
+            <h2>Azure Failures by Branch (30d)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Pipeline</th><th>Branch</th><th>Total</th><th>New</th><th>Persistent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adoFailures.slice(0,12).map(f => (
+                  <tr key={`${f.pipelineConfigId}-${f.branchName}`}>
+                    <td>{f.pipelineConfigId}</td>
+                    <td>{f.branchName || 'unknown'}</td>
+                    <td>{f.totalFailures}</td>
+                    <td>{f.newFailures}</td>
+                    <td>{f.persistentFailures}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="aa-card">
+            <h2>Azure Build Throughput (14d)</h2>
+            <div className="trend-grid">
+              <div className="trend-card">
+                <div className="trend-title">Builds/hour</div>
+                <Sparkline data={(adoThroughput?.points || []).map(p => p.builds)} ariaLabel="Build throughput" stroke="#3b82f6" fill="rgba(59,130,246,0.15)" />
+                <div className="muted">Avg: {adoThroughput?.avgPerHour ?? 0}/hr</div>
               </div>
             </div>
           </section>

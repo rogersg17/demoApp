@@ -393,6 +393,121 @@ export class AnalyticsIntelligenceService extends EventEmitter {
 
   private all<T=any>(sql: string, params: any[] = []): Promise<T[]> { return new Promise((res, rej) => this.db.all(sql, params, (e,r)=> e?rej(e):res(r as T[]))); }
   private get<T=any>(sql: string, params: any[] = []): Promise<T | undefined> { return new Promise((res, rej) => this.db.get(sql, params, (e,r)=> e?rej(e):res(r as T))); }
+
+  /**
+   * Azure-specific analytics (pipelines, durations, tasks, failures, throughput)
+   */
+  async getAdoPipelineHealth(days = 30): Promise<Array<{ buildDefinitionId: number; definitionName: string; totalBuilds: number; passedBuilds: number; failedBuilds: number; successRate: number; avgDurationMs: number }>> {
+    return this.getOrSet(`adoPipelineHealth:${days}`, this.defaultTtl, async () => {
+      const rows = await this.all<any>(
+        `SELECT build_definition_id as buildDefinitionId,
+                COALESCE(definition_name, 'Unknown') as definitionName,
+                COUNT(*) as totalBuilds,
+                SUM(CASE WHEN result='succeeded' THEN 1 ELSE 0 END) as passedBuilds,
+                SUM(CASE WHEN result='failed' THEN 1 ELSE 0 END) as failedBuilds,
+                AVG(duration) as avgDurationMs
+         FROM ado_builds
+         WHERE start_time >= datetime('now', ?)
+         GROUP BY build_definition_id, COALESCE(definition_name, 'Unknown')
+         ORDER BY failedBuilds DESC, totalBuilds DESC`,
+        [`-${days} days`]
+      );
+      return rows.map(r => ({
+        buildDefinitionId: Number(r.buildDefinitionId),
+        definitionName: r.definitionName,
+        totalBuilds: Number(r.totalBuilds) || 0,
+        passedBuilds: Number(r.passedBuilds) || 0,
+        failedBuilds: Number(r.failedBuilds) || 0,
+        successRate: r.totalBuilds ? Math.round(((r.passedBuilds / r.totalBuilds) * 100) * 100) / 100 : 0,
+        avgDurationMs: Math.round(Number(r.avgDurationMs) || 0)
+      }));
+    });
+  }
+
+  async getAdoDurations(days = 30, buildDefinitionId?: number): Promise<Array<{ date: string; avgDurationMs: number; builds: number }>> {
+    const key = `adoDurations:${days}:${buildDefinitionId || 'all'}`;
+    return this.getOrSet(key, this.defaultTtl, async () => {
+      const where: string[] = ["start_time >= datetime('now', ?)"];
+      const params: any[] = [`-${days} days`];
+      if (buildDefinitionId) { where.push('build_definition_id = ?'); params.push(buildDefinitionId); }
+      const sql = `SELECT DATE(start_time) as d, COUNT(*) as builds, AVG(duration) as avgDurationMs
+                   FROM ado_builds
+                   WHERE ${where.join(' AND ')}
+                   GROUP BY DATE(start_time)
+                   ORDER BY d ASC`;
+      const rows = await this.all<any>(sql, params);
+      return rows.map(r => ({ date: r.d, avgDurationMs: Math.round(Number(r.avgDurationMs) || 0), builds: Number(r.builds) || 0 }));
+    });
+  }
+
+  async getAdoTaskBreakdown(days = 30, buildDefinitionId?: number): Promise<Array<{ taskName: string; runs: number; failures: number; avgDurationMs: number }>> {
+    const key = `adoTasks:${days}:${buildDefinitionId || 'all'}`;
+    return this.getOrSet(key, this.defaultTtl, async () => {
+      const params: any[] = [`-${days} days`];
+      let sql = `SELECT t.task_name as taskName,
+                        COUNT(*) as runs,
+                        SUM(CASE WHEN LOWER(COALESCE(t.result,'')) IN ('failed','error') THEN 1 ELSE 0 END) as failures,
+                        AVG(t.duration) as avgDurationMs
+                 FROM ado_build_tasks t
+                 JOIN ado_builds b ON b.ado_build_id = t.ado_build_id
+                 WHERE b.start_time >= datetime('now', ?)`;
+      if (buildDefinitionId) { sql += ` AND b.build_definition_id = ?`; params.push(buildDefinitionId); }
+      sql += ` GROUP BY t.task_name
+               HAVING runs > 0
+               ORDER BY failures DESC, avgDurationMs DESC
+               LIMIT 50`;
+      const rows = await this.all<any>(sql, params);
+      return rows.map(r => ({ taskName: r.taskName || 'Unknown Task', runs: Number(r.runs) || 0, failures: Number(r.failures) || 0, avgDurationMs: Math.round(Number(r.avgDurationMs) || 0) }));
+    });
+  }
+
+  async getAdoFailuresSummary(days = 30): Promise<Array<{ pipelineConfigId: number; branchName: string | null; totalFailures: number; newFailures: number; persistentFailures: number }>> {
+    return this.getOrSet(`adoFailSummary:${days}`, this.defaultTtl, async () => {
+      // Summarize failures by pipeline and branch; classify new vs persistent relative to window start
+      const window = `-${days} days`;
+      const rows = await this.all<any>(
+        `SELECT f.pipeline_config_id as pipelineConfigId,
+                COALESCE(f.branch_name, 'unknown') as branchName,
+                COUNT(*) as totalFailures,
+                SUM(CASE WHEN EXISTS (
+                      SELECT 1 FROM mvp_test_failures f2 
+                      WHERE f2.test_name = f.test_name AND f2.created_at < datetime('now', ?)
+                    ) THEN 1 ELSE 0 END) as persistentFailures,
+                SUM(CASE WHEN NOT EXISTS (
+                      SELECT 1 FROM mvp_test_failures f2 
+                      WHERE f2.test_name = f.test_name AND f2.created_at < datetime('now', ?)
+                    ) THEN 1 ELSE 0 END) as newFailures
+         FROM mvp_test_failures f
+         WHERE f.created_at >= datetime('now', ?)
+         GROUP BY f.pipeline_config_id, COALESCE(f.branch_name, 'unknown')
+         ORDER BY totalFailures DESC, persistentFailures DESC`,
+        [window, window, window]
+      );
+      return rows.map(r => ({
+        pipelineConfigId: Number(r.pipelineConfigId),
+        branchName: r.branchName,
+        totalFailures: Number(r.totalFailures) || 0,
+        newFailures: Number(r.newFailures) || 0,
+        persistentFailures: Number(r.persistentFailures) || 0,
+      }));
+    });
+  }
+
+  async getAdoThroughput(days = 14): Promise<{ points: Array<{ hour: string; builds: number }>; avgPerHour: number }>{
+    return this.getOrSet(`adoThroughput:${days}`, this.defaultTtl, async () => {
+      const rows = await this.all<any>(
+        `SELECT strftime('%Y-%m-%d %H:00:00', start_time) as hour, COUNT(*) as builds
+         FROM ado_builds
+         WHERE start_time >= datetime('now', ?)
+         GROUP BY strftime('%Y-%m-%d %H', start_time)
+         ORDER BY hour ASC`,
+        [`-${days} days`]
+      );
+      const points = rows.map(r => ({ hour: r.hour, builds: Number(r.builds) || 0 }));
+      const avgPerHour = points.length ? Math.round((points.reduce((a,c)=> a + c.builds, 0) / points.length) * 100) / 100 : 0;
+      return { points, avgPerHour };
+    });
+  }
 }
 
 export default AnalyticsIntelligenceService;

@@ -67,3 +67,19 @@ export interface NotificationRouting {
 export interface RemediationSuggestions {
   suggestions: string[]
 }
+
+// Azure-specific analytics
+export interface AdoPipelineHealthItem {
+  buildDefinitionId: number
+  definitionName: string
+  totalBuilds: number
+  passedBuilds: number
+  failedBuilds: number
+  successRate: number
+  avgDurationMs: number
+}
+
+export interface AdoDurationPoint { date: string; avgDurationMs: number; builds: number }
+export interface AdoTaskBreakdownItem { taskName: string; runs: number; failures: number; avgDurationMs: number }
+export interface AdoFailuresSummaryItem { pipelineConfigId: number; branchName: string | null; totalFailures: number; newFailures: number; persistentFailures: number }
+export interface AdoThroughput { points: Array<{ hour: string; builds: number }>; avgPerHour: number }

@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ValidatedInput, ValidationErrors } from '../ValidationComponents'
 import LoadingOverlay from '../LoadingOverlay'
+import GitHubDashboard from '../GitHubDashboard'
 
 interface GitHubTabProps {
   settings: {
@@ -27,6 +28,15 @@ const GitHubTab: React.FC<GitHubTabProps> = ({
   isLoading = false 
 }) => {
   const [branchInput, setBranchInput] = useState('')
+  const [showActionsPanel, setShowActionsPanel] = useState(true)
+
+  const { owner, repo } = useMemo(() => {
+    const parts = (settings.githubRepository || '').split('/')
+    return {
+      owner: parts[0] || '',
+      repo: parts[1] || ''
+    }
+  }, [settings.githubRepository])
 
   const handleTestConnection = async () => {
     if (testConnection) {
@@ -257,6 +267,30 @@ const GitHubTab: React.FC<GitHubTabProps> = ({
               'Test GitHub Connection'
             )}
           </button>
+        </div>
+      )}
+
+      {settings.githubEnabled && owner && repo && settings.githubToken && (
+        <div className="settings-section" style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ margin: 0 }}>GitHub Actions</h4>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={showActionsPanel}
+                onChange={(e) => setShowActionsPanel(e.target.checked)}
+              />
+              Show panel
+            </label>
+          </div>
+          <small className="setting-description">
+            View recent workflow runs and job details for {owner}/{repo}
+          </small>
+          {showActionsPanel && (
+            <div style={{ marginTop: 12 }}>
+              <GitHubDashboard owner={owner} repo={repo} token={settings.githubToken} embedded />
+            </div>
+          )}
         </div>
       )}
       </div>

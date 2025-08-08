@@ -9,7 +9,6 @@ import TestManagementPage from './pages/TestManagementPage'
 import UserManagementPage from './pages/UserManagementPage'
 import TabbedSettingsPage from './pages/TabbedSettingsPage'
 import FlakyTestsPage from './pages/FlakyTestsPage'
-import GitHubActionsPage from './pages/GitHubActionsPage'
 import AdvancedAnalyticsPage from './pages/AdvancedAnalyticsPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import './App.css'
@@ -51,7 +50,6 @@ function AppContent() {
             <Route path="/users" element={<UserManagementPage />} />
             <Route path="/settings" element={<TabbedSettingsPage />} />
             <Route path="/flaky-tests" element={<FlakyTestsPage />} />
-            <Route path="/github-actions" element={<GitHubActionsPage />} />
             <Route path="/analytics" element={<AdvancedAnalyticsPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </>
